@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
+/blob-report
+/e2e/.auth
+/.codex/audits/
 
 # next.js
 /.next/
@@ -23,6 +28,9 @@
 # misc
 .DS_Store
 *.pem
+*.py[cod]
+__pycache__/
+/.superpowers/
 
 # debug
 npm-debug.log*
