@@ -1,216 +1,111 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
-import { supabase } from "@/lib/supabase";
-import { 
-  User, 
-  Bot, 
-  Database, 
-  Settings as SettingsIcon, 
-  LogOut, 
-  Clipboard,
-  Check
-} from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { Bot, Check, Clipboard, Database, Eye, EyeOff, Globe2, LogOut, ShieldCheck, Smartphone, User, WalletCards, Wifi, WifiOff } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Surface } from "@/components/ui/Surface";
+import { maskUserIdentifier } from "@/lib/settings";
+import { getNetworkSnapshot, getServerNetworkSnapshot, subscribeToNetworkStatus } from "@/lib/pwa";
+import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const online = useSyncExternalStore(
+    subscribeToNetworkStatus,
+    getNetworkSnapshot,
+    getServerNetworkSnapshot,
+  );
+  const [standalone, setStandalone] = useState(false);
+  const copyTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email || null);
-        setUserId(user.id || null);
-      } else {
-        router.push("/login");
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { setLoading(false); if (navigator.onLine) router.push("/login"); return; }
+      setUserEmail(session.user.email ?? null);
+      setUserId(session.user.id);
+      setLoading(false);
     };
-    fetchUser();
+    void fetchUser();
   }, [router]);
 
-  const handleLogout = async () => {
+  useEffect(() => {
+    const displayQuery = window.matchMedia("(display-mode: standalone)");
+    const updateStandalone = () => setStandalone(displayQuery.matches || ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone)));
+    updateStandalone();
+    displayQuery.addEventListener("change", updateStandalone);
+    return () => {
+      displayQuery.removeEventListener("change", updateStandalone);
+      if (copyTimer.current) window.clearTimeout(copyTimer.current);
+    };
+  }, []);
+
+  async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
-  };
+  }
 
-  const copyUserId = () => {
+  async function copyUserId() {
     if (!userId) return;
-    navigator.clipboard.writeText(userId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(userId);
+      setCopied(true);
+      if (copyTimer.current) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => setCopied(false), 2_000);
+    } catch {
+      setCopyError("Identitas belum dapat disalin. Pilih tampilkan lalu salin manual.");
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-[#050507] text-[#f7f8f8] flex flex-col pb-24 md:pb-6 font-sans antialiased">
+    <div className="app-page">
       <Navbar />
+      <main className="app-page-content max-w-6xl space-y-5 sm:space-y-6">
+        <PageHeader eyebrow="Workspace settings" title="Pengaturan" description="Kelola sesi, periksa lingkungan aplikasi, dan hubungkan workflow Telegram dengan aman." />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#f7f8f8]">
-            Pengaturan
-          </h1>
-          <p className="text-xs text-[#8a8f98] mt-0.5">
-            Konfigurasi profil akun Anda dan petunjuk koneksi bot Telegram
-          </p>
-        </div>
+        <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
+          <div className="space-y-6">
+            <Surface className="p-5 sm:p-6">
+              <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><User className="h-5 w-5" /></span><div className="min-w-0"><p className="truncate text-sm font-bold">{loading ? "Memuat akun..." : userEmail || "Email tidak tersedia"}</p><p className="mt-0.5 text-xs text-slate-500">Pemilik workspace pribadi</p></div></div>
+              <div className="mt-5 rounded-xl bg-slate-50 p-3"><p className="flex items-center gap-2 text-xs font-bold text-slate-700"><ShieldCheck className="h-4 w-4 text-emerald-700" /> Sesi privat</p><p className="mt-1 text-xs leading-5 text-slate-500">Data keuangan hanya dibuka lewat akun terautentikasi ini.</p></div>
+              <Button variant="destructive" onClick={() => void handleLogout()} className="mt-5 w-full"><LogOut className="h-4 w-4" /> Keluar dari sesi</Button>
+            </Surface>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          
-          {/* Left Panel: Profile Info */}
-          <div className="md:col-span-1 space-y-4">
-            <div className="linear-panel p-5 rounded flex flex-col items-center text-center space-y-4">
-              <div className="w-12 h-12 rounded bg-violet-600/10 border border-violet-500/20 flex items-center justify-center">
-                <User className="w-6 h-6 text-violet-400" />
-              </div>
-
-              <div className="space-y-0.5 w-full">
-                <h4 className="font-bold text-white text-sm truncate">{userEmail || "Memuat..."}</h4>
-                <p className="text-[9px] text-[#8a8f98] font-bold uppercase tracking-wider">Pemilik Akun</p>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="w-full py-2 bg-rose-950/20 hover:bg-rose-900/40 border border-rose-900/30 text-rose-400 text-xs font-bold rounded transition-all cursor-pointer flex items-center justify-center gap-1.5 click-active"
-              >
-                <LogOut className="w-4 h-4" />
-                Keluar Sesi
-              </button>
-            </div>
-
-            {/* Quick config stats */}
-            <div className="linear-panel p-4.5 rounded space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#8a8f98] flex items-center gap-1.5 border-b border-neutral-900 pb-1.5">
-                <SettingsIcon className="w-3.5 h-3.5 text-[#5e6ad2]" />
-                Sistem FinTrack
-              </h4>
-              <div className="text-[11px] space-y-2 text-[#d0d6e0] font-medium">
-                <div className="flex justify-between">
-                  <span className="text-[#8a8f98]">Mata Uang:</span>
-                  <span>IDR (Rupiah - Rp)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#8a8f98]">Mode:</span>
-                  <span className="text-emerald-400">Pribadi (Single User)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#8a8f98]">Versi:</span>
-                  <span>v1.0.0 (MVP)</span>
-                </div>
-              </div>
-            </div>
+            <Surface className="overflow-hidden">
+              <div className="border-b border-emerald-100 px-5 py-4"><h2 className="text-sm font-bold">Lingkungan aplikasi</h2><p className="mt-1 text-xs text-slate-500">Konfigurasi aktif pada perangkat ini.</p></div>
+              <dl className="divide-y divide-slate-100 px-5"><SystemRow icon={WalletCards} label="Mata uang utama" value="IDR · Rupiah" /><SystemRow icon={Globe2} label="Zona waktu" value="Asia/Jakarta" /><SystemRow icon={Smartphone} label="Mode tampilan" value={standalone ? "Aplikasi terpasang" : "Browser"} /><SystemRow icon={online ? Wifi : WifiOff} label="Koneksi" value={online ? "Online" : "Offline"} tone={online ? "text-emerald-700" : "text-amber-700"} /></dl>
+            </Surface>
           </div>
 
-          {/* Right Panel: Telegram Bot Integration Guide */}
-          <div className="md:col-span-2 space-y-4">
-            
-            {/* User ID Card for n8n */}
-            <div className="linear-panel p-5 rounded space-y-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 text-white">
-                <Database className="w-4.5 h-4.5 text-[#5e6ad2]" />
-                Kredensial Integrasi n8n
-              </h3>
-              
-              <p className="text-xs text-[#8a8f98] leading-relaxed">
-                Untuk menghubungkan bot Telegram di n8n dengan database Supabase, gunakan **Supabase User ID** Anda di bawah ini pada konfigurasi variabel lingkungan n8n Anda (`SUPABASE_USER_ID`).
-              </p>
+          <div className="space-y-6">
+            <Surface className="p-5 sm:p-6">
+              <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Database className="h-5 w-5" /></span><div><h2 className="text-base font-bold">Identitas integrasi</h2><p className="mt-1 text-xs leading-5 text-slate-500">Gunakan Supabase User ID ini untuk mengikat workflow n8n ke pemilik data yang benar.</p></div></div>
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><code className="min-w-0 truncate text-xs font-semibold text-slate-700">{revealed ? userId || "Memuat identitas..." : maskUserIdentifier(userId)}</code><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" className="h-9 min-h-9 w-9" onClick={() => setRevealed((value) => !value)} aria-label={revealed ? "Sembunyikan User ID" : "Tampilkan User ID"}>{revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button><Button variant="secondary" size="compact" onClick={() => void copyUserId()} disabled={!userId}>{copied ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : <Clipboard className="h-3.5 w-3.5" />} {copied ? "Tersalin" : "Salin"}</Button></div></div></div>
+              {copyError && <p role="alert" className="mt-2 text-xs text-rose-700">{copyError}</p>}
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"><p className="text-xs font-bold text-amber-900">Jaga batas kredensial</p><p className="mt-1 text-xs leading-5 text-amber-800/80">Anon key boleh dipakai client dengan RLS aktif. Jangan pernah menaruh service-role key di browser, Telegram, atau workflow yang dapat dibaca publik.</p></div>
+            </Surface>
 
-              <div className="space-y-1">
-                <label className="text-[9px] text-[#8a8f98] font-bold ml-0.5 uppercase tracking-wider">Supabase User ID Anda</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    readOnly
-                    value={userId || "Memuat..."}
-                    className="w-full pl-3.5 pr-10 py-2.5 bg-[#050507] border border-[#202024] rounded text-neutral-300 text-xs font-mono select-all focus:outline-none"
-                  />
-                  <button
-                    onClick={copyUserId}
-                    disabled={!userId}
-                    className="absolute right-2 top-2 p-1 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Clipboard className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Step-by-Step Guide */}
-            <div className="linear-panel p-5 rounded space-y-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 text-white">
-                <Bot className="w-4.5 h-4.5 text-[#5e6ad2]" />
-                Panduan Integrasi Bot Telegram
-              </h3>
-
-              <div className="space-y-4 text-xs leading-relaxed text-[#d0d6e0]">
-                <div className="flex gap-3">
-                  <div className="w-5.5 h-5.5 rounded bg-violet-600/10 border border-violet-500/25 flex items-center justify-center text-violet-400 font-bold shrink-0 text-xs">
-                    1
-                  </div>
-                  <div className="space-y-0.5">
-                    <h5 className="font-bold text-white">Buat Bot Telegram di @BotFather</h5>
-                    <p className="text-[#8a8f98]">
-                      Cari user <span className="text-[#5e6ad2] font-semibold">@BotFather</span> di Telegram, ketik `/newbot`, ikuti petunjuknya, lalu salin **Telegram Bot Token** yang diberikan.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-5.5 h-5.5 rounded bg-violet-600/10 border border-violet-500/25 flex items-center justify-center text-violet-400 font-bold shrink-0 text-xs">
-                    2
-                  </div>
-                  <div className="space-y-0.5">
-                    <h5 className="font-bold text-white">Dapatkan Chat/User ID Telegram Anda</h5>
-                    <p className="text-[#8a8f98]">
-                      Cari user <span className="text-[#5e6ad2] font-semibold">@userinfobot</span> di Telegram, kirim pesan apa saja, lalu salin User ID Anda. User ID ini digunakan untuk whitelist agar orang lain tidak bisa memakai bot Anda.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-5.5 h-5.5 rounded bg-violet-600/10 border border-violet-500/25 flex items-center justify-center text-violet-400 font-bold shrink-0 text-xs">
-                    3
-                  </div>
-                  <div className="space-y-0.5">
-                    <h5 className="font-bold text-white">Konfigurasi Environment Variables di n8n</h5>
-                    <p className="text-[#8a8f98]">
-                      Pasang variabel berikut pada file `.env` di VPS/Docker n8n Anda atau di Credentials n8n:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 mt-1 font-mono text-[10px] text-violet-400">
-                      <li>TELEGRAM_ALLOWED_USER_ID = (User ID Langkah 2)</li>
-                      <li>GEMINI_API_KEY = (Kunci API gratis dari Google AI Studio)</li>
-                      <li>SUPABASE_URL = (URL Proyek Supabase Anda)</li>
-                      <li>SUPABASE_ANON_KEY = (Kunci Anon Supabase Anda)</li>
-                      <li>SUPABASE_USER_ID = (User ID Langkah 1 di atas)</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-5.5 h-5.5 rounded bg-violet-600/10 border border-violet-500/25 flex items-center justify-center text-violet-400 font-bold shrink-0 text-xs">
-                    4
-                  </div>
-                  <div className="space-y-0.5">
-                    <h5 className="font-bold text-white">Import Workflow & Aktifkan</h5>
-                    <p className="text-[#8a8f98]">
-                      Import file JSON di folder `n8n/` proyek Anda ke n8n. Hubungkan Telegram credential Anda di node pemicu, lalu aktifkan workflow. Sekarang bot Anda siap digunakan!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            <Surface className="overflow-hidden">
+              <div className="border-b border-emerald-100 px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Bot className="h-5 w-5" /></span><div><h2 className="text-base font-bold">Hubungkan bot Telegram</h2><p className="mt-1 text-xs text-slate-500">Empat langkah dari bot baru sampai workflow aktif.</p></div></div></div>
+              <div className="divide-y divide-slate-100 px-5"><SetupStep number="1" title="Buat bot melalui BotFather">Buka akun resmi <code className="font-bold text-emerald-700">@BotFather</code>, jalankan <code>/newbot</code>, lalu simpan token di credential n8n—bukan di source code.</SetupStep><SetupStep number="2" title="Batasi pengguna Telegram">Ambil Telegram User ID Anda melalui bot informasi akun, lalu gunakan sebagai allowlist agar bot pribadi tidak dapat dipakai orang lain.</SetupStep><SetupStep number="3" title="Atur environment n8n"><VariableList items={["TELEGRAM_ALLOWED_USER_ID", "GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_USER_ID"]} /></SetupStep><SetupStep number="4" title="Import dan aktifkan workflow">Import workflow dari folder <code className="font-bold text-emerald-700">n8n/</code>, hubungkan Telegram credential, uji satu transaksi, lalu aktifkan workflow.</SetupStep></div>
+            </Surface>
           </div>
-
         </div>
-
       </main>
     </div>
   );
 }
+
+function SystemRow({ icon: Icon, label, value, tone = "text-slate-700" }: { icon: typeof WalletCards; label: string; value: string; tone?: string }) { return <div className="flex items-center justify-between gap-3 py-3.5"><dt className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Icon className="h-4 w-4 text-emerald-700" /> {label}</dt><dd className={`text-right text-xs font-bold ${tone}`}>{value}</dd></div>; }
+function SetupStep({ number, title, children }: { number: string; title: string; children: React.ReactNode }) { return <article className="flex gap-3 py-5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-700">{number}</span><div><h3 className="text-sm font-bold">{title}</h3><div className="mt-1 text-xs leading-5 text-slate-500">{children}</div></div></article>; }
+function VariableList({ items }: { items: string[] }) { return <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">{items.map((item) => <li key={item}><code className="block rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] font-semibold text-slate-700">{item}</code></li>)}</ul>; }
