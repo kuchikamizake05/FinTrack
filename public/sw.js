@@ -1,60 +1,67 @@
-const CACHE_NAME = "fintrack-cache-v2";
-const urlsToCache = [
-  "/manifest.json",
+const STATIC_CACHE = "fintrack-static-v6";
+const PAGE_CACHE = "fintrack-pages-v6";
+const PRECACHE_URLS = [
+  "/offline",
+  "/manifest.webmanifest",
   "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  "/icons/icon-512.png",
 ];
 
-// Perform install
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log("Service Worker: Caching Files");
-      return cache.addAll(urlsToCache);
-    })
-  );
+  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)));
 });
 
-// Cache and return requests
-self.addEventListener("fetch", (event) => {
-  // Never cache Next.js documents. App Router navigation and HMR must always
-  // reach the network, otherwise a stale document can trigger reload loops.
-  if (event.request.mode === "navigate") {
-    return;
-  }
-
-  // Only cache same-origin static GET requests.
-  if (event.request.method !== "GET" || !event.request.url.startsWith(self.location.origin)) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response; // Return cached file
-      }
-      return fetch(event.request); // Fetch from network
-    })
-  );
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
-// Update service worker
 self.addEventListener("activate", (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    Promise.all([
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log("Service Worker: Clearing Old Cache");
-            return caches.delete(cacheName);
+    caches.keys()
+      .then((names) => Promise.all(names.filter((name) => name.startsWith("fintrack-") && ![STATIC_CACHE, PAGE_CACHE].includes(name)).map((name) => caches.delete(name))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET" || !request.url.startsWith(self.location.origin)) return;
+
+  if (request.mode === "navigate") {
+    const offlineFallback = () => caches.match("/offline").then((response) => (
+      response || new Response("FinTrack sedang offline.", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      })
+    ));
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (!response.ok && self.navigator.onLine === false) return offlineFallback();
+          if (response.ok && new URL(request.url).pathname === "/offline") {
+            const copy = response.clone();
+            void caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
           }
+          return response;
         })
-      );
-      }),
-      self.clients.claim(),
-    ])
+        .catch(offlineFallback),
+    );
+    return;
+  }
+
+  const destination = request.destination;
+  if (!["style", "script", "font", "image"].includes(destination)) return;
+  event.respondWith(
+    caches.match(request).then(async (cached) => {
+      const refresh = () => fetch(request).then((response) => {
+        if (response.ok) void caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
+        return response;
+      });
+      if (cached) {
+        event.waitUntil(refresh().then(() => undefined).catch(() => undefined));
+        return cached;
+      }
+      return refresh();
+    }),
   );
 });
