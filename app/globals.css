@@ -56,21 +56,58 @@
   --radius: 0.5rem;                  /* 8px compact technical border radius */
 }
 
+html {
+  min-height: 100%;
+  background: #f7faf7;
+}
+
 /* Base style overrides */
 body {
   background: linear-gradient(180deg, #dcf7e5 0, #f4fbf6 300px, #ffffff 680px) fixed;
   color: hsl(var(--foreground));
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   min-height: 100vh;
+  min-height: 100svh;
   overflow-x: hidden;
   letter-spacing: -0.01em;
+}
+
+/* Shared feature-page rhythm. The dashboard remains intentionally bespoke,
+   while secondary screens inherit the same mint atmosphere and mobile density. */
+.app-page {
+  min-height: 100vh;
+  min-height: 100svh;
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 92% 2%, rgba(187, 247, 208, 0.34), transparent 24rem),
+    linear-gradient(180deg, #e9f8ee 0, #f7fbf8 21rem, #f8faf9 100%);
+  color: #0f172a;
+}
+
+.app-page-content {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 1.25rem 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .app-page-content {
+    padding: 2rem 1.5rem 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-page {
+    padding-bottom: 2.5rem;
+  }
 }
 
 /* Bright, bank-like surfaces: clear hierarchy without an AI-dashboard feel. */
 .linear-panel {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 6px 20px rgba(31, 47, 78, 0.06);
+  box-shadow: 0 2px 12px rgba(31, 47, 78, 0.05);
   position: relative;
 }
 
@@ -103,6 +140,11 @@ main :is(p, span, td, th, label, li).text-neutral-200,
 main :is(p, span, td, th, label, li).text-neutral-300 { color: #42526b !important; }
 main :is(input, textarea, select).text-white { color: #17233b !important; }
 main :is(input, textarea, select) { caret-color: #15803d; }
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: 3px;
+}
 
 /* Warning and error text was originally tuned for the dark interface.
    Keep it legible against the bright alert surfaces. */

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import AppBoundary from "@/components/AppBoundary";
+import OnboardingBoundary from "@/components/OnboardingBoundary";
 import PWARegister from "@/components/PWARegister";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -10,13 +12,24 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#030604",
+  themeColor: "#15803d",
+  colorScheme: "light",
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
   title: "FinTrack - Personal Finance Dashboard",
-  description: "Asisten Keuangan Pribadi Berbasis Chat Bot Telegram & PWA Dashboard",
-  manifest: "/manifest.json",
+  description: "Pantau arus kas, investasi, dan trading dalam satu ruang keuangan pribadi yang tenang.",
+  applicationName: "FinTrack",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "FinTrack" },
 };
 
 export default function RootLayout({
@@ -25,13 +38,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${jetbrainsMono.variable} h-full antialiased dark`}>
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      </head>
-      <body className="min-h-full flex flex-col bg-[#030604] text-[#f6f8f6] font-sans">
+    <html lang="id" className={`${jetbrainsMono.variable} h-full antialiased`}>
+      <head />
+      <body className="flex min-h-full flex-col bg-[#f7faf7] font-sans text-slate-900">
         <PWARegister />
-        {children}
+        <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
       </body>
     </html>
   );
