@@ -4,6 +4,47 @@ export type MonthlyAccountTransaction = {
   amount: number;
 };
 
+export type CashFlowTransaction = {
+  date: string;
+  type: "income" | "expense";
+  amount: number;
+};
+
+export function buildCumulativeCashFlowSeries(
+  transactions: CashFlowTransaction[],
+  sampleDays: number[],
+  monthLabel = "Jul",
+) {
+  const daily = new Map<number, { income: number; expense: number }>();
+
+  for (const transaction of transactions) {
+    const day = Number(transaction.date.slice(8, 10));
+    if (!Number.isInteger(day) || day < 1 || day > 31) continue;
+
+    const current = daily.get(day) || { income: 0, expense: 0 };
+    current[transaction.type] += Math.max(0, Number(transaction.amount) || 0);
+    daily.set(day, current);
+  }
+
+  let income = 0;
+  let expense = 0;
+  let previousDay = 0;
+
+  return [...sampleDays]
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 31)
+    .sort((a, b) => a - b)
+    .map((day) => {
+      for (let currentDay = previousDay + 1; currentDay <= day; currentDay += 1) {
+        const totals = daily.get(currentDay);
+        income += totals?.income || 0;
+        expense += totals?.expense || 0;
+      }
+      previousDay = day;
+
+      return { day, label: `${day} ${monthLabel}`, income, expense };
+    });
+}
+
 export function getTimeGreeting(hour: number) {
   if (hour < 11) return "Selamat pagi";
   if (hour < 15) return "Selamat siang";

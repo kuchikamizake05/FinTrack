@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCumulativeCashFlowSeries,
   calculateAccountMonthlyMovement,
   calculateGoalProgress,
   getTimeGreeting,
@@ -39,5 +40,26 @@ describe("home dashboard helpers", () => {
 
     expect(movement.get("jago")).toBe(2_250_000);
     expect(movement.get("bri")).toBe(-200_000);
+  });
+
+  it("builds cumulative cash-flow points across sparse transaction days", () => {
+    expect(buildCumulativeCashFlowSeries([
+      { date: "2026-07-01", type: "income", amount: 5_000_000 },
+      { date: "2026-07-07", type: "expense", amount: 750_000 },
+      { date: "2026-07-10", type: "income", amount: 2_000_000 },
+      { date: "2026-07-13", type: "expense", amount: 250_000 },
+    ], [1, 7, 13])).toEqual([
+      { day: 1, label: "1 Jul", income: 5_000_000, expense: 0 },
+      { day: 7, label: "7 Jul", income: 5_000_000, expense: 750_000 },
+      { day: 13, label: "13 Jul", income: 7_000_000, expense: 1_000_000 },
+    ]);
+  });
+
+  it("returns stable zero-value cash-flow points when the month is empty", () => {
+    expect(buildCumulativeCashFlowSeries([], [1, 15, 31])).toEqual([
+      { day: 1, label: "1 Jul", income: 0, expense: 0 },
+      { day: 15, label: "15 Jul", income: 0, expense: 0 },
+      { day: 31, label: "31 Jul", income: 0, expense: 0 },
+    ]);
   });
 });
