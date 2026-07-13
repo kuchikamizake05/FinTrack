@@ -1,0 +1,350 @@
+{
+  "name": "FinTrack - Telegram Text Transaction",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "52857007-00b8-472e-8a24-17796dcf982e",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        380,
+        240
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.from.id.toString() }}",
+              "value2": "={{ $env.TELEGRAM_ALLOWED_USER_ID }}"
+            }
+          ]
+        }
+      },
+      "id": "a671239c-5dcd-4b10-be01-7ef4a1ff9195",
+      "name": "Check Whitelist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        600,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Maaf, bot ini hanya untuk pemakaian pribadi.",
+        "additionalFields": {}
+      },
+      "id": "2fe95b3d-1a48-4cb2-8700-6cb4a7065961",
+      "name": "Send Unauthorized Msg",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        800,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.text }}",
+              "operation": "startsWith",
+              "value2": "/"
+            }
+          ]
+        }
+      },
+      "id": "3b4f62ce-412e-4b68-b80c-7b44747db8ab",
+      "name": "Is Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        820,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.message.text }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "/start",
+              "output": 0
+            },
+            {
+              "value2": "/help",
+              "output": 0
+            },
+            {
+              "value2": "/today",
+              "output": 1
+            },
+            {
+              "value2": "/month",
+              "output": 2
+            },
+            {
+              "value2": "/categories",
+              "output": 3
+            }
+          ]
+        },
+        "fallbackOutput": 0
+      },
+      "id": "893c834a-9b43-4ce4-8fa2-3788292c735d",
+      "name": "Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Kamu adalah parser transaksi keuangan pribadi.\\n\\nUbah pesan user menjadi JSON transaksi.\\nBalas HANYA dalam JSON valid tanpa markdown (jangan gunakan ```json atau penutup apa pun).\\n\\nTanggal hari ini: {{ $today }}\\n\\nInput user:\\n{{ $json.message.text }}\\n\\nFormat JSON:\\n{\\n  \\\"date\\\": \\\"YYYY-MM-DD\\\",\\n  \\\"merchant\\\": string | null,\\n  \\\"type\\\": \\\"income\\\" | \\\"expense\\\",\\n  \\\"category\\\": string,\\n  \\\"amount\\\": number,\\n  \\\"note\\\": string,\\n  \\\"confidence\\\": number\\n}\\n\\nAturan:\\n- Jika tidak ada indikasi pemasukan, default type adalah expense.\\n- Jika ada kata gaji, bonus, freelance, refund, transfer masuk, maka type income.\\n- Nominal harus angka tanpa simbol Rp atau titik ribuan.\\n- Pilih kategori paling sesuai dari: Makanan & Minuman, Transportasi, Belanja Harian, Tagihan, Hiburan, Kesehatan, Pendidikan, Rumah, Pekerjaan, Gaji, Freelance, Lainnya.\\n- Jika kategori tidak jelas, gunakan \\\"Lainnya\\\".\\n- Jika tanggal tidak disebut, gunakan tanggal hari ini.\\n- Jangan menambahkan teks selain JSON.\"\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {}
+      },
+      "id": "270dbb09-cf80-4966-9ab5-7d8481358cc1",
+      "name": "Gemini Text Parser",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1040,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const geminiText = items[0].json.candidates[0].content.parts[0].text;\nconst parsedData = JSON.parse(geminiText);\n\n// Cari category_id berdasarkan nama category yang dikembalikan Gemini\n// (Mapping default)\nconst categoriesMap = {\n  'Makanan & Minuman': 'Makanan & Minuman',\n  'Transportasi': 'Transportasi',\n  'Belanja Harian': 'Belanja Harian',\n  'Tagihan': 'Tagihan',\n  'Hiburan': 'Hiburan',\n  'Kesehatan': 'Kesehatan',\n  'Pendidikan': 'Pendidikan',\n  'Rumah': 'Rumah',\n  'Pekerjaan': 'Pekerjaan',\n  'Gaji': 'Gaji',\n  'Freelance': 'Freelance',\n  'Lainnya': 'Lainnya'\n};\n\nreturn [{\n  json: {\n    date: parsedData.date,\n    type: parsedData.type || 'expense',\n    merchant: parsedData.merchant || null,\n    category_name: categoriesMap[parsedData.category] || 'Lainnya',\n    amount: parsedData.amount,\n    note: parsedData.note || null,\n    ai_confidence: parsedData.confidence || 1.0,\n    source: 'telegram_text',\n    status: (parsedData.confidence && parsedData.confidence < 0.8) ? 'pending_approval' : 'confirmed'\n  }\n}];"
+      },
+      "id": "e0b59b34-8c88-46c5-a6e4-4d8dbcbcd58c",
+      "name": "Parse Gemini JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/transactions",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"user_id\": \"{{ $env.SUPABASE_USER_ID }}\",\n  \"date\": \"{{ $json.date }}\",\n  \"type\": \"{{ $json.type }}\",\n  \"merchant\": \"{{ $json.merchant }}\",\n  \"category\": \"{{ $json.category_name }}\",\n  \"amount\": {{ $json.amount }},\n  \"note\": \"{{ $json.note }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"ai_confidence\": {{ $json.ai_confidence }},\n  \"status\": \"{{ $json.status }}\",\n  \"telegram_message_id\": \"{{ $('Telegram Trigger').item.json.message.message_id }}\"\n}",
+        "options": {}
+      },
+      "id": "1c74829d-4e9b-4395-92c9-9488a032c021",
+      "name": "Insert Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1440,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Tercatat ✅\n\nNominal: Rp{{ $json[0].amount.toLocaleString('id-ID') }}\nTipe: {{ $json[0].type === 'expense' ? 'Pengeluaran 🔴' : 'Pemasukan 🟢' }}\nKategori: {{ $json[0].category }}\nCatatan: {{ $json[0].note || '-' }}\nStatus: {{ $json[0].status === 'confirmed' ? 'Dikonfirmasi' : 'Perlu Review di Dashboard' }}",
+        "additionalFields": {}
+      },
+      "id": "12eb929d-7dbd-46e3-ae30-fa89e52dc00a",
+      "name": "Send Confirmation Bot",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        500
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Halo! Saya adalah FinTrack Bot.\n\nKirimkan transaksi Anda langsung lewat chat, contoh:\n- kopi 25000\n- makan siang nasi goreng 35000\n- gaji bulanan 5000000\n\nAtau Anda bisa mengirimkan foto struk belanja Anda untuk saya catat otomatis. Kelola detail lengkapnya di dashboard PWA Anda!",
+        "additionalFields": {}
+      },
+      "id": "92f70b43-4a11-40be-bd38-7cf5bfa02cb1",
+      "name": "Send Help Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Whitelist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Whitelist": {
+      "main": [
+        [
+          {
+            "node": "Is Command?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unauthorized Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Command?": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gemini Text Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Router": {
+      "main": [
+        [
+          {
+            "node": "Send Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Text Parser": {
+      "main": [
+        [
+          {
+            "node": "Parse Gemini JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Gemini JSON": {
+      "main": [
+        [
+          {
+            "node": "Insert Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fintrack-text-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

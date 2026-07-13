@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-plus-jakarta), var(--font-outfit), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 6px);
+}
+
+:root {
+  --background: 150 20% 3%;          /* #030604 - deep forest/obsidian canvas */
+  --foreground: 150 10% 98%;         /* #f6f8f6 - crisp white ink with green undertone */
+  --card: 150 15% 6%;                /* #080d0a - rich forest surface-1 */
+  --card-foreground: 150 10% 98%;
+  --popover: 150 15% 6%;
+  --popover-foreground: 150 10% 98%;
+  --primary: 157 100% 38%;           /* #00c278 - vibrant emerald green */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 10% 12%;          /* #1a221d - deep forest gray surface-2 */
+  --secondary-foreground: 150 10% 98%;
+  --muted: 150 10% 12%;
+  --muted-foreground: 150 8% 65%;    /* #8fa096 - muted mint text */
+  --accent: 150 10% 12%;
+  --accent-foreground: 150 10% 98%;
+  --destructive: 350 75% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 150 10% 14%;             /* #202b24 - slate-emerald precise hairline */
+  --input: 150 10% 14%;
+  --ring: 157 100% 38%;
+  --radius: 0.5rem;                  /* 8px compact technical border radius */
+}
+
+/* Base style overrides */
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  min-height: 100vh;
+  overflow-x: hidden;
+  letter-spacing: -0.015em;
+}
+
+/* Technical precise panel styling with emerald undertones */
+.linear-panel {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.linear-card {
+  background-color: rgba(8, 13, 10, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.linear-card:hover {
+  background-color: rgba(16, 26, 20, 0.65);
+  border-color: rgba(0, 194, 120, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 194, 120, 0.25);
+}
+
+/* Click feedback scaling */
+.click-active {
+  transition: transform 0.1s ease;
+}
+
+.click-active:active {
+  transform: scale(0.98);
+}

@@ -1,0 +1,435 @@
+{
+  "name": "FinTrack - Telegram Receipt OCR",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "e2ba96b4-47ef-46e3-863a-b8519de5641a",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        240
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.from.id.toString() }}",
+              "value2": "={{ $env.TELEGRAM_ALLOWED_USER_ID }}"
+            }
+          ]
+        }
+      },
+      "id": "d1d80b7c-3f2d-45db-91b5-55ff2c8d2345",
+      "name": "Check Whitelist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        420,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Maaf, bot ini hanya untuk pemakaian pribadi.",
+        "additionalFields": {}
+      },
+      "id": "a1b415a7-96a8-4e1b-8521-125acb2b4122",
+      "name": "Send Unauthorized Msg",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        620,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !!$json.message.photo || !!$json.message.document }}"
+            }
+          ]
+        }
+      },
+      "id": "2b30e4fe-98de-44a1-872f-524bc166df87",
+      "name": "Has Photo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getFile",
+        "fileId": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : $json.message.document.file_id }}"
+      },
+      "id": "d0e12d4a-5fce-4c12-870b-93fe61a0212f",
+      "name": "Telegram Get File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        860,
+        340
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pertahankan binary agar node upload dapat mengirim berkas asli ke Supabase.\nconst binaryProperty = Object.keys(items[0].binary || {})[0];\nif (!binaryProperty) throw new Error('Telegram tidak mengirim binary image data');\n\nconst binaryData = items[0].binary[binaryProperty];\nconst base64Data = binaryData.data;\nconst mimeType = binaryData.mimeType || 'image/jpeg';\nconst fileName = binaryData.fileName || `receipt_${Date.now()}.jpg`;\n\nreturn [{\n  json: { base64Data, mimeType, fileName },\n  binary: items[0].binary,\n  pairedItem: { item: 0 }\n}];"
+      },
+      "id": "119ad5d9-482a-43cf-ac5e-7a0e3a649bc8",
+      "name": "Extract Image Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/receipts-temp/{{ $json.fileName }}",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "={{ $json.mimeType }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "cb12ef09-2425-41ef-bb67-548fe53bb129",
+      "name": "Upload to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1260,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Kamu adalah sistem OCR dan parser struk belanja Indonesia.\\n\\nBaca gambar struk ini dan ekstrak informasi transaksi.\\nBalas HANYA dalam JSON valid tanpa markdown (jangan gunakan ```json atau penutup apa pun).\\n\\nFormat JSON:\\n{\\n  \\\"date\\\": \\\"YYYY-MM-DD\\\",\\n  \\\"merchant\\\": string | null,\\n  \\\"type\\\": \\\"expense\\\",\\n  \\\"category\\\": string,\\n  \\\"amount\\\": number,\\n  \\\"items\\\": [\\n    {\\n      \\\"name\\\": string,\\n      \\\"qty\\\": number | null,\\n      \\\"price\\\": number | null\\n    }\\n  ],\\n  \\\"payment_method\\\": string | null,\\n  \\\"raw_text\\\": string,\\n  \\\"confidence\\\": number\\n}\\n\\nAturan:\\n- Gunakan Rupiah.\\n- amount adalah total akhir yang dibayar.\\n- Jangan gunakan subtotal jika ada total akhir.\\n- Jika tanggal tidak terlihat, gunakan null.\\n- Jika merchant tidak terlihat, gunakan null.\\n- Jika item tidak terbaca, gunakan array kosong.\\n- Pilih kategori paling sesuai dari: Makanan & Minuman, Transportasi, Belanja Harian, Tagihan, Hiburan, Kesehatan, Pendidikan, Rumah, Pekerjaan, Lainnya.\\n- confidence bernilai 0 sampai 1.\\n- Jangan menambahkan teks selain JSON.\"\n        },\n        {\n          \"inlineData\": {\n            \"mimeType\": \"{{ $json.mimeType }}\",\n            \"data\": \"{{ $json.base64Data }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ea49b9c0-bd6c-482a-a92c-619ab4bc268d",
+      "name": "Gemini Vision OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1260,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const geminiText = items[0].json.candidates[0].content.parts[0].text;\nconst parsedData = JSON.parse(geminiText);\n\n// Ambil file path untuk simpan ke database\nconst uploadResult = $('Upload to Supabase Storage').first().json;\nconst receiptUrl = uploadResult ? uploadResult.Key || uploadResult.path : null;\n\nreturn [{\n  json: {\n    date: parsedData.date || new Date().toISOString().split('T')[0],\n    type: 'expense',\n    merchant: parsedData.merchant || null,\n    category_name: parsedData.category || 'Belanja Harian',\n    amount: parsedData.amount || 0,\n    note: `Struk di ${parsedData.merchant || 'Merchant'}`,\n    ai_confidence: parsedData.confidence || 0.8,\n    source: 'telegram_receipt',\n    receipt_url: receiptUrl,\n    raw_text: parsedData.raw_text || geminiText,\n    status: (parsedData.confidence && parsedData.confidence >= 0.85) ? 'confirmed' : 'pending_approval',\n    items: parsedData.items || []\n  }\n}];"
+      },
+      "id": "e4ad9b30-6cbd-49a8-9dbe-271ab11b3bc2",
+      "name": "Parse OCR JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/transactions",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"user_id\": \"{{ $env.SUPABASE_USER_ID }}\",\n  \"date\": \"{{ $json.date }}\",\n  \"type\": \"{{ $json.type }}\",\n  \"merchant\": \"{{ $json.merchant }}\",\n  \"category\": \"{{ $json.category_name }}\",\n  \"amount\": {{ $json.amount }},\n  \"note\": \"{{ $json.note }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"receipt_url\": \"{{ $json.receipt_url }}\",\n  \"raw_text\": \"{{ $json.raw_text }}\",\n  \"ai_confidence\": {{ $json.ai_confidence }},\n  \"status\": \"{{ $json.status }}\",\n  \"telegram_message_id\": \"{{ $('Telegram Trigger').item.json.message.message_id }}\"\n}",
+        "options": {}
+      },
+      "id": "db81a942-d67b-402a-9cb8-f4581c7bc002",
+      "name": "Insert Supabase Tx",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Siapkan item belanjaan untuk di-insert ke transaction_items\nconst tx = $('Insert Supabase Tx').first().json[0];\nconst ocrData = $('Parse OCR JSON').first().json;\n\nif (!ocrData.items || ocrData.items.length === 0) {\n  return [];\n}\n\nconst itemsToInsert = ocrData.items.map(item => ({\n  transaction_id: tx.id,\n  name: item.name,\n  qty: item.qty || 1,\n  price: item.price || 0\n}));\n\nreturn itemsToInsert.map(item => ({ json: item }));"
+      },
+      "id": "ca1d92bf-4efc-46a2-98ab-102bc0f70a1a",
+      "name": "Map Transaction Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/transaction_items",
+        "sendHeaders": true,
+        "headers": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.all().map(item => item.json)) }}",
+        "options": {}
+      },
+      "id": "cb1c834a-9b43-4ce4-8fa2-3788292c735d",
+      "name": "Insert Supabase Items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2080,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Struk Terbaca 🧾\n\nMerchant: {{ $('Insert Supabase Tx').first().json[0].merchant || '-' }}\nTotal Belanja: Rp{{ $('Insert Supabase Tx').first().json[0].amount.toLocaleString('id-ID') }}\nKategori: {{ $('Insert Supabase Tx').first().json[0].category }}\nStatus: {{ $('Insert Supabase Tx').first().json[0].status === 'confirmed' ? 'Otomatis Dikonfirmasi' : 'Pending (Perlu Persetujuan di Dashboard)' }}\n\nItem Terbaca:\n{{ $('Parse OCR JSON').first().json.items.map(i => `- ${i.name} (x${i.qty || 1}): Rp${(i.price || 0).toLocaleString('id-ID')}`).join('\\n') }}",
+        "additionalFields": {}
+      },
+      "id": "1c74829d-4e9b-4395-92c9-9488a032c029",
+      "name": "Send OCR Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2300,
+        460
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred-id",
+          "name": "FinTrack Bot Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Whitelist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Whitelist": {
+      "main": [
+        [
+          {
+            "node": "Has Photo?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unauthorized Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Photo?": {
+      "main": [
+        [
+          {
+            "node": "Telegram Get File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Get File": {
+      "main": [
+        [
+          {
+            "node": "Extract Image Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image Base64": {
+      "main": [
+        [
+          {
+            "node": "Upload to Supabase Storage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini Vision OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Vision OCR": {
+      "main": [
+        [
+          {
+            "node": "Parse OCR JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse OCR JSON": {
+      "main": [
+        [
+          {
+            "node": "Insert Supabase Tx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Supabase Tx": {
+      "main": [
+        [
+          {
+            "node": "Map Transaction Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Transaction Items": {
+      "main": [
+        [
+          {
+            "node": "Insert Supabase Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Supabase Items": {
+      "main": [
+        [
+          {
+            "node": "Send OCR Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fintrack-ocr-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
