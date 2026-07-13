@@ -70,9 +70,10 @@ export default function AccountsPage() {
   }, [loadAccounts]);
 
   const netWorth = useMemo(
-    () => calculateNetWorth(accounts.map((account) => ({ id: account.id, kind: account.kind, balance: Number(account.current_balance), isActive: account.is_active }))),
+    () => calculateNetWorth(accounts.filter((account) => account.currency === "IDR").map((account) => ({ id: account.id, kind: account.kind, balance: Number(account.current_balance), isActive: account.is_active }))),
     [accounts],
   );
+  const foreignAccountCount = accounts.filter((account) => account.currency !== "IDR" && account.is_active).length;
 
   async function saveAccount(event: React.FormEvent) {
     event.preventDefault();
@@ -160,7 +161,7 @@ export default function AccountsPage() {
           <div className="linear-panel rounded-lg p-5 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#8a8f98]">Net worth</p>
             <p className="mt-2 text-3xl font-bold font-mono">Rp{netWorth.toLocaleString("id-ID")}</p>
-            <p className="mt-2 text-xs text-[#8a8f98]">Aset aktif dikurangi akun kewajiban.</p>
+            <p className="mt-2 text-xs text-[#8a8f98]">Aset aktif dikurangi kewajiban (akun IDR).</p>
           </div>
           <div className="linear-panel rounded-lg p-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#8a8f98]">Akun aktif</p>
@@ -168,6 +169,8 @@ export default function AccountsPage() {
             <p className="mt-2 text-xs text-[#8a8f98]">Bank, e-wallet, investasi, dan trading.</p>
           </div>
         </section>
+
+        {foreignAccountCount > 0 && <p className="text-xs text-amber-300">{foreignAccountCount} akun mata uang asing ditampilkan dalam mata uang asal dan belum dikonversi ke net worth IDR.</p>}
 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-violet-400" /></div>

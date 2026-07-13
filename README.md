@@ -15,7 +15,7 @@ PWA pencatat keuangan pribadi yang menerima transaksi manual dari dashboard dan 
 ## Menjalankan dashboard
 
 1. Salin `.env.example` menjadi `.env.local`, lalu isi kredensial Supabase publik Anda.
-2. Jalankan `supabase/schema.sql`, lalu seluruh berkas di `supabase/migrations/` secara berurutan pada SQL Editor Supabase. Ini juga diperlukan pada database baru karena akun, transfer, dan trigger saldo berada di migration. Untuk database lama, jangan lewati migration yang sudah ada.
+2. Jalankan `supabase/schema.sql`, lalu migration ini **dengan urutan persis** pada SQL Editor Supabase: `20260713_align_transaction_category.sql`, `20260714_add_financial_accounts.sql`, `20260714_add_investment_and_forex_journal.sql`, dan `20260714_add_ai_trade_reviews.sql`. Ini juga diperlukan pada database baru karena akun, transfer, jurnal, dan trigger saldo berada di migration.
 3. Instal dependensi dan mulai aplikasi:
 
 ```bash
