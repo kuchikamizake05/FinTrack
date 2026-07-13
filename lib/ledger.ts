@@ -13,6 +13,15 @@ export type TransferInput = {
   amount: number;
 };
 
+export type ExchangeTransferInput = {
+  sourceAccountId: string;
+  destinationAccountId: string;
+  sourceAmount: number;
+  destinationAmount: number;
+  sourceCurrency: string;
+  destinationCurrency: string;
+};
+
 export function calculateNetWorth(accounts: readonly LedgerAccount[]) {
   return accounts.reduce((total, account) => {
     if (!account.isActive) return total;
@@ -28,6 +37,21 @@ export function validateTransfer(transfer: TransferInput) {
     transfer.sourceAccountId !== transfer.destinationAccountId &&
     Number.isFinite(transfer.amount) &&
     transfer.amount > 0;
+
+  return { valid };
+}
+
+export function validateExchangeTransfer(transfer: ExchangeTransferInput) {
+  const valid =
+    transfer.sourceAccountId.trim().length > 0 &&
+    transfer.destinationAccountId.trim().length > 0 &&
+    transfer.sourceAccountId !== transfer.destinationAccountId &&
+    Number.isFinite(transfer.sourceAmount) &&
+    transfer.sourceAmount > 0 &&
+    Number.isFinite(transfer.destinationAmount) &&
+    transfer.destinationAmount > 0 &&
+    /^[A-Z]{3}$/.test(transfer.sourceCurrency) &&
+    /^[A-Z]{3}$/.test(transfer.destinationCurrency);
 
   return { valid };
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
-import { calculateNetWorth, type FinancialAccountKind } from "@/lib/ledger";
+import { calculateNetWorth, validateExchangeTransfer, type FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/lib/supabase";
 import { ArrowLeftRight, Building2, ChartNoAxesCombined, Landmark, Loader2, Plus, Smartphone, WalletCards, X } from "lucide-react";
 
@@ -42,7 +42,7 @@ export default function AccountsPage() {
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
-  const [transferForm, setTransferForm] = useState({ sourceAccountId: "", destinationAccountId: "", amount: "", date: new Date().toISOString().slice(0, 10), kind: "transfer", note: "" });
+  const [transferForm, setTransferForm] = useState({ sourceAccountId: "", destinationAccountId: "", amount: "", destinationAmount: "", date: new Date().toISOString().slice(0, 10), kind: "transfer", note: "" });
 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
@@ -74,6 +74,9 @@ export default function AccountsPage() {
     [accounts],
   );
   const foreignAccountCount = accounts.filter((account) => account.currency !== "IDR" && account.is_active).length;
+  const sourceAccount = accounts.find((account) => account.id === transferForm.sourceAccountId);
+  const destinationAccount = accounts.find((account) => account.id === transferForm.destinationAccountId);
+  const isCrossCurrencyTransfer = Boolean(sourceAccount && destinationAccount && sourceAccount.currency !== destinationAccount.currency);
 
   async function saveAccount(event: React.FormEvent) {
     event.preventDefault();
@@ -106,8 +109,9 @@ export default function AccountsPage() {
   async function saveTransfer(event: React.FormEvent) {
     event.preventDefault();
     const amount = Number(transferForm.amount);
-    if (!transferForm.sourceAccountId || !transferForm.destinationAccountId || transferForm.sourceAccountId === transferForm.destinationAccountId || !Number.isFinite(amount) || amount <= 0) {
-      setError("Pilih dua akun berbeda dan masukkan nominal positif.");
+    const destinationAmount = Number(isCrossCurrencyTransfer ? transferForm.destinationAmount : transferForm.amount);
+    if (!sourceAccount || !destinationAccount || !validateExchangeTransfer({ sourceAccountId: transferForm.sourceAccountId, destinationAccountId: transferForm.destinationAccountId, sourceAmount: amount, destinationAmount, sourceCurrency: sourceAccount.currency, destinationCurrency: destinationAccount.currency }).valid) {
+      setError("Pilih dua akun berbeda dan masukkan nominal kirim/terima yang positif.");
       return;
     }
     setSaving(true);
@@ -120,13 +124,16 @@ export default function AccountsPage() {
         source_account_id: transferForm.sourceAccountId,
         destination_account_id: transferForm.destinationAccountId,
         amount,
+        destination_amount: destinationAmount,
+        currency: sourceAccount.currency,
+        destination_currency: destinationAccount.currency,
         date: transferForm.date,
         kind: transferForm.kind,
         note: transferForm.note.trim() || null,
       });
       if (insertError) throw insertError;
       setTransferModalOpen(false);
-      setTransferForm({ sourceAccountId: "", destinationAccountId: "", amount: "", date: new Date().toISOString().slice(0, 10), kind: "transfer", note: "" });
+      setTransferForm({ sourceAccountId: "", destinationAccountId: "", amount: "", destinationAmount: "", date: new Date().toISOString().slice(0, 10), kind: "transfer", note: "" });
       await loadAccounts();
     } catch (transferError) {
       setError(transferError instanceof Error ? transferError.message : "Gagal menyimpan transfer.");
@@ -217,7 +224,8 @@ export default function AccountsPage() {
           <div className="flex items-center justify-between"><h2 className="font-semibold">Transfer antar akun</h2><button type="button" onClick={() => setTransferModalOpen(false)}><X className="h-5 w-5" /></button></div>
           <select required value={transferForm.sourceAccountId} onChange={(event) => setTransferForm({ ...transferForm, sourceAccountId: event.target.value })} className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm"><option value="">Dari akun...</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>
           <select required value={transferForm.destinationAccountId} onChange={(event) => setTransferForm({ ...transferForm, destinationAccountId: event.target.value })} className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm"><option value="">Ke akun...</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>
-          <div className="grid grid-cols-2 gap-3"><input required type="number" min="0.01" step="0.01" value={transferForm.amount} onChange={(event) => setTransferForm({ ...transferForm, amount: event.target.value })} placeholder="Nominal" className="rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" /><input required type="date" value={transferForm.date} onChange={(event) => setTransferForm({ ...transferForm, date: event.target.value })} className="rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" /></div>
+          <div className="grid grid-cols-2 gap-3"><input required type="number" min="0.01" step="0.01" value={transferForm.amount} onChange={(event) => setTransferForm({ ...transferForm, amount: event.target.value })} placeholder={`Dikirim (${sourceAccount?.currency || "mata uang asal"})`} className="rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" /><input required type="date" value={transferForm.date} onChange={(event) => setTransferForm({ ...transferForm, date: event.target.value })} className="rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" /></div>
+          {isCrossCurrencyTransfer ? <input required type="number" min="0.000001" step="any" value={transferForm.destinationAmount} onChange={(event) => setTransferForm({ ...transferForm, destinationAmount: event.target.value })} placeholder={`Diterima (${destinationAccount?.currency})`} className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" /> : <p className="text-xs text-[#8a8f98]">Nominal diterima akan sama dengan nominal dikirim untuk transfer mata uang yang sama.</p>}
           <select value={transferForm.kind} onChange={(event) => setTransferForm({ ...transferForm, kind: event.target.value })} className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm"><option value="transfer">Transfer biasa</option><option value="broker_deposit">Deposit ke broker</option><option value="broker_withdrawal">Withdraw dari broker</option></select>
           <input value={transferForm.note} onChange={(event) => setTransferForm({ ...transferForm, note: event.target.value })} placeholder="Catatan (opsional)" className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" />
           <button disabled={saving} className="w-full rounded bg-violet-600 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan transfer"}</button>
