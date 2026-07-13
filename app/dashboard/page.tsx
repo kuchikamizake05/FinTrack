@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
-import { calculateNetWorth, type FinancialAccountKind } from "@/lib/ledger";
+import { calculateIdrNetWorth, type FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, 
@@ -58,6 +58,7 @@ type FinancialAccount = {
   kind: FinancialAccountKind;
   currency: string;
   current_balance: number;
+  reporting_balance_idr: number | null;
   is_active: boolean;
 };
 
@@ -133,7 +134,7 @@ export default function DashboardPage() {
 
       const { data: accountData, error: accountError } = await supabase
         .from("financial_accounts")
-        .select("id, name, institution, kind, currency, current_balance, is_active")
+        .select("id, name, institution, kind, currency, current_balance, reporting_balance_idr, is_active")
         .eq("user_id", user.id)
         .order("name");
 
@@ -255,16 +256,17 @@ export default function DashboardPage() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpense;
-  const idrAccounts = accounts.filter((account) => account.currency === "IDR");
-  const netWorth = calculateNetWorth(
-    idrAccounts.map((account) => ({
+  const netWorth = calculateIdrNetWorth(
+    accounts.map((account) => ({
       id: account.id,
       kind: account.kind,
       balance: Number(account.current_balance),
       isActive: account.is_active,
+      currency: account.currency,
+      reportingBalanceIdr: account.reporting_balance_idr === null ? null : Number(account.reporting_balance_idr),
     })),
   );
-  const foreignAccounts = accounts.filter((account) => account.currency !== "IDR" && account.is_active);
+  const foreignAccountsWithoutValuation = accounts.filter((account) => account.currency !== "IDR" && account.is_active && account.reporting_balance_idr === null);
 
   const categoryDataObj: Record<string, number> = {};
   transactions
@@ -484,8 +486,8 @@ export default function DashboardPage() {
                   Tambahkan rekening, e-wallet, broker, atau kewajiban pertama Anda dari menu Akun.
                 </div>
               )}
-              {foreignAccounts.length > 0 && (
-                <p className="text-[10px] text-amber-400/90">Akun mata uang asing ditampilkan dalam nominal asal dan belum dikonversi ke net worth IDR.</p>
+              {foreignAccountsWithoutValuation.length > 0 && (
+                <p className="text-[10px] text-amber-400/90">Ada akun mata uang asing tanpa nilai setara IDR; akun tersebut belum masuk net worth.</p>
               )}
             </div>
 

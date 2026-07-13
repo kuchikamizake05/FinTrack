@@ -7,6 +7,11 @@ export type LedgerAccount = {
   isActive: boolean;
 };
 
+export type ReportingLedgerAccount = LedgerAccount & {
+  currency: string;
+  reportingBalanceIdr: number | null;
+};
+
 export type TransferInput = {
   sourceAccountId: string;
   destinationAccountId: string;
@@ -28,6 +33,13 @@ export function calculateNetWorth(accounts: readonly LedgerAccount[]) {
     const amount = Number(account.balance);
     return account.kind === "liability" ? total - amount : total + amount;
   }, 0);
+}
+
+export function calculateIdrNetWorth(accounts: readonly ReportingLedgerAccount[]) {
+  return calculateNetWorth(accounts.map((account) => ({
+    ...account,
+    balance: account.currency === "IDR" ? account.balance : (account.reportingBalanceIdr ?? 0),
+  })));
 }
 
 export function validateTransfer(transfer: TransferInput) {

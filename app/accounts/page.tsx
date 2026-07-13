@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
-import { calculateNetWorth, validateExchangeTransfer, type FinancialAccountKind } from "@/lib/ledger";
+import { calculateIdrNetWorth, validateExchangeTransfer, type FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/lib/supabase";
 import { ArrowLeftRight, Building2, ChartNoAxesCombined, Landmark, Loader2, Plus, Smartphone, WalletCards, X } from "lucide-react";
 
@@ -13,6 +13,7 @@ type FinancialAccount = {
   kind: FinancialAccountKind;
   currency: string;
   current_balance: number;
+  reporting_balance_idr: number | null;
   is_active: boolean;
 };
 
@@ -32,7 +33,7 @@ const kindIcon = {
   liability: Building2,
 };
 
-const emptyAccountForm = { name: "", institution: "", kind: "bank" as FinancialAccountKind, currency: "IDR", currentBalance: "0" };
+const emptyAccountForm = { name: "", institution: "", kind: "bank" as FinancialAccountKind, currency: "IDR", currentBalance: "0", reportingBalanceIdr: "" };
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
@@ -41,8 +42,10 @@ export default function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [balanceModalAccount, setBalanceModalAccount] = useState<FinancialAccount | null>(null);
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
   const [transferForm, setTransferForm] = useState({ sourceAccountId: "", destinationAccountId: "", amount: "", destinationAmount: "", date: new Date().toISOString().slice(0, 10), kind: "transfer", note: "" });
+  const [balanceForm, setBalanceForm] = useState({ currentBalance: "", reportingBalanceIdr: "" });
 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
@@ -52,7 +55,7 @@ export default function AccountsPage() {
       if (!user) return;
       const { data, error: queryError } = await supabase
         .from("financial_accounts")
-        .select("id, name, institution, kind, currency, current_balance, is_active")
+        .select("id, name, institution, kind, currency, current_balance, reporting_balance_idr, is_active")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true });
       if (queryError) throw queryError;
@@ -70,10 +73,10 @@ export default function AccountsPage() {
   }, [loadAccounts]);
 
   const netWorth = useMemo(
-    () => calculateNetWorth(accounts.filter((account) => account.currency === "IDR").map((account) => ({ id: account.id, kind: account.kind, balance: Number(account.current_balance), isActive: account.is_active }))),
+    () => calculateIdrNetWorth(accounts.map((account) => ({ id: account.id, kind: account.kind, balance: Number(account.current_balance), isActive: account.is_active, currency: account.currency, reportingBalanceIdr: account.reporting_balance_idr === null ? null : Number(account.reporting_balance_idr) }))),
     [accounts],
   );
-  const foreignAccountCount = accounts.filter((account) => account.currency !== "IDR" && account.is_active).length;
+  const foreignAccountCount = accounts.filter((account) => account.currency !== "IDR" && account.is_active && account.reporting_balance_idr === null).length;
   const sourceAccount = accounts.find((account) => account.id === transferForm.sourceAccountId);
   const destinationAccount = accounts.find((account) => account.id === transferForm.destinationAccountId);
   const isCrossCurrencyTransfer = Boolean(sourceAccount && destinationAccount && sourceAccount.currency !== destinationAccount.currency);
@@ -81,7 +84,8 @@ export default function AccountsPage() {
   async function saveAccount(event: React.FormEvent) {
     event.preventDefault();
     const amount = Number(accountForm.currentBalance);
-    if (!accountForm.name.trim() || !Number.isFinite(amount)) return;
+    const reportingBalanceIdr = accountForm.reportingBalanceIdr.trim() === "" ? null : Number(accountForm.reportingBalanceIdr);
+    if (!accountForm.name.trim() || !Number.isFinite(amount) || (reportingBalanceIdr !== null && (!Number.isFinite(reportingBalanceIdr) || reportingBalanceIdr < 0))) return;
     setSaving(true);
     setError(null);
     try {
@@ -94,6 +98,7 @@ export default function AccountsPage() {
         kind: accountForm.kind,
         currency: accountForm.currency.toUpperCase(),
         current_balance: amount,
+        reporting_balance_idr: accountForm.currency === "IDR" ? null : reportingBalanceIdr,
       });
       if (insertError) throw insertError;
       setAccountModalOpen(false);
@@ -142,6 +147,28 @@ export default function AccountsPage() {
     }
   }
 
+  function openBalanceModal(account: FinancialAccount) {
+    setBalanceModalAccount(account);
+    setBalanceForm({ currentBalance: String(account.current_balance), reportingBalanceIdr: account.reporting_balance_idr === null ? "" : String(account.reporting_balance_idr) });
+  }
+
+  async function saveBalance(event: React.FormEvent) {
+    event.preventDefault();
+    if (!balanceModalAccount) return;
+    const currentBalance = Number(balanceForm.currentBalance);
+    const reportingBalanceIdr = balanceForm.reportingBalanceIdr.trim() === "" ? null : Number(balanceForm.reportingBalanceIdr);
+    if (!Number.isFinite(currentBalance) || (reportingBalanceIdr !== null && (!Number.isFinite(reportingBalanceIdr) || reportingBalanceIdr < 0))) {
+      setError("Masukkan saldo dan nilai setara IDR yang valid."); return;
+    }
+    setSaving(true); setError(null);
+    try {
+      const { error: updateError } = await supabase.from("financial_accounts").update({ current_balance: currentBalance, reporting_balance_idr: balanceModalAccount.currency === "IDR" ? null : reportingBalanceIdr }).eq("id", balanceModalAccount.id);
+      if (updateError) throw updateError;
+      setBalanceModalAccount(null);
+      await loadAccounts();
+    } catch (balanceError) { setError(balanceError instanceof Error ? balanceError.message : "Gagal memperbarui saldo akun."); } finally { setSaving(false); }
+  }
+
   return (
     <div className="min-h-screen bg-[#050507] pb-24 text-[#f7f8f8] md:pb-6">
       <Navbar />
@@ -177,7 +204,7 @@ export default function AccountsPage() {
           </div>
         </section>
 
-        {foreignAccountCount > 0 && <p className="text-xs text-amber-300">{foreignAccountCount} akun mata uang asing ditampilkan dalam mata uang asal dan belum dikonversi ke net worth IDR.</p>}
+        {foreignAccountCount > 0 && <p className="text-xs text-amber-300">{foreignAccountCount} akun mata uang asing belum memiliki nilai setara IDR sehingga belum masuk net worth.</p>}
 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-violet-400" /></div>
@@ -199,6 +226,8 @@ export default function AccountsPage() {
                 <h2 className="mt-4 font-semibold text-white">{account.name}</h2>
                 <p className="mt-1 text-xs text-[#8a8f98]">{account.institution || "Akun pribadi"}</p>
                 <p className="mt-5 text-xl font-bold font-mono">{account.currency} {Number(account.current_balance).toLocaleString("id-ID")}</p>
+                {account.currency !== "IDR" && <p className="mt-1 text-xs text-[#8a8f98]">Setara {account.reporting_balance_idr === null ? "belum diisi" : `Rp${Number(account.reporting_balance_idr).toLocaleString("id-ID")}`}</p>}
+                <button onClick={() => openBalanceModal(account)} className="mt-4 text-xs font-bold text-violet-300 hover:text-violet-200">Perbarui snapshot saldo</button>
               </article>;
             })}
           </section>
@@ -215,6 +244,7 @@ export default function AccountsPage() {
             <select value={accountForm.currency} onChange={(event) => setAccountForm({ ...accountForm, currency: event.target.value })} className="rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm"><option>IDR</option><option>USD</option></select>
           </div>
           <input required type="number" step="0.01" value={accountForm.currentBalance} onChange={(event) => setAccountForm({ ...accountForm, currentBalance: event.target.value })} placeholder="Saldo awal" className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" />
+          {accountForm.currency !== "IDR" && <input type="number" min="0" step="0.01" value={accountForm.reportingBalanceIdr} onChange={(event) => setAccountForm({ ...accountForm, reportingBalanceIdr: event.target.value })} placeholder="Nilai setara IDR untuk net worth (manual)" className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" />}
           <button disabled={saving} className="w-full rounded bg-violet-600 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan akun"}</button>
         </form>
       </div>}
@@ -231,6 +261,8 @@ export default function AccountsPage() {
           <button disabled={saving} className="w-full rounded bg-violet-600 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan transfer"}</button>
         </form>
       </div>}
+
+      {balanceModalAccount && <div className="fixed inset-0 z-50 flex items-end bg-black/70 p-4 sm:items-center sm:justify-center"><form onSubmit={saveBalance} className="linear-panel w-full max-w-md space-y-4 rounded-lg p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Perbarui snapshot {balanceModalAccount.name}</h2><button type="button" onClick={() => setBalanceModalAccount(null)}><X className="h-5 w-5" /></button></div><p className="text-xs text-[#8a8f98]">Gunakan setelah mengecek saldo/equity terbaru. Transfer dan transaksi tetap tercatat terpisah.</p><input required type="number" step="0.01" value={balanceForm.currentBalance} onChange={(event) => setBalanceForm({ ...balanceForm, currentBalance: event.target.value })} placeholder={`Saldo ${balanceModalAccount.currency}`} className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" />{balanceModalAccount.currency !== "IDR" && <input type="number" min="0" step="0.01" value={balanceForm.reportingBalanceIdr} onChange={(event) => setBalanceForm({ ...balanceForm, reportingBalanceIdr: event.target.value })} placeholder="Nilai setara IDR untuk net worth" className="w-full rounded border border-neutral-800 bg-[#050507] px-3 py-2 text-sm" />}<button disabled={saving} className="w-full rounded bg-violet-600 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan snapshot"}</button></form></div>}
     </div>
   );
 }
