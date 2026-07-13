@@ -32,11 +32,19 @@ type Transaction = {
   ai_confidence: number | null;
   status: "confirmed" | "pending_approval" | "needs_review" | "deleted";
   created_at: string;
+  account_id: string | null;
+};
+
+type FinancialAccount = {
+  id: string;
+  name: string;
+  currency: string;
 };
 
 export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -59,6 +67,7 @@ export default function TransactionsPage() {
     category: "Makanan & Minuman",
     amount: "",
     note: "",
+    accountId: "",
   });
 
   const categoriesList = [
@@ -91,6 +100,15 @@ export default function TransactionsPage() {
 
       if (error) throw error;
       setTransactions(data || []);
+
+      const { data: accountData, error: accountError } = await supabase
+        .from("financial_accounts")
+        .select("id, name, currency")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+      if (accountError) throw accountError;
+      setFinancialAccounts((accountData ?? []) as FinancialAccount[]);
     } catch (err) {
       console.error("Error fetching transactions:", err);
     } finally {
@@ -127,6 +145,7 @@ export default function TransactionsPage() {
       category: "Makanan & Minuman",
       amount: "",
       note: "",
+      accountId: "",
     });
     setModalOpen(true);
   };
@@ -141,14 +160,15 @@ export default function TransactionsPage() {
       category: tx.category,
       amount: tx.amount.toString(),
       note: tx.note || "",
+      accountId: tx.account_id || "",
     });
     setModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.amount || Number(form.amount) <= 0) {
-      alert("Masukkan nominal transaksi yang valid!");
+    if (!form.amount || Number(form.amount) <= 0 || !form.accountId) {
+      alert("Pilih akun sumber dan masukkan nominal transaksi yang valid!");
       return;
     }
 
@@ -166,6 +186,7 @@ export default function TransactionsPage() {
         note: form.note.trim() || null,
         source: isEditMode && selectedTx ? selectedTx.source : "manual",
         status: "confirmed",
+        account_id: form.accountId,
       };
 
       if (isEditMode && selectedTx) {
@@ -369,6 +390,7 @@ export default function TransactionsPage() {
                     <th className="p-4 font-semibold">Tanggal</th>
                     <th className="p-4 font-semibold">Merchant</th>
                     <th className="p-4 font-semibold">Kategori</th>
+                    <th className="p-4 font-semibold">Akun</th>
                     <th className="p-4 font-semibold">Nominal</th>
                     <th className="p-4 font-semibold">Catatan</th>
                     <th className="p-4 font-semibold">Sumber</th>
@@ -388,6 +410,7 @@ export default function TransactionsPage() {
                           {tx.category}
                         </span>
                       </td>
+                      <td className="p-4 text-neutral-400">{financialAccounts.find((account) => account.id === tx.account_id)?.name || "-"}</td>
                       <td className={`p-4 font-bold font-mono whitespace-nowrap text-sm ${tx.type === "expense" ? "text-rose-400" : "text-emerald-400"}`}>
                         {tx.type === "expense" ? "-" : "+"}Rp{tx.amount.toLocaleString("id-ID")}
                       </td>
@@ -522,6 +545,21 @@ export default function TransactionsPage() {
                   className="w-full bg-[#050507] border border-neutral-800 rounded px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#5e6ad2]"
                   placeholder="Contoh: Alfamart, Starbucks"
                 />
+              </div>
+
+              {/* Amount input */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-neutral-400 font-bold ml-1 uppercase tracking-wider">Akun sumber</label>
+                <select
+                  required
+                  value={form.accountId}
+                  onChange={(e) => setForm(prev => ({ ...prev, accountId: e.target.value }))}
+                  className="w-full bg-[#050507] border border-neutral-800 rounded px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#5e6ad2]"
+                >
+                  <option value="">Pilih akun...</option>
+                  {financialAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>)}
+                </select>
+                {financialAccounts.length === 0 && <p className="text-[10px] text-amber-400">Tambahkan akun terlebih dahulu dari menu Akun.</p>}
               </div>
 
               {/* Amount input */}
