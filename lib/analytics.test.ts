@@ -21,6 +21,6 @@ describe("calculateTradingPerformance", () => {
       { netPnl: -40 },
       { netPnl: 60 },
       { netPnl: -80 },
-    ])).toEqual({ winRate: 50, profitFactor: 1.33, maxDrawdown: 120, totalPnl: 40 });
+    ])).toEqual({ winRate: 50, profitFactor: 1.33, maxDrawdown: 80, totalPnl: 40 });
   });
 });
