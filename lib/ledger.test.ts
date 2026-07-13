@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateNetWorth, validateTransfer } from "./ledger";
+import { calculateNetWorth, validateExchangeTransfer, validateTransfer } from "./ledger";
 
 describe("ledger rules", () => {
   it("calculates net worth from active assets minus liabilities", () => {
@@ -21,5 +21,13 @@ describe("ledger rules", () => {
     { sourceAccountId: "bri", destinationAccountId: "hfm", amount: -1 },
   ])("rejects an invalid transfer %#", (transfer) => {
     expect(validateTransfer(transfer)).toEqual({ valid: false });
+  });
+
+  it("accepts an FX transfer only when both sent and received amounts are positive", () => {
+    expect(validateExchangeTransfer({ sourceAccountId: "bri", destinationAccountId: "hfm", sourceAmount: 1_000_000, destinationAmount: 60, sourceCurrency: "IDR", destinationCurrency: "USD" })).toEqual({ valid: true });
+  });
+
+  it("rejects an FX transfer with a missing conversion result", () => {
+    expect(validateExchangeTransfer({ sourceAccountId: "bri", destinationAccountId: "hfm", sourceAmount: 1_000_000, destinationAmount: 0, sourceCurrency: "IDR", destinationCurrency: "USD" })).toEqual({ valid: false });
   });
 });
