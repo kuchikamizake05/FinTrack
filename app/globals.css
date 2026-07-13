@@ -144,3 +144,11 @@ main :is(input, textarea, select) { caret-color: #3558d3; }
 .click-active:active {
   transform: scale(0.98);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
