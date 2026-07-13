@@ -1,0 +1,35 @@
+{
+  "name": "FinTrack - AI Forex Trade Review (Advisory)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "fintrack-trade-review", "responseMode": "lastNode" },
+      "id": "f8014b08-f8c8-4383-a76b-16d36cdc0973", "name": "Trade Review Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [300, 300]
+    },
+    {
+      "parameters": { "jsCode": "const headers = $json.headers || {};\nconst provided = headers['x-fintrack-review-secret'] || headers['X-Fintrack-Review-Secret'];\nif (!provided || provided !== $env.N8N_TRADE_REVIEW_SHARED_SECRET) throw new Error('Unauthorized review request');\nconst body = $json.body || {};\nif (!body.tradeId || !body.userId) throw new Error('tradeId and userId are required');\nreturn [{ json: { tradeId: body.tradeId, userId: body.userId } }];" },
+      "id": "78b59a5e-c9d1-49af-8dd4-c92124be82c4", "name": "Validate Private Request", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [520, 300]
+    },
+    {
+      "parameters": { "method": "GET", "url": "={{ $env.SUPABASE_URL }}/rest/v1/forex_trades?id=eq.{{ $json.tradeId }}&user_id=eq.{{ $json.userId }}&select=*", "sendHeaders": true, "headers": { "parameters": [{ "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }, { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }] }, "options": {} },
+      "id": "f41b92a1-68fc-489c-9f3f-8e3924bc7033", "name": "Read Owned Trade", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [740, 300]
+    },
+    {
+      "parameters": { "jsCode": "const trade = items[0].json[0];\nif (!trade) throw new Error('Trade not found or does not belong to user');\nreturn [{ json: { trade, userId: $('Validate Private Request').first().json.userId } }];" },
+      "id": "c93f3acd-185f-4cd2-8b5e-dc98e70a2a9e", "name": "Prepare Trade Context", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [940, 300]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", "sendQueryParameters": true, "queryParameters": { "parameters": [{ "name": "key", "value": "={{ $env.GEMINI_API_KEY }}" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={\"contents\":[{\"parts\":[{\"text\":\"Kamu adalah coach jurnal trading, bukan penasihat investasi. Berikan review edukatif atas trade berikut, jangan memberi instruksi membeli/menjual. Balas JSON valid: {summary:string,strengths:string[],improvements:string[]}. Maksimal tiga poin per array. Fokus pada kesesuaian entry, risiko, disiplin, emosi, dan pelajaran. Trade: {{ JSON.stringify($json.trade) }}\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\"}}", "options": {} },
+      "id": "e6aa031c-79e9-429a-8ff2-838f567e5f13", "name": "Gemini Advisory Review", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [1150, 300]
+    },
+    {
+      "parameters": { "jsCode": "const review = JSON.parse($json.candidates[0].content.parts[0].text);\nconst context = $('Prepare Trade Context').first().json;\nreturn [{ json: { user_id: context.userId, forex_trade_id: context.trade.id, scope: 'trade', summary: review.summary, strengths: review.strengths || [], improvements: review.improvements || [] } }];" },
+      "id": "0e133167-9514-4d72-8844-05024a42dc57", "name": "Parse Advisory JSON", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1370, 300]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.SUPABASE_URL }}/rest/v1/ai_trade_reviews", "sendHeaders": true, "headers": { "parameters": [{ "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }, { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }, { "name": "Content-Type", "value": "application/json" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}", "options": {} },
+      "id": "dc09e4d8-f093-46c1-b31e-1079cf745711", "name": "Store Advisory Review", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [1580, 300]
+    }
+  ],
+  "connections": { "Trade Review Webhook": { "main": [[{ "node": "Validate Private Request", "type": "main", "index": 0 }]] }, "Validate Private Request": { "main": [[{ "node": "Read Owned Trade", "type": "main", "index": 0 }]] }, "Read Owned Trade": { "main": [[{ "node": "Prepare Trade Context", "type": "main", "index": 0 }]] }, "Prepare Trade Context": { "main": [[{ "node": "Gemini Advisory Review", "type": "main", "index": 0 }]] }, "Gemini Advisory Review": { "main": [[{ "node": "Parse Advisory JSON", "type": "main", "index": 0 }]] }, "Parse Advisory JSON": { "main": [[{ "node": "Store Advisory Review", "type": "main", "index": 0 }]] } },
+  "active": false, "settings": { "executionOrder": "v1" }, "versionId": "fintrack-trade-review-v1"
+}

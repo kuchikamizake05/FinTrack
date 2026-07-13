@@ -12,6 +12,7 @@ import {
   LogOut, 
   TrendingUp,
   ChartNoAxesCombined,
+  BrainCircuit,
   User,
   WalletCards,
 } from "lucide-react";
@@ -44,6 +45,7 @@ export default function Navbar() {
     { name: "Transaksi", href: "/transactions", icon: Receipt },
     { name: "Investasi", href: "/investments", icon: ChartNoAxesCombined },
     { name: "Trading", href: "/trading", icon: TrendingUp },
+    { name: "Insights", href: "/insights", icon: BrainCircuit },
     { name: "Kategori", href: "/categories", icon: Tags },
     { name: "Pengaturan", href: "/settings", icon: SettingsIcon },
   ];

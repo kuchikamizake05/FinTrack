@@ -25,11 +25,13 @@ npm run dev
 
 ## Menghubungkan bot
 
-1. Import kedua berkas di `n8n/` ke instance n8n Anda.
+1. Import workflow yang diperlukan dari `n8n/` ke instance n8n Anda. Dua workflow transaksi menangani Telegram; `forex-trade-review-workflow.json` menangani review satu trade; `forex-weekly-review-workflow.json` menghasilkan laporan mingguan.
 2. Pasang Telegram credential pada node trigger dan pengirim pesan.
-3. Atur environment variable berikut di n8n: `TELEGRAM_ALLOWED_USER_ID`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, dan `SUPABASE_USER_ID`.
+3. Atur environment variable berikut di n8n: `TELEGRAM_ALLOWED_USER_ID`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, dan `SUPABASE_USER_ID`. Untuk review satu trade, tambahkan juga `N8N_TRADE_REVIEW_SHARED_SECRET` yang sama dengan aplikasi. Service role hanya boleh berada di n8n/server—jangan pernah dimasukkan ke `.env.local` frontend atau dibagikan.
 4. Buat bucket Supabase Storage privat bernama `receipts-temp`, lalu pastikan policy bucket mengizinkan service yang digunakan n8n menulis objek.
 5. Uji tiap workflow secara manual dengan satu pesan dan satu struk sebelum mengaktifkannya. Workflow sengaja tersimpan nonaktif agar import tidak langsung memproses pesan pada environment yang belum dikonfigurasi.
+
+Untuk review trade dari aplikasi, salin `.env.example` menjadi `.env.local` lalu isi dua variabel `N8N_TRADE_REVIEW_*`; gunakan production webhook URL n8n setelah workflow diaktifkan. AI menyimpan hasil sebagai `ai_trade_reviews` dan tidak punya jalur untuk mengubah transaksi, saldo, atau trade.
 
 ## Kualitas kode
 
