@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import { calculateNetWorth, type FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, 
@@ -50,10 +51,21 @@ type Transaction = {
   created_at: string;
 };
 
+type FinancialAccount = {
+  id: string;
+  name: string;
+  institution: string | null;
+  kind: FinancialAccountKind;
+  currency: string;
+  current_balance: number;
+  is_active: boolean;
+};
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingTx, setPendingTx] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   
   // PWA Install Prompt States
@@ -118,6 +130,15 @@ export default function DashboardPage() {
 
       if (pendError) throw pendError;
       setPendingTx(pendData || []);
+
+      const { data: accountData, error: accountError } = await supabase
+        .from("financial_accounts")
+        .select("id, name, institution, kind, currency, current_balance, is_active")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (accountError) throw accountError;
+      setAccounts((accountData || []) as FinancialAccount[]);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -234,6 +255,16 @@ export default function DashboardPage() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpense;
+  const idrAccounts = accounts.filter((account) => account.currency === "IDR");
+  const netWorth = calculateNetWorth(
+    idrAccounts.map((account) => ({
+      id: account.id,
+      kind: account.kind,
+      balance: Number(account.current_balance),
+      isActive: account.is_active,
+    })),
+  );
+  const foreignAccounts = accounts.filter((account) => account.currency !== "IDR" && account.is_active);
 
   const categoryDataObj: Record<string, number> = {};
   transactions
@@ -362,22 +393,36 @@ export default function DashboardPage() {
         {!loading && (
           <>
             {/* Bento Grid Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: Balance */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {/* Card 1: Net Worth */}
               <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Net Saldo</span>
+                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Net Worth</span>
                   <Wallet className="w-4 h-4 text-[#8a8f98]" />
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="text-2xl font-bold tracking-tight text-white font-mono">
-                    Rp{balance.toLocaleString("id-ID")}
+                    Rp{netWorth.toLocaleString("id-ID")}
                   </h3>
-                  <p className="text-[10px] text-[#8a8f98]">Pemasukan dikurangi pengeluaran</p>
+                  <p className="text-[10px] text-[#8a8f98]">Aset aktif dikurangi kewajiban (IDR)</p>
                 </div>
               </div>
 
-              {/* Card 2: Income */}
+              {/* Card 2: Cash Flow */}
+              <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Arus Kas</span>
+                  <ArrowRightLeft className="w-4 h-4 text-[#5e6ad2]" />
+                </div>
+                <div className="space-y-0.5">
+                  <h3 className={`text-2xl font-bold tracking-tight font-mono ${balance >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {balance >= 0 ? "+" : "-"}Rp{Math.abs(balance).toLocaleString("id-ID")}
+                  </h3>
+                  <p className="text-[10px] text-[#8a8f98]">Pemasukan dikurangi pengeluaran bulan ini</p>
+                </div>
+              </div>
+
+              {/* Card 3: Income */}
               <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Pemasukan</span>
@@ -391,7 +436,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Card 3: Expense */}
+              {/* Card 4: Expense */}
               <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Pengeluaran</span>
@@ -404,6 +449,44 @@ export default function DashboardPage() {
                   <p className="text-[10px] text-[#8a8f98]">Pengeluaran harian & bulanan</p>
                 </div>
               </div>
+            </div>
+
+            <div className="linear-panel p-5 rounded-lg space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#8a8f98]">Saldo per Akun</h2>
+                  <p className="mt-1 text-xs text-neutral-500">Saldo berubah otomatis dari transaksi dan transfer yang sudah dikonfirmasi.</p>
+                </div>
+                <Link href="/accounts" className="shrink-0 text-xs text-[#5e6ad2] hover:text-[#828fff] font-bold flex items-center gap-0.5 transition-colors">
+                  Kelola Akun
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+              {accounts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {accounts.filter((account) => account.is_active).map((account) => (
+                    <div key={account.id} className="rounded-md border border-neutral-800 bg-[#0a0a0d] p-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{account.name}</p>
+                          <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-neutral-500">{account.institution || account.kind}</p>
+                        </div>
+                        <span className="rounded border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-[9px] font-bold uppercase text-neutral-400">{account.kind}</span>
+                      </div>
+                      <p className={`mt-4 font-mono text-lg font-bold ${account.kind === "liability" ? "text-rose-400" : "text-white"}`}>
+                        {account.kind === "liability" ? "-" : ""}{account.currency === "IDR" ? "Rp" : `${account.currency} `}{Math.abs(Number(account.current_balance)).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
+                  Tambahkan rekening, e-wallet, broker, atau kewajiban pertama Anda dari menu Akun.
+                </div>
+              )}
+              {foreignAccounts.length > 0 && (
+                <p className="text-[10px] text-amber-400/90">Akun mata uang asing ditampilkan dalam nominal asal dan belum dikonversi ke net worth IDR.</p>
+              )}
             </div>
 
             {/* Pending Approvals Widget */}

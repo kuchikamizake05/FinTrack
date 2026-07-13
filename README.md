@@ -5,8 +5,9 @@ PWA pencatat keuangan pribadi yang menerima transaksi manual dari dashboard dan 
 ## Yang tersedia
 
 - Magic-link login dengan Supabase Auth
-- Dashboard ringkasan pemasukan, pengeluaran, kategori, dan transaksi yang menunggu konfirmasi
-- Tambah, ubah, filter, ekspor CSV, pulihkan, dan soft-delete transaksi
+- Dashboard ringkasan net worth IDR, arus kas bulanan, saldo akun, kategori, dan transaksi yang menunggu konfirmasi
+- Rekening, e-wallet, broker, dan kewajiban dengan transfer antar-akun yang memperbarui saldo secara atomik
+- Tambah, ubah, filter, ekspor CSV, pulihkan, dan soft-delete transaksi yang ditautkan ke akun sumber
 - Manajemen kategori
 - Workflow n8n untuk pesan teks Telegram dan OCR struk menggunakan Gemini
 - PWA manifest, service worker, dan ikon aplikasi
@@ -14,7 +15,7 @@ PWA pencatat keuangan pribadi yang menerima transaksi manual dari dashboard dan 
 ## Menjalankan dashboard
 
 1. Salin `.env.example` menjadi `.env.local`, lalu isi kredensial Supabase publik Anda.
-2. Jalankan skema baru `supabase/schema.sql` pada proyek Supabase baru. Untuk database lama, jalankan juga `supabase/migrations/20260713_align_transaction_category.sql` sekali.
+2. Jalankan `supabase/schema.sql`, lalu seluruh berkas di `supabase/migrations/` secara berurutan pada SQL Editor Supabase. Ini juga diperlukan pada database baru karena akun, transfer, dan trigger saldo berada di migration. Untuk database lama, jangan lewati migration yang sudah ada.
 3. Instal dependensi dan mulai aplikasi:
 
 ```bash
