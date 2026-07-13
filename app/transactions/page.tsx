@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabase";
 import { 
@@ -284,6 +285,7 @@ export default function TransactionsPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link href="/categories" className="px-3 py-2 text-xs font-semibold text-[#8a8f98] hover:text-white">Kategori</Link>
             <button
               onClick={exportCSV}
               disabled={filteredTx.length === 0}

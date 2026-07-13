@@ -19,7 +19,10 @@ import {
   ChevronRight,
   Loader2,
   Download,
-  Sparkles
+  Sparkles,
+  ChartNoAxesCombined,
+  Landmark,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
@@ -358,10 +361,10 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[#f7f8f8]">
-              Dashboard
+              Home
             </h1>
             <p className="text-xs text-[#8a8f98] mt-0.5">
-              Pencatatan keuangan personal terintegrasi Telegram Bot
+              Semua rekening, pengeluaran, investasi, dan trading kamu dalam satu ringkasan.
             </p>
           </div>
 
@@ -384,6 +387,16 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        <section className="linear-panel rounded-xl p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-white">Akses cepat</h2><p className="mt-0.5 text-xs text-[#8a8f98]">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-300 hover:text-violet-200">Lihat akun</Link></div>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 sm:gap-3">
+            <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-violet-600/15 p-2 text-violet-300"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Catat</span></Link>
+            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-sky-500/10 p-2 text-sky-300"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Transfer</span></Link>
+            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-emerald-500/10 p-2 text-emerald-300"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Saldo</span></Link>
+            <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-amber-500/10 p-2 text-amber-300"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Portfolio</span></Link>
+          </div>
+        </section>
 
         {/* Loading Spinner */}
         {loading && (

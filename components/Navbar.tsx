@@ -3,35 +3,29 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ChevronDown, LogOut, Settings, Tags, TrendingUp, User, WalletCards, X } from "lucide-react";
+import { primaryNavigation } from "@/lib/navigation";
 import { supabase } from "@/lib/supabase";
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  Tags, 
-  Settings as SettingsIcon, 
-  LogOut, 
-  TrendingUp,
-  ChartNoAxesCombined,
-  BrainCircuit,
-  User,
-  WalletCards,
-} from "lucide-react";
+
+const profileItems = [
+  { name: "Akun & saldo", href: "/accounts", icon: WalletCards },
+  { name: "Kategori", href: "/categories", icon: Tags },
+  { name: "Pengaturan", href: "/settings", icon: Settings },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email || null);
-      } else {
-        router.push("/login");
-      }
+      if (user) setUserEmail(user.email || null);
+      else router.push("/login");
     };
-    fetchUser();
+    void fetchUser();
   }, [router]);
 
   const handleLogout = async () => {
@@ -39,103 +33,25 @@ export default function Navbar() {
     router.push("/login");
   };
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Akun", href: "/accounts", icon: WalletCards },
-    { name: "Transaksi", href: "/transactions", icon: Receipt },
-    { name: "Investasi", href: "/investments", icon: ChartNoAxesCombined },
-    { name: "Trading", href: "/trading", icon: TrendingUp },
-    { name: "Insights", href: "/insights", icon: BrainCircuit },
-    { name: "Kategori", href: "/categories", icon: Tags },
-    { name: "Pengaturan", href: "/settings", icon: SettingsIcon },
-  ];
+  const isActive = (href: string) => pathname === href || (href === "/trading" && pathname === "/insights");
 
-  return (
-    <>
-      {/* Desktop Top Navbar */}
-      <header className="sticky top-0 z-40 w-full glass-panel border-b border-neutral-900 hidden md:block">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-md shadow-violet-500/25">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white group-hover:text-neutral-200 transition-colors">
-                FinTrack
-              </span>
-            </Link>
-
-            <nav className="flex items-center gap-1">
-              {navItems.map((item) => {
-                const IconComponent = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                      isActive
-                        ? "bg-violet-600/10 text-violet-400 border border-violet-500/20"
-                        : "text-neutral-400 hover:text-white hover:bg-white/5 border border-transparent"
-                    }`}
-                  >
-                    <IconComponent className="w-4 h-4" />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {userEmail && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f0f1b] border border-neutral-800 rounded-xl">
-                <User className="w-4 h-4 text-violet-400" />
-                <span className="text-xs text-neutral-300 font-medium max-w-[150px] truncate">
-                  {userEmail}
-                </span>
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/25 transition-all cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              Keluar
-            </button>
-          </div>
+  return <>
+    <header className="sticky top-0 z-40 hidden w-full border-b border-neutral-900 glass-panel md:block">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <div className="flex items-center gap-8">
+          <Link href="/dashboard" className="flex items-center gap-2 group"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 shadow-md shadow-violet-500/25"><TrendingUp className="h-5 w-5 text-white" /></div><span className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-neutral-200">FinTrack</span></Link>
+          <nav className="flex items-center gap-1">{primaryNavigation.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-all ${isActive(item.href) ? "border-violet-500/20 bg-violet-600/10 text-violet-400" : "border-transparent text-neutral-400 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{item.name}</Link>; })}</nav>
         </div>
-      </header>
+        <div className="relative"><button onClick={() => setProfileOpen((value) => !value)} className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-[#0f0f1b] px-3 py-2 text-xs font-medium text-neutral-300 hover:border-violet-500/30 hover:text-white"><User className="h-4 w-4 text-violet-400" /><span className="max-w-[160px] truncate">{userEmail || "Profil"}</span><ChevronDown className="h-3.5 w-3.5" /></button>{profileOpen && <ProfileMenu onClose={() => setProfileOpen(false)} onLogout={handleLogout} />}</div>
+      </div>
+    </header>
 
-      {/* Mobile Bottom Tab Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#07070f]/85 backdrop-blur-lg border-t border-neutral-900 md:hidden pb-safe">
-        <div className="flex items-center justify-around h-16">
-          {navItems.map((item) => {
-            const IconComponent = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${
-                  isActive ? "text-violet-400 font-bold" : "text-neutral-500"
-                }`}
-              >
-                <div
-                  className={`p-1.5 rounded-xl transition-all ${
-                    isActive ? "bg-violet-600/10 border border-violet-500/20" : ""
-                  }`}
-                >
-                  <IconComponent className="w-5 h-5" />
-                </div>
-                <span className="text-[10px] font-semibold tracking-wide">
-                  {item.name}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-    </>
-  );
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-neutral-900 bg-[#07070f]/90 px-4 backdrop-blur-lg md:hidden"><Link href="/dashboard" className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-600"><TrendingUp className="h-4 w-4 text-white" /></div><span className="font-bold text-white">FinTrack</span></Link><button onClick={() => setProfileOpen((value) => !value)} aria-label="Buka profil" className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900 text-violet-300"><User className="h-4 w-4" /></button>{profileOpen && <ProfileMenu onClose={() => setProfileOpen(false)} onLogout={handleLogout} mobile />}</header>
+
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#07070f]/90 pb-safe backdrop-blur-lg md:hidden"><div className="mx-auto flex h-16 max-w-lg items-center justify-around">{primaryNavigation.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className={`flex h-full w-1/4 flex-col items-center justify-center gap-1 ${isActive(item.href) ? "font-bold text-violet-400" : "text-neutral-500"}`}><div className={`rounded-xl p-1.5 ${isActive(item.href) ? "border border-violet-500/20 bg-violet-600/10" : ""}`}><Icon className="h-5 w-5" /></div><span className="text-[10px] font-semibold tracking-wide">{item.name}</span></Link>; })}</div></nav>
+  </>;
+}
+
+function ProfileMenu({ onClose, onLogout, mobile = false }: { onClose: () => void; onLogout: () => void; mobile?: boolean }) {
+  return <div className={`${mobile ? "fixed inset-x-4 top-16" : "absolute right-0 top-12"} z-50 w-64 rounded-xl border border-neutral-800 bg-[#111116] p-2 shadow-2xl`}><div className="flex items-center justify-between border-b border-neutral-800 px-2 py-2 text-xs font-bold uppercase tracking-wider text-neutral-500"><span>Profil & lainnya</span>{mobile && <button onClick={onClose} aria-label="Tutup menu"><X className="h-4 w-4" /></button>}</div><div className="py-1">{profileItems.map((item) => { const Icon = item.icon; return <Link onClick={onClose} key={item.href} href={item.href} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white"><Icon className="h-4 w-4 text-violet-300" />{item.name}</Link>; })}</div><button onClick={onLogout} className="flex w-full items-center gap-2 rounded-lg border-t border-neutral-800 px-3 py-2.5 text-sm text-rose-400 hover:bg-rose-500/10"><LogOut className="h-4 w-4" />Keluar</button></div>;
 }
