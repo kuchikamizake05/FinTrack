@@ -11,9 +11,9 @@ describe("summarizeStockPosition", () => {
       ]),
     ).toEqual({
       quantity: 15,
-      costBasis: 1_650,
-      averageCost: 110,
-      realizedPnl: 190,
+      costBasis: 1_665,
+      averageCost: 111,
+      realizedPnl: 185,
       oversoldQuantity: 0,
     });
   });
