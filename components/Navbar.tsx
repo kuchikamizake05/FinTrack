@@ -11,7 +11,8 @@ import {
   Settings as SettingsIcon, 
   LogOut, 
   TrendingUp,
-  User
+  User,
+  WalletCards,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -38,6 +39,7 @@ export default function Navbar() {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Akun", href: "/accounts", icon: WalletCards },
     { name: "Transaksi", href: "/transactions", icon: Receipt },
     { name: "Kategori", href: "/categories", icon: Tags },
     { name: "Pengaturan", href: "/settings", icon: SettingsIcon },
