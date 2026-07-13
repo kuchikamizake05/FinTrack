@@ -145,6 +145,21 @@ main :is(input, textarea, select) { caret-color: #3558d3; }
   transform: scale(0.98);
 }
 
+.field {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: #17233b;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.field:focus {
+  outline: 2px solid #a78bfa;
+  outline-offset: 1px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

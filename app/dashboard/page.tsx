@@ -10,6 +10,7 @@ import {
   getTimeGreeting,
   maskAmount,
 } from "@/lib/home";
+import { calculatePercentageChange } from "@/lib/analytics";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, 
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [previousMonthExpense, setPreviousMonthExpense] = useState(0);
   const [firstName, setFirstName] = useState("Kamu");
   const [showBalances, setShowBalances] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -154,6 +156,20 @@ export default function DashboardPage() {
 
       if (txError) throw txError;
       setTransactions(txData || []);
+
+      const previousMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
+      const { data: previousTxData, error: previousTxError } = await supabase
+        .from("transactions")
+        .select("type, amount")
+        .eq("user_id", user.id)
+        .eq("type", "expense")
+        .neq("status", "deleted")
+        .neq("status", "pending_approval")
+        .neq("status", "needs_review")
+        .gte("date", format(startOfMonth(previousMonth), "yyyy-MM-dd"))
+        .lte("date", format(endOfMonth(previousMonth), "yyyy-MM-dd"));
+      if (previousTxError) throw previousTxError;
+      setPreviousMonthExpense((previousTxData || []).reduce((sum, transaction) => sum + Number(transaction.amount), 0));
 
       const { data: pendData, error: pendError } = await supabase
         .from("transactions")
@@ -312,6 +328,7 @@ export default function DashboardPage() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpense;
+  const expenseChange = calculatePercentageChange(totalExpense, previousMonthExpense);
   const accountMonthlyMovement = calculateAccountMonthlyMovement(
     transactions.map((transaction) => ({
       accountId: transaction.account_id,
@@ -532,7 +549,7 @@ export default function DashboardPage() {
                   <h3 className="text-2xl font-bold tracking-tight text-[#ef4444] font-mono">
                     {displayIdr(totalExpense)}
                   </h3>
-                  <p className="text-[10px] text-[#8a8f98]">Pengeluaran harian & bulanan</p>
+                  <p className={`text-[10px] ${expenseChange === null ? "text-[#8a8f98]" : expenseChange > 0 ? "text-rose-500" : "text-emerald-600"}`}>{expenseChange === null ? "Pengeluaran harian & bulanan" : `${expenseChange > 0 ? "Naik" : "Turun"} ${Math.abs(expenseChange).toLocaleString("id-ID")}% vs bulan lalu`}</p>
                 </div>
               </div>
             </div>
