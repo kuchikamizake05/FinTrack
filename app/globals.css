@@ -95,6 +95,15 @@ body {
 .linear-panel .border-neutral-800 { border-color: #e2e8f3 !important; }
 .linear-panel .border-neutral-900 { border-color: #edf1f7 !important; }
 
+/* Text carried over from the dark theme: keep content readable on white cards
+   while leaving white labels on colored buttons untouched. */
+main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-white,
+main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-\[\#f7f8f8\] { color: #17233b !important; }
+main :is(p, span, td, th, label, li).text-neutral-200,
+main :is(p, span, td, th, label, li).text-neutral-300 { color: #42526b !important; }
+main :is(input, textarea, select).text-white { color: #17233b !important; }
+main :is(input, textarea, select) { caret-color: #3558d3; }
+
 /* Status Badges */
 .status-badge {
   padding: 3px 8px;
