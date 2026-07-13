@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateNetWorth, validateExchangeTransfer, validateTransfer } from "./ledger";
+import { calculateIdrNetWorth, calculateNetWorth, validateExchangeTransfer, validateTransfer } from "./ledger";
 
 describe("ledger rules", () => {
   it("calculates net worth from active assets minus liabilities", () => {
@@ -9,6 +9,13 @@ describe("ledger rules", () => {
       { id: "credit", kind: "liability", balance: 750_000, isActive: true },
       { id: "old", kind: "bank", balance: 999_999, isActive: false },
     ])).toBe(6_250_000);
+  });
+
+  it("uses a manually supplied IDR value for a foreign-currency account", () => {
+    expect(calculateIdrNetWorth([
+      { id: "bri", kind: "bank", balance: 2_000_000, isActive: true, currency: "IDR", reportingBalanceIdr: null },
+      { id: "hfm", kind: "trading", balance: 100, isActive: true, currency: "USD", reportingBalanceIdr: 1_650_000 },
+    ])).toBe(3_650_000);
   });
 
   it("accepts a positive transfer between two distinct accounts", () => {
