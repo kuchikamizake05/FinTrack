@@ -34,31 +34,31 @@
 }
 
 :root {
-  --background: 150 20% 3%;          /* #030604 - deep forest/obsidian canvas */
-  --foreground: 150 10% 98%;         /* #f6f8f6 - crisp white ink with green undertone */
-  --card: 150 15% 6%;                /* #080d0a - rich forest surface-1 */
-  --card-foreground: 150 10% 98%;
-  --popover: 150 15% 6%;
-  --popover-foreground: 150 10% 98%;
-  --primary: 157 100% 38%;           /* #00c278 - vibrant emerald green */
+  --background: 220 33% 97%;
+  --foreground: 222 38% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 38% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 38% 16%;
+  --primary: 224 75% 52%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 150 10% 12%;          /* #1a221d - deep forest gray surface-2 */
-  --secondary-foreground: 150 10% 98%;
-  --muted: 150 10% 12%;
-  --muted-foreground: 150 8% 65%;    /* #8fa096 - muted mint text */
-  --accent: 150 10% 12%;
-  --accent-foreground: 150 10% 98%;
-  --destructive: 350 75% 45%;
+  --secondary: 220 30% 94%;
+  --secondary-foreground: 222 38% 16%;
+  --muted: 220 30% 94%;
+  --muted-foreground: 220 12% 43%;
+  --accent: 220 30% 94%;
+  --accent-foreground: 222 38% 16%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 150 10% 14%;             /* #202b24 - slate-emerald precise hairline */
-  --input: 150 10% 14%;
-  --ring: 157 100% 38%;
+  --border: 220 23% 89%;
+  --input: 220 23% 89%;
+  --ring: 224 75% 52%;
   --radius: 0.5rem;                  /* 8px compact technical border radius */
 }
 
 /* Base style overrides */
 body {
-  background-color: hsl(var(--background));
+  background-color: #f5f7fb;
   color: hsl(var(--foreground));
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   min-height: 100vh;
@@ -66,25 +66,34 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Technical precise panel styling with emerald undertones */
+/* Bright, bank-like surfaces: clear hierarchy without an AI-dashboard feel. */
 .linear-panel {
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 6px 20px rgba(31, 47, 78, 0.06);
   position: relative;
 }
 
 .linear-card {
-  background-color: rgba(8, 13, 10, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(32, 58, 104, 0.08);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .linear-card:hover {
-  background-color: rgba(16, 26, 20, 0.65);
-  border-color: rgba(0, 194, 120, 0.15);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+  background-color: #ffffff;
+  border-color: rgba(53, 88, 211, 0.22);
+  box-shadow: 0 10px 24px rgba(31, 47, 78, 0.10);
 }
+
+/* Legacy utility colors are normalized here while the screens are migrated. */
+[class*="bg-[#050507]"], [class*="bg-[#030604]"] { background-color: #f5f7fb !important; }
+[class*="bg-[#07070f]"] { background-color: #ffffff !important; }
+[class*="bg-[#101012]"], [class*="bg-[#0a0a0d]"], [class*="bg-[#0b0b0f]"], [class*="bg-[#0f0f1b]"] { background-color: #ffffff !important; }
+[class*="text-[#f7f8f8]"] { color: #1b2740 !important; }
+.linear-panel .text-white, .linear-panel .text-\[\#f7f8f8\] { color: #1b2740 !important; }
+.linear-panel .border-neutral-800 { border-color: #e2e8f3 !important; }
+.linear-panel .border-neutral-900 { border-color: #edf1f7 !important; }
 
 /* Status Badges */
 .status-badge {
