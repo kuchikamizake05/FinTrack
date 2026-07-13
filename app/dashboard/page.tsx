@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { calculateIdrNetWorth, type FinancialAccountKind } from "@/lib/ledger";
+import {
+  calculateAccountMonthlyMovement,
+  calculateGoalProgress,
+  getInstitutionPresentation,
+  getTimeGreeting,
+  maskAmount,
+} from "@/lib/home";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, 
@@ -13,6 +20,7 @@ import {
   Edit3, 
   AlertCircle,
   Eye,
+  EyeOff,
   Calendar,
   Layers,
   ArrowRightLeft,
@@ -23,6 +31,10 @@ import {
   ChartNoAxesCombined,
   Landmark,
   Plus,
+  Target,
+  Clock3,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import Link from "next/link";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
@@ -51,6 +63,7 @@ type Transaction = {
   receipt_url: string | null;
   ai_confidence: number | null;
   status: "confirmed" | "pending_approval" | "needs_review" | "deleted";
+  account_id: string | null;
   created_at: string;
 };
 
@@ -65,12 +78,27 @@ type FinancialAccount = {
   is_active: boolean;
 };
 
+type FinancialGoal = {
+  id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  color: string | null;
+  due_date: string | null;
+};
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingTx, setPendingTx] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [firstName, setFirstName] = useState("Kamu");
+  const [showBalances, setShowBalances] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("fintrack-show-balances") !== "false";
+  });
   
   // PWA Install Prompt States
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -107,6 +135,8 @@ export default function DashboardPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Kamu";
+      setFirstName(String(displayName).split(" ")[0]);
 
       const start = format(startOfMonth(selectedMonth), "yyyy-MM-dd");
       const end = format(endOfMonth(selectedMonth), "yyyy-MM-dd");
@@ -143,6 +173,21 @@ export default function DashboardPage() {
 
       if (accountError) throw accountError;
       setAccounts((accountData || []) as FinancialAccount[]);
+
+      const { data: goalData, error: goalError } = await supabase
+        .from("financial_goals")
+        .select("id, name, target_amount, current_amount, color, due_date")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (goalError) {
+        // The migration can be applied independently on existing Supabase projects.
+        if (goalError.code !== "42P01" && goalError.code !== "PGRST205") console.warn("Goals are unavailable:", goalError.message);
+      } else {
+        setGoals((goalData || []) as FinancialGoal[]);
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -156,6 +201,14 @@ export default function DashboardPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [fetchDashboardData]);
+
+  const toggleBalances = () => {
+    setShowBalances((current) => {
+      const next = !current;
+      window.localStorage.setItem("fintrack-show-balances", String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     const handleBeforeInstall = (event: Event) => {
@@ -259,6 +312,15 @@ export default function DashboardPage() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpense;
+  const accountMonthlyMovement = calculateAccountMonthlyMovement(
+    transactions.map((transaction) => ({
+      accountId: transaction.account_id,
+      type: transaction.type,
+      amount: Number(transaction.amount),
+    })),
+  );
+  const formatIdr = (amount: number) => `Rp${Math.abs(amount).toLocaleString("id-ID")}`;
+  const displayIdr = (amount: number) => maskAmount(formatIdr(amount), showBalances);
   const netWorth = calculateIdrNetWorth(
     accounts.map((account) => ({
       id: account.id,
@@ -357,44 +419,45 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Dashboard Header */}
+        {/* Personal dashboard header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[#f7f8f8]">
-              Home
-            </h1>
-            <p className="text-xs text-[#8a8f98] mt-0.5">
-              Semua rekening, pengeluaran, investasi, dan trading kamu dalam satu ringkasan.
+            <p className="text-sm font-semibold text-violet-600">{getTimeGreeting(new Date().getHours())}, {firstName} 👋</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#17233b]">Keuanganmu hari ini</h1>
+            <p className="mt-1 text-xs text-slate-500">
+              {format(new Date(), "EEEE, dd MMMM yyyy", { locale: id })} · semua yang penting, dalam satu tempat.
             </p>
           </div>
 
-          <div className="flex items-center gap-1 bg-[#101012] border border-[#202024] rounded p-0.5">
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             <button 
               onClick={() => adjustMonth(-1)}
-              className="p-1.5 hover:bg-[#1a1a1e] rounded text-[#8a8f98] hover:text-white transition-colors cursor-pointer click-active"
+              aria-label="Bulan sebelumnya"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors cursor-pointer click-active"
             >
               &larr;
             </button>
             <div className="flex items-center gap-2 px-3 font-semibold text-xs tracking-wide">
-              <Calendar className="w-3.5 h-3.5 text-[#5e6ad2]" />
+              <Calendar className="w-3.5 h-3.5 text-violet-600" />
               <span>{format(selectedMonth, "MMMM yyyy", { locale: id })}</span>
             </div>
             <button 
               onClick={() => adjustMonth(1)}
-              className="p-1.5 hover:bg-[#1a1a1e] rounded text-[#8a8f98] hover:text-white transition-colors cursor-pointer click-active"
+              aria-label="Bulan berikutnya"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors cursor-pointer click-active"
             >
               &rarr;
             </button>
           </div>
         </div>
 
-        <section className="linear-panel rounded-xl p-4 sm:p-5">
-          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-white">Akses cepat</h2><p className="mt-0.5 text-xs text-[#8a8f98]">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-300 hover:text-violet-200">Lihat akun</Link></div>
+        <section className="linear-panel rounded-2xl p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-[#17233b]">Akses cepat</h2><p className="mt-0.5 text-xs text-slate-500">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-600 hover:text-violet-800">Lihat akun</Link></div>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 sm:gap-3">
-            <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-violet-600/15 p-2 text-violet-300"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Catat</span></Link>
-            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-sky-500/10 p-2 text-sky-300"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Transfer</span></Link>
-            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-emerald-500/10 p-2 text-emerald-300"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Saldo</span></Link>
-            <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-lg border border-neutral-800 bg-[#0a0a0d] px-2 py-3 text-center hover:border-violet-500/30"><span className="rounded-lg bg-amber-500/10 p-2 text-amber-300"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-neutral-300 group-hover:text-white">Portfolio</span></Link>
+            <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50"><span className="rounded-xl bg-violet-100 p-2 text-violet-700"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Catat</span></Link>
+            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50"><span className="rounded-xl bg-sky-100 p-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Transfer</span></Link>
+            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Saldo</span></Link>
+            <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-amber-200 hover:bg-amber-50"><span className="rounded-xl bg-amber-100 p-2 text-amber-700"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Portfolio</span></Link>
           </div>
         </section>
 
@@ -407,6 +470,14 @@ export default function DashboardPage() {
 
         {!loading && (
           <>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500">Ringkasan {format(selectedMonth, "MMMM", { locale: id })}</p>
+              <button onClick={toggleBalances} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 click-active" aria-pressed={showBalances}>
+                {showBalances ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showBalances ? "Sembunyikan saldo" : "Tampilkan saldo"}
+              </button>
+            </div>
+
             {/* Bento Grid Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {/* Card 1: Net Worth */}
@@ -417,7 +488,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="text-2xl font-bold tracking-tight text-white font-mono">
-                    Rp{netWorth.toLocaleString("id-ID")}
+                    {displayIdr(netWorth)}
                   </h3>
                   <p className="text-[10px] text-[#8a8f98]">Aset aktif dikurangi kewajiban (IDR)</p>
                 </div>
@@ -431,7 +502,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-0.5">
                   <h3 className={`text-2xl font-bold tracking-tight font-mono ${balance >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {balance >= 0 ? "+" : "-"}Rp{Math.abs(balance).toLocaleString("id-ID")}
+                    {showBalances ? `${balance >= 0 ? "+" : "-"}${formatIdr(balance)}` : "Rp••••••"}
                   </h3>
                   <p className="text-[10px] text-[#8a8f98]">Pemasukan dikurangi pengeluaran bulan ini</p>
                 </div>
@@ -445,7 +516,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="text-2xl font-bold tracking-tight text-[#27a644] font-mono">
-                    Rp{totalIncome.toLocaleString("id-ID")}
+                    {displayIdr(totalIncome)}
                   </h3>
                   <p className="text-[10px] text-[#8a8f98]">Gaji, freelance, & transfer masuk</p>
                 </div>
@@ -459,18 +530,18 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="text-2xl font-bold tracking-tight text-[#ef4444] font-mono">
-                    Rp{totalExpense.toLocaleString("id-ID")}
+                    {displayIdr(totalExpense)}
                   </h3>
                   <p className="text-[10px] text-[#8a8f98]">Pengeluaran harian & bulanan</p>
                 </div>
               </div>
             </div>
 
-            <div className="linear-panel p-5 rounded-lg space-y-4">
+            <div className="linear-panel p-5 rounded-2xl space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#8a8f98]">Saldo per Akun</h2>
-                  <p className="mt-1 text-xs text-neutral-500">Saldo berubah otomatis dari transaksi dan transfer yang sudah dikonfirmasi.</p>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo per Akun</h2>
+                  <p className="mt-1 text-xs text-slate-500">Saldo berubah otomatis dari transaksi dan transfer yang sudah dikonfirmasi.</p>
                 </div>
                 <Link href="/accounts" className="shrink-0 text-xs text-[#5e6ad2] hover:text-[#828fff] font-bold flex items-center gap-0.5 transition-colors">
                   Kelola Akun
@@ -480,17 +551,34 @@ export default function DashboardPage() {
               {accounts.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {accounts.filter((account) => account.is_active).map((account) => (
-                    <div key={account.id} className="rounded-md border border-neutral-800 bg-[#0a0a0d] p-3.5">
+                    <div key={account.id} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 transition hover:-translate-y-0.5 hover:shadow-sm">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-white">{account.name}</p>
-                          <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-neutral-500">{account.institution || account.kind}</p>
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          {(() => {
+                            const presentation = getInstitutionPresentation(account.institution, account.kind);
+                            return <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[10px] font-black ${presentation.tone}`}>{presentation.initials}</span>;
+                          })()}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[#17233b]">{account.name}</p>
+                            <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-slate-500">{account.institution || account.kind}</p>
+                          </div>
                         </div>
-                        <span className="rounded border border-neutral-800 bg-neutral-900 px-1.5 py-0.5 text-[9px] font-bold uppercase text-neutral-400">{account.kind}</span>
+                        <span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase text-slate-500 shadow-sm">{account.kind}</span>
                       </div>
-                      <p className={`mt-4 font-mono text-lg font-bold ${account.kind === "liability" ? "text-rose-400" : "text-white"}`}>
-                        {account.kind === "liability" ? "-" : ""}{account.currency === "IDR" ? "Rp" : `${account.currency} `}{Math.abs(Number(account.current_balance)).toLocaleString("id-ID")}
-                      </p>
+                      <div className="mt-4 flex items-end justify-between gap-2">
+                        <p className={`font-mono text-lg font-bold ${account.kind === "liability" ? "text-rose-600" : "text-[#17233b]"}`}>
+                          {showBalances ? `${account.kind === "liability" ? "-" : ""}${account.currency === "IDR" ? "Rp" : `${account.currency} `}${Math.abs(Number(account.current_balance)).toLocaleString("id-ID")}` : `${account.currency === "IDR" ? "Rp" : `${account.currency} `}••••••`}
+                        </p>
+                        <Link href="/accounts" className="rounded-lg bg-white p-1.5 text-slate-400 shadow-sm transition hover:text-violet-600" aria-label={`Perbarui saldo ${account.name}`}><Edit3 className="h-3.5 w-3.5" /></Link>
+                      </div>
+                      {(() => {
+                        const monthlyChange = accountMonthlyMovement.get(account.id) || 0;
+                        const positive = monthlyChange >= 0;
+                        return <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${positive ? "text-emerald-600" : "text-rose-600"}`}>
+                          {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                          {monthlyChange === 0 ? "Belum ada aktivitas bulan ini" : `${positive ? "+" : "-"}${showBalances ? formatIdr(monthlyChange) : "Rp••••••"} bulan ini`}
+                        </p>;
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -502,6 +590,40 @@ export default function DashboardPage() {
               {foreignAccountsWithoutValuation.length > 0 && (
                 <p className="text-[10px] text-amber-400/90">Ada akun mata uang asing tanpa nilai setara IDR; akun tersebut belum masuk net worth.</p>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <section className="linear-panel rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="flex items-center gap-2 text-sm font-bold text-[#17233b]"><Target className="h-4 w-4 text-violet-600" /> Target keuangan</h2>
+                    <p className="mt-1 text-xs text-slate-500">Pantau kemajuan yang ingin kamu capai.</p>
+                  </div>
+                  <Link href="/accounts" className="text-xs font-bold text-violet-600 hover:text-violet-800">Kelola dana</Link>
+                </div>
+                {goals.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {goals.map((goal) => {
+                      const progress = calculateGoalProgress(Number(goal.current_amount), Number(goal.target_amount));
+                      const circumference = 2 * Math.PI * 16;
+                      return <div key={goal.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <div className="relative flex h-11 w-11 items-center justify-center">
+                          <svg className="h-11 w-11 -rotate-90" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" strokeWidth="4" /><circle cx="20" cy="20" r="16" fill="none" stroke={goal.color || "#7c3aed"} strokeWidth="4" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress.percentage / 100)} /></svg>
+                          <span className="absolute text-[9px] font-bold text-slate-700">{progress.percentage}%</span>
+                        </div>
+                        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#17233b]">{goal.name}</p><p className="mt-0.5 text-[10px] text-slate-500">Sisa {displayIdr(progress.remaining)} dari {displayIdr(Number(goal.target_amount))}</p></div>
+                      </div>;
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-dashed border-violet-200 bg-violet-50/60 p-4 text-center"><Target className="mx-auto h-5 w-5 text-violet-500" /><p className="mt-2 text-xs font-bold text-[#17233b]">Belum ada target aktif</p><p className="mt-1 text-[11px] text-slate-500">Buat target dana darurat atau pembelian besar setelah menjalankan migration target keuangan.</p></div>
+                )}
+              </section>
+
+              <section className="linear-panel rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-bold text-[#17233b]"><Clock3 className="h-4 w-4 text-sky-600" /> Aktivitas terakhir</h2><p className="mt-1 text-xs text-slate-500">Transaksi terbaru di bulan yang dipilih.</p></div><Link href="/transactions" className="text-xs font-bold text-violet-600 hover:text-violet-800">Lihat semua</Link></div>
+                {transactions.length > 0 ? <div className="mt-4 space-y-3">{transactions.slice(0, 4).map((transaction) => <div key={transaction.id} className="flex items-center gap-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${transaction.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>{transaction.type === "income" ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#17233b]">{transaction.merchant || transaction.note || transaction.category}</p><p className="mt-0.5 text-[10px] text-slate-500">{format(parseISO(transaction.date), "dd MMM", { locale: id })} · {transaction.category}</p></div><p className={`text-xs font-bold ${transaction.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>{transaction.type === "income" ? "+" : "-"}{displayIdr(Number(transaction.amount))}</p></div>)}</div> : <div className="mt-4 rounded-xl bg-slate-50 p-4 text-center"><p className="text-xs font-bold text-[#17233b]">Mulai dari satu transaksi kecil</p><p className="mt-1 text-[11px] text-slate-500">Catat pengeluaran atau pemasukan pertama agar pola keuanganmu mulai terbentuk.</p><Link href="/transactions" className="mt-3 inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white">Catat transaksi</Link></div>}
+              </section>
             </div>
 
             {/* Pending Approvals Widget */}
