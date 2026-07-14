@@ -439,7 +439,7 @@ export default function DashboardPage() {
         {/* Personal dashboard header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-violet-600">{getTimeGreeting(new Date().getHours())}, {firstName} 👋</p>
+            <p className="text-sm font-semibold text-emerald-700">{getTimeGreeting(new Date().getHours())}, {firstName} 👋</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#17233b]">Keuanganmu hari ini</h1>
             <p className="mt-1 text-xs text-slate-500">
               {format(new Date(), "EEEE, dd MMMM yyyy", { locale: id })} · semua yang penting, dalam satu tempat.
@@ -465,16 +465,16 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <section className="linear-panel overflow-hidden rounded-2xl">
-              <div className="bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-5 py-4 text-white sm:px-6 sm:py-5">
+            <section className="linear-panel overflow-hidden rounded-2xl border-emerald-100">
+              <div className="bg-white px-5 py-4 sm:px-6 sm:py-5">
                 <div className="flex items-start justify-between gap-3">
-                  <div><div className="flex items-center gap-1 rounded-lg bg-white/10 p-0.5 text-violet-50"><button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="rounded-md p-1 transition hover:bg-white/15 click-active">&larr;</button><span className="flex items-center gap-1 px-1.5 text-[10px] font-bold"><Calendar className="h-3 w-3" />{format(selectedMonth, "MMMM yyyy", { locale: id })}</span><button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="rounded-md p-1 transition hover:bg-white/15 click-active">&rarr;</button></div><p className="mt-2 text-xs text-violet-100">Total kekayaan bersih</p></div>
-                  <button onClick={toggleBalances} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/25 click-active" aria-pressed={showBalances}>{showBalances ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{showBalances ? "Sembunyikan" : "Tampilkan"}</button>
+                  <div><div className="flex items-center gap-1 rounded-lg bg-emerald-50 p-0.5 text-emerald-700"><button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="rounded-md p-1 transition hover:bg-emerald-100 click-active">&larr;</button><span className="flex items-center gap-1 px-1.5 text-[10px] font-bold"><Calendar className="h-3 w-3" />{format(selectedMonth, "MMMM yyyy", { locale: id })}</span><button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="rounded-md p-1 transition hover:bg-emerald-100 click-active">&rarr;</button></div><p className="mt-2 text-xs text-slate-500">Total kekayaan bersih</p></div>
+                  <button onClick={toggleBalances} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 click-active" aria-pressed={showBalances}>{showBalances ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{showBalances ? "Sembunyikan" : "Tampilkan"}</button>
                 </div>
-                <div className="mt-3 flex items-end justify-between gap-4"><h2 className="min-w-0 truncate font-mono text-3xl font-bold tracking-tight sm:text-4xl">{displayIdr(netWorth)}</h2><Wallet className="mb-1 h-6 w-6 shrink-0 text-violet-100" /></div>
-                <p className="mt-1 text-[11px] text-violet-100">Aset aktif dikurangi kewajiban</p>
+                <div className="mt-3 flex items-end justify-between gap-4"><h2 className="min-w-0 truncate font-mono text-3xl font-bold tracking-tight text-[#17233b] sm:text-4xl">{displayIdr(netWorth)}</h2><Wallet className="mb-1 h-6 w-6 shrink-0 text-emerald-600" /></div>
+                <p className="mt-1 text-[11px] text-slate-500">Aset aktif dikurangi kewajiban</p>
               </div>
-              <div className="grid grid-cols-3 divide-x divide-slate-100 bg-white">
+              <div className="grid grid-cols-3 divide-x divide-emerald-100 bg-emerald-50/70">
                 <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><ArrowRightLeft className="h-3 w-3 text-violet-500" /> Arus kas</div><p className={`mt-1 truncate font-mono text-sm font-bold sm:text-base ${balance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{showBalances ? `${balance >= 0 ? "+" : "-"}${formatIdr(balance)}` : "Rp••••••"}</p></div>
                 <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><TrendingUp className="h-3 w-3 text-emerald-500" /> Masuk</div><p className="mt-1 truncate font-mono text-sm font-bold text-emerald-600 sm:text-base">{displayIdr(totalIncome)}</p></div>
                 <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><TrendingDown className="h-3 w-3 text-rose-500" /> Keluar</div><p className="mt-1 truncate font-mono text-sm font-bold text-rose-600 sm:text-base">{displayIdr(totalExpense)}</p><p className={`hidden sm:block text-[10px] ${expenseChange === null ? "text-slate-500" : expenseChange > 0 ? "text-rose-500" : "text-emerald-600"}`}>{expenseChange === null ? "Bulan ini" : `${expenseChange > 0 ? "Naik" : "Turun"} ${Math.abs(expenseChange).toLocaleString("id-ID")}%`}</p></div>
@@ -541,9 +541,9 @@ export default function DashboardPage() {
             </div>
 
             <section className="linear-panel rounded-2xl p-4 sm:p-5">
-              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-[#17233b]">Akses cepat</h2><p className="mt-0.5 text-xs text-slate-500">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-600 hover:text-violet-800">Lihat akun</Link></div>
+              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-[#17233b]">Akses cepat</h2><p className="mt-0.5 text-xs text-slate-500">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">Lihat akun</Link></div>
               <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50"><span className="rounded-xl bg-violet-100 p-2 text-violet-700"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Catat</span></Link>
+                <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Catat</span></Link>
                 <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50"><span className="rounded-xl bg-sky-100 p-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Transfer</span></Link>
                 <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Saldo</span></Link>
                 <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-amber-200 hover:bg-amber-50"><span className="rounded-xl bg-amber-100 p-2 text-amber-700"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Portfolio</span></Link>
