@@ -468,16 +468,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <section className="linear-panel rounded-2xl p-4 sm:p-5">
-          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-[#17233b]">Akses cepat</h2><p className="mt-0.5 text-xs text-slate-500">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-600 hover:text-violet-800">Lihat akun</Link></div>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 sm:gap-3">
-            <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50"><span className="rounded-xl bg-violet-100 p-2 text-violet-700"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Catat</span></Link>
-            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50"><span className="rounded-xl bg-sky-100 p-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Transfer</span></Link>
-            <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Saldo</span></Link>
-            <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-amber-200 hover:bg-amber-50"><span className="rounded-xl bg-amber-100 p-2 text-amber-700"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Portfolio</span></Link>
-          </div>
-        </section>
-
         {/* Loading Spinner */}
         {loading && (
           <div className="py-20 flex justify-center items-center">
@@ -496,63 +486,73 @@ export default function DashboardPage() {
             </div>
 
             {/* Bento Grid Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-4">
               {/* Card 1: Net Worth */}
-              <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
+              <div className="linear-panel p-2.5 sm:p-5 rounded-xl flex flex-col justify-between h-24 sm:h-28">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Net Worth</span>
-                  <Wallet className="w-4 h-4 text-[#8a8f98]" />
+                  <span className="text-[8px] sm:text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Net Worth</span>
+                  <Wallet className="w-3 h-3 sm:w-4 sm:h-4 text-[#8a8f98]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className="text-2xl font-bold tracking-tight text-white font-mono">
+                  <h3 className="text-sm sm:text-2xl font-bold tracking-tight text-white font-mono truncate">
                     {displayIdr(netWorth)}
                   </h3>
-                  <p className="text-[10px] text-[#8a8f98]">Aset aktif dikurangi kewajiban (IDR)</p>
+                  <p className="hidden sm:block text-[10px] text-[#8a8f98]">Aset aktif dikurangi kewajiban (IDR)</p>
                 </div>
               </div>
 
               {/* Card 2: Cash Flow */}
-              <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
+              <div className="linear-panel p-2.5 sm:p-5 rounded-xl flex flex-col justify-between h-24 sm:h-28">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Arus Kas</span>
-                  <ArrowRightLeft className="w-4 h-4 text-[#5e6ad2]" />
+                  <span className="text-[8px] sm:text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Arus Kas</span>
+                  <ArrowRightLeft className="w-3 h-3 sm:w-4 sm:h-4 text-[#5e6ad2]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className={`text-2xl font-bold tracking-tight font-mono ${balance >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  <h3 className={`text-sm sm:text-2xl font-bold tracking-tight font-mono truncate ${balance >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {showBalances ? `${balance >= 0 ? "+" : "-"}${formatIdr(balance)}` : "Rp••••••"}
                   </h3>
-                  <p className="text-[10px] text-[#8a8f98]">Pemasukan dikurangi pengeluaran bulan ini</p>
+                  <p className="hidden sm:block text-[10px] text-[#8a8f98]">Pemasukan dikurangi pengeluaran bulan ini</p>
                 </div>
               </div>
 
               {/* Card 3: Income */}
-              <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
+              <div className="linear-panel p-2.5 sm:p-5 rounded-xl flex flex-col justify-between h-24 sm:h-28">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Pemasukan</span>
-                  <TrendingUp className="w-4 h-4 text-[#27a644]" />
+                  <span className="text-[8px] sm:text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Masuk</span>
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-[#27a644]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className="text-2xl font-bold tracking-tight text-[#27a644] font-mono">
+                  <h3 className="text-sm sm:text-2xl font-bold tracking-tight text-[#27a644] font-mono truncate">
                     {displayIdr(totalIncome)}
                   </h3>
-                  <p className="text-[10px] text-[#8a8f98]">Gaji, freelance, & transfer masuk</p>
+                  <p className="hidden sm:block text-[10px] text-[#8a8f98]">Gaji, freelance, & transfer masuk</p>
                 </div>
               </div>
 
               {/* Card 4: Expense */}
-              <div className="linear-panel p-5 rounded-lg flex flex-col justify-between h-28">
+              <div className="linear-panel p-2.5 sm:p-5 rounded-xl flex flex-col justify-between h-24 sm:h-28">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Pengeluaran</span>
-                  <TrendingDown className="w-4 h-4 text-[#ef4444]" />
+                  <span className="text-[8px] sm:text-xs font-semibold tracking-wider text-[#8a8f98] uppercase">Keluar</span>
+                  <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-[#ef4444]" />
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className="text-2xl font-bold tracking-tight text-[#ef4444] font-mono">
+                  <h3 className="text-sm sm:text-2xl font-bold tracking-tight text-[#ef4444] font-mono truncate">
                     {displayIdr(totalExpense)}
                   </h3>
-                  <p className={`text-[10px] ${expenseChange === null ? "text-[#8a8f98]" : expenseChange > 0 ? "text-rose-500" : "text-emerald-600"}`}>{expenseChange === null ? "Pengeluaran harian & bulanan" : `${expenseChange > 0 ? "Naik" : "Turun"} ${Math.abs(expenseChange).toLocaleString("id-ID")}% vs bulan lalu`}</p>
+                  <p className={`hidden sm:block text-[10px] ${expenseChange === null ? "text-[#8a8f98]" : expenseChange > 0 ? "text-rose-500" : "text-emerald-600"}`}>{expenseChange === null ? "Pengeluaran harian & bulanan" : `${expenseChange > 0 ? "Naik" : "Turun"} ${Math.abs(expenseChange).toLocaleString("id-ID")}% vs bulan lalu`}</p>
                 </div>
               </div>
             </div>
+
+            <section className="linear-panel rounded-2xl p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-bold text-[#17233b]">Akses cepat</h2><p className="mt-0.5 text-xs text-slate-500">Hal yang paling sering kamu lakukan.</p></div><Link href="/accounts" className="text-xs font-bold text-violet-600 hover:text-violet-800">Lihat akun</Link></div>
+              <div className="grid grid-cols-4 gap-2 sm:gap-3">
+                <Link href="/transactions" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50"><span className="rounded-xl bg-violet-100 p-2 text-violet-700"><Plus className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Catat</span></Link>
+                <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50"><span className="rounded-xl bg-sky-100 p-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Transfer</span></Link>
+                <Link href="/accounts" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"><span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><Landmark className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Saldo</span></Link>
+                <Link href="/investments" className="group flex flex-col items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-amber-200 hover:bg-amber-50"><span className="rounded-xl bg-amber-100 p-2 text-amber-700"><ChartNoAxesCombined className="h-4 w-4" /></span><span className="text-[10px] font-bold text-slate-700">Portfolio</span></Link>
+              </div>
+            </section>
 
             <div className="linear-panel p-5 rounded-2xl space-y-4">
               <div className="flex items-center justify-between gap-4">
