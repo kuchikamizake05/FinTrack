@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTradeReviewDispatch } from "./trade-review";
+import { buildTradeReviewDispatch, parseTradeReviewRequest } from "./trade-review";
 
 describe("buildTradeReviewDispatch", () => {
   it("builds an authenticated n8n payload without placing secrets in the body", () => {
@@ -17,5 +17,23 @@ describe("buildTradeReviewDispatch", () => {
 
   it("rejects missing configuration or identifiers", () => {
     expect(() => buildTradeReviewDispatch({ webhookUrl: "", sharedSecret: "", userId: "", tradeId: "" })).toThrow("not configured");
+  });
+});
+
+describe("parseTradeReviewRequest", () => {
+  it("accepts a UUID trade id and a well-formed bearer token", () => {
+    expect(parseTradeReviewRequest({
+      tradeId: "7e4f58f8-c5b5-49d6-b66f-16c73bb04d8f",
+      authorization: "Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
+    })).toEqual({
+      ok: true,
+      tradeId: "7e4f58f8-c5b5-49d6-b66f-16c73bb04d8f",
+      accessToken: "eyJhbGciOiJIUzI1NiJ9.payload.signature",
+    });
+  });
+
+  it("rejects malformed identifiers and authorization headers", () => {
+    expect(parseTradeReviewRequest({ tradeId: "../admin", authorization: "Bearer token" })).toEqual({ ok: false });
+    expect(parseTradeReviewRequest({ tradeId: "7e4f58f8-c5b5-49d6-b66f-16c73bb04d8f", authorization: "Basic abc" })).toEqual({ ok: false });
   });
 });
