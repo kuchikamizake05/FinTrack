@@ -104,6 +104,12 @@ main :is(p, span, td, th, label, li).text-neutral-300 { color: #42526b !importan
 main :is(input, textarea, select).text-white { color: #17233b !important; }
 main :is(input, textarea, select) { caret-color: #3558d3; }
 
+/* Warning and error text was originally tuned for the dark interface.
+   Keep it legible against the bright alert surfaces. */
+main [class~="text-amber-100"], main [class~="text-amber-200"], main [class~="text-amber-300"] { color: #92400e !important; }
+main [class~="text-rose-100"], main [class~="text-rose-200"], main [class~="text-rose-300"] { color: #be123c !important; }
+main [class~="text-emerald-300"] { color: #047857 !important; }
+
 /* Status Badges */
 .status-badge {
   padding: 3px 8px;
