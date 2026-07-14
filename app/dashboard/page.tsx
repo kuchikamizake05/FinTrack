@@ -477,7 +477,7 @@ export default function DashboardPage() {
 
         {!loading && (
           <>
-            <div className="flex items-center justify-between">
+            <div className="hidden">
               <p className="text-xs font-semibold text-slate-500">Ringkasan {format(selectedMonth, "MMMM", { locale: id })}</p>
               <button onClick={toggleBalances} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 click-active" aria-pressed={showBalances}>
                 {showBalances ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -485,8 +485,24 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Bento Grid Summary Cards */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-4">
+            <section className="linear-panel overflow-hidden rounded-2xl">
+              <div className="bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-5 py-4 text-white sm:px-6 sm:py-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-violet-100">Ringkasan {format(selectedMonth, "MMMM", { locale: id })}</p><p className="mt-1 text-xs text-violet-100">Total kekayaan bersih</p></div>
+                  <button onClick={toggleBalances} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/25 click-active" aria-pressed={showBalances}>{showBalances ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{showBalances ? "Sembunyikan" : "Tampilkan"}</button>
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-4"><h2 className="min-w-0 truncate font-mono text-3xl font-bold tracking-tight sm:text-4xl">{displayIdr(netWorth)}</h2><Wallet className="mb-1 h-6 w-6 shrink-0 text-violet-100" /></div>
+                <p className="mt-1 text-[11px] text-violet-100">Aset aktif dikurangi kewajiban</p>
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-slate-100 bg-white">
+                <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><ArrowRightLeft className="h-3 w-3 text-violet-500" /> Arus kas</div><p className={`mt-1 truncate font-mono text-sm font-bold sm:text-base ${balance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{showBalances ? `${balance >= 0 ? "+" : "-"}${formatIdr(balance)}` : "Rp••••••"}</p></div>
+                <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><TrendingUp className="h-3 w-3 text-emerald-500" /> Masuk</div><p className="mt-1 truncate font-mono text-sm font-bold text-emerald-600 sm:text-base">{displayIdr(totalIncome)}</p></div>
+                <div className="min-w-0 px-3 py-3 sm:px-5"><div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500"><TrendingDown className="h-3 w-3 text-rose-500" /> Keluar</div><p className="mt-1 truncate font-mono text-sm font-bold text-rose-600 sm:text-base">{displayIdr(totalExpense)}</p><p className={`hidden sm:block text-[10px] ${expenseChange === null ? "text-slate-500" : expenseChange > 0 ? "text-rose-500" : "text-emerald-600"}`}>{expenseChange === null ? "Bulan ini" : `${expenseChange > 0 ? "Naik" : "Turun"} ${Math.abs(expenseChange).toLocaleString("id-ID")}%`}</p></div>
+              </div>
+            </section>
+
+            {/* Legacy compact cards are kept hidden while the unified summary is active. */}
+            <div className="hidden">
               {/* Card 1: Net Worth */}
               <div className="linear-panel p-2.5 sm:p-5 rounded-xl flex flex-col justify-between h-24 sm:h-28">
                 <div className="flex items-center justify-between">
