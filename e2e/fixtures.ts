@@ -79,18 +79,42 @@ export async function mockAuthenticatedSession(page: Page, onboardingCompleted =
 }
 
 export async function mockSupabase(page: Page, authenticated: boolean) {
+  let signedIn = authenticated;
   if (authenticated) {
     await mockAuthenticatedSession(page);
   }
 
   await page.route("https://e2e-project.supabase.co/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === "/auth/v1/token" && url.searchParams.get("grant_type") === "password") {
+      signedIn = true;
+      await route.fulfill({
+        status: 200,
+        json: {
+          access_token: accessToken,
+          refresh_token: "e2e-refresh-token",
+          expires_in: 3600,
+          expires_at: 4_102_444_800,
+          token_type: "bearer",
+          user,
+        },
+      });
+      return;
+    }
+    if (url.pathname === "/auth/v1/signup") {
+      await route.fulfill({ status: 200, json: { user, session: null } });
+      return;
+    }
+    if (url.pathname === "/auth/v1/recover") {
+      await route.fulfill({ status: 200, json: {} });
+      return;
+    }
     if (url.pathname === "/auth/v1/otp") {
       await route.fulfill({ status: 200, json: {} });
       return;
     }
     if (url.pathname === "/auth/v1/user") {
-      await route.fulfill(authenticated
+      await route.fulfill(signedIn
         ? { status: 200, json: user }
         : { status: 401, json: { message: "invalid session" } });
       return;

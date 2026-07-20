@@ -4,7 +4,7 @@ FinTrack adalah PWA pencatat keuangan pribadi untuk transaksi manual, akun dan s
 
 ## Fitur utama
 
-- Magic-link login dengan Supabase Auth
+- Login email/password, pendaftaran akun, pemulihan password, dan Google OAuth dengan Supabase Auth
 - Dashboard net worth IDR, arus kas bulanan, saldo akun, dan transaksi tertunda
 - Rekening, e-wallet, broker, kewajiban, dan transfer antar-akun atomik
 - Manajemen transaksi dan kategori dengan ekspor CSV dan soft delete
@@ -23,6 +23,17 @@ npm run dev
 ```
 
 Isi `.env.local` dengan konfigurasi milikmu. Variabel `NEXT_PUBLIC_*` memang dikirim ke browser; provider key, service-role key, shared secret, dan webhook privat harus tetap server-only.
+
+## Konfigurasi autentikasi
+
+FinTrack menggunakan Supabase Auth agar identitas pengguna tetap kompatibel dengan seluruh policy RLS berbasis `auth.uid()`.
+
+1. Di Supabase Dashboard buka **Authentication > Providers > Email**, aktifkan email/password, dan tentukan apakah akun baru wajib mengonfirmasi email.
+2. Untuk Google, buat OAuth Client bertipe **Web application** di Google Auth Platform. Masukkan callback URL yang ditampilkan pada halaman provider Google di Supabase sebagai **Authorized redirect URI**, lalu simpan Client ID dan Client Secret hanya di Supabase Dashboard.
+3. Di **Authentication > URL Configuration**, tambahkan `http://localhost:3000/**` untuk development dan `https://*-kuchikamizakes-projects.vercel.app/**` untuk preview Vercel. Saat production memiliki domain tetap, jadikan domain itu Site URL dan tambahkan path redirect production secara eksplisit.
+4. Jika template email pernah dikustomisasi, pastikan link konfirmasi dan recovery memakai `{{ .RedirectTo }}` agar kembali ke URL yang diminta aplikasi.
+
+Google Client Secret tidak digunakan oleh Next.js/Vercel dan tidak boleh dimasukkan ke `.env.local` atau repository.
 
 Untuk database baru, jalankan `supabase/schema.sql`, lalu migration dalam `supabase/migrations/` berdasarkan urutan nama file. Jangan mengubah migration yang sudah diterapkan; tambahkan migration baru untuk perubahan berikutnya.
 
