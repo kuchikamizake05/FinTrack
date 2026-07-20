@@ -8,7 +8,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // The mocked Supabase server is more stable under bounded local concurrency.
+  workers: process.env.CI ? 1 : 4,
   reporter: process.env.CI
     ? [["list"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],

@@ -1,48 +1,58 @@
 # FinTrack
 
-PWA pencatat keuangan pribadi yang menerima transaksi manual dari dashboard dan transaksi otomatis dari bot Telegram melalui n8n.
+FinTrack adalah PWA pencatat keuangan pribadi untuk transaksi manual, akun dan saldo, investasi, jurnal trading, serta otomasi Telegram melalui n8n.
 
-## Yang tersedia
+## Fitur utama
 
 - Magic-link login dengan Supabase Auth
-- Dashboard ringkasan net worth IDR, arus kas bulanan, saldo akun, kategori, dan transaksi yang menunggu konfirmasi
-- Rekening, e-wallet, broker, dan kewajiban dengan transfer antar-akun yang memperbarui saldo secara atomik
-- Tambah, ubah, filter, ekspor CSV, pulihkan, dan soft-delete transaksi yang ditautkan ke akun sumber
-- Manajemen kategori
-- Workflow n8n untuk pesan teks Telegram dan OCR struk menggunakan Gemini
-- PWA manifest, service worker, dan ikon aplikasi
+- Dashboard net worth IDR, arus kas bulanan, saldo akun, dan transaksi tertunda
+- Rekening, e-wallet, broker, kewajiban, dan transfer antar-akun atomik
+- Manajemen transaksi dan kategori dengan ekspor CSV dan soft delete
+- Portofolio investasi, jurnal trading, AI trade review, dan Smart Insights
+- PWA installable dengan offline fallback
+- Workflow n8n untuk teks Telegram, OCR struk, dan review trading
 
-## Menjalankan dashboard
+## Menjalankan aplikasi
 
-1. Salin `.env.example` menjadi `.env.local`, lalu isi kredensial Supabase publik Anda.
-2. Jalankan `supabase/schema.sql`, lalu migration ini **dengan urutan persis** pada SQL Editor Supabase: `20260713_align_transaction_category.sql`, `20260714_add_financial_accounts.sql`, `20260714_add_investment_and_forex_journal.sql`, `20260714_add_ai_trade_reviews.sql`, `20260714_add_cross_currency_transfer_support.sql`, `20260714_add_account_reporting_value.sql`, `20260714_add_financial_goals.sql`, dan `20260714_add_account_equity_snapshots.sql`. Ini juga diperlukan pada database baru karena akun, transfer, jurnal, target, snapshot equity, dan trigger saldo berada di migration.
-3. Instal dependensi dan mulai aplikasi:
+Persyaratan: Node.js 20.9 atau lebih baru dan sebuah proyek Supabase.
 
 ```bash
-npm install
+npm ci
+copy .env.example .env.local
 npm run dev
 ```
 
-## Menghubungkan bot
+Isi `.env.local` dengan konfigurasi milikmu. Variabel `NEXT_PUBLIC_*` memang dikirim ke browser; provider key, service-role key, shared secret, dan webhook privat harus tetap server-only.
 
-1. Import workflow yang diperlukan dari `n8n/` ke instance n8n Anda. Dua workflow transaksi menangani Telegram; `forex-trade-review-workflow.json` menangani review satu trade; `forex-weekly-review-workflow.json` menghasilkan laporan mingguan.
-2. Pasang Telegram credential pada node trigger dan pengirim pesan.
-3. Atur environment variable berikut di n8n: `TELEGRAM_ALLOWED_USER_ID`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, dan `SUPABASE_USER_ID`. Untuk review satu trade, tambahkan juga `N8N_TRADE_REVIEW_SHARED_SECRET` yang sama dengan aplikasi. Service role hanya boleh berada pada environment server/n8n, tidak pernah memakai awalan `NEXT_PUBLIC_`, dan tidak boleh dibagikan.
-4. Buat bucket Supabase Storage privat bernama `receipts-temp`, lalu pastikan policy bucket mengizinkan service yang digunakan n8n menulis objek.
-5. Uji tiap workflow secara manual dengan satu pesan dan satu struk sebelum mengaktifkannya. Workflow sengaja tersimpan nonaktif agar import tidak langsung memproses pesan pada environment yang belum dikonfigurasi.
+Untuk database baru, jalankan `supabase/schema.sql`, lalu migration dalam `supabase/migrations/` berdasarkan urutan nama file. Jangan mengubah migration yang sudah diterapkan; tambahkan migration baru untuk perubahan berikutnya.
 
-Untuk review trade dari aplikasi, salin `.env.example` menjadi `.env.local` lalu isi dua variabel `N8N_TRADE_REVIEW_*`; gunakan production webhook URL n8n setelah workflow diaktifkan. AI menyimpan hasil sebagai `ai_trade_reviews` dan tidak punya jalur untuk mengubah transaksi, saldo, atau trade.
+## Integrasi n8n
+
+Workflow dalam `n8n/` adalah template nonaktif dan tidak menyimpan credential nyata. Setelah import:
+
+1. Hubungkan credential Telegram pada node terkait.
+2. Atur `TELEGRAM_ALLOWED_USER_ID`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, dan `SUPABASE_USER_ID` di environment n8n.
+3. Untuk review trade, tambahkan `N8N_TRADE_REVIEW_SHARED_SECRET` yang sama dengan environment server aplikasi.
+4. Buat bucket privat `receipts-temp` dan policy akses yang sesuai.
+5. Uji menggunakan data dummy sebelum mengaktifkan workflow.
+
+Jangan mengekspor credential n8n ke repository. Gunakan suffix `.private.json` untuk export lokal agar otomatis di-ignore.
 
 ## Kualitas kode
 
 ```bash
-npm run lint
-npx tsc --noEmit
+npm run check
 npm run test:coverage
-npm run build
-npm audit --omit=dev --audit-level=moderate
+npm run audit:security
 ```
 
-## Kontrak data transaksi
+CI menjalankan lint, typecheck, unit test, production build, dan audit dependency untuk setiap pull request dan push ke `main`.
 
-Kolom `transactions.category` adalah nama kategori (teks), bukan UUID. Kontrak ini digunakan konsisten oleh frontend dan kedua workflow n8n. Nama kategori disimpan sebagai snapshot agar transaksi lama tetap terbaca jika kategori kemudian diubah atau dihapus.
+## Struktur dan keamanan
+
+- [Arsitektur repository](docs/architecture.md)
+- [Kebijakan keamanan](SECURITY.md)
+- `.env.example` adalah satu-satunya file environment yang boleh di-commit.
+- Data finansial lokal, receipt, export, database dump, audit visual, dan state tooling tidak boleh masuk Git.
+
+Kolom `transactions.category` menyimpan nama kategori sebagai snapshot teks, bukan UUID, agar transaksi lama tetap dapat dibaca setelah kategori diubah atau dihapus.

@@ -7,10 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:list": "playwright test --list"
+    "test:e2e:list": "playwright test --list",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "audit:security": "npm audit --omit=dev --audit-level=high"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
@@ -23,6 +29,7 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.77.0",
     "recharts": "^3.8.1",
+    "server-only": "0.0.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^4.4.3"

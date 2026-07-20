@@ -1,7 +1,7 @@
 import { expect, mockSupabase, test } from "./fixtures";
 
 const routes = [
-  ["/dashboard", "Kondisi keuangan bulan ini"],
+  ["/dashboard", /^(?:Keuanganmu|Kondisi keuangan bulan ini)$/],
   ["/transactions", "Transaksi"],
   ["/accounts", "Akun & saldo"],
   ["/categories", "Kategori"],

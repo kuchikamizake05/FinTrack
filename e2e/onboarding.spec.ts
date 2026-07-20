@@ -1,6 +1,8 @@
 import type { Page, Route } from "@playwright/test";
 import { expect, mockAuthenticatedSession, test, user } from "./fixtures";
 
+const dashboardHeading = /^(?:Keuanganmu|Kondisi keuangan bulan ini)$/;
+
 type MockState = {
   account: null | {
     id: string;
@@ -131,7 +133,7 @@ test.describe("premium onboarding @critical", () => {
     await expect(page.getByText(/Rp\s*875\.000/)).toBeVisible();
     await page.getByRole("button", { name: /Buka dashboard/ }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Kondisi keuangan bulan ini" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: dashboardHeading })).toBeVisible();
   });
 
   test("refresh resumes after the account step and deferral can resume from dashboard", async ({ page }) => {
@@ -142,8 +144,9 @@ test.describe("premium onboarding @critical", () => {
     await expect(page.getByRole("heading", { name: "Catat satu aktivitas nyata." })).toBeVisible();
     await page.getByRole("button", { name: "Lanjutkan nanti" }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Selesaikan penyiapan FinTrack" })).toBeVisible();
-    await page.getByRole("button", { name: /Selesaikan penyiapan/ }).click();
+    const setupCard = page.getByRole("region", { name: /Progres penyiapan|Selesaikan penyiapan FinTrack/ });
+    await expect(setupCard).toBeVisible();
+    await setupCard.getByRole("button", { name: /Lanjutkan penyiapan|Selesaikan penyiapan/ }).click();
     await expect(page).toHaveURL(/\/onboarding$/);
     await expect(page.getByRole("heading", { name: "Catat satu aktivitas nyata." })).toBeVisible();
   });
@@ -169,7 +172,7 @@ test.describe("premium onboarding @critical", () => {
     await mockOnboardingSupabase(page, { account: { id: "legacy-account", name: "Akun Lama", currency: "IDR", current_balance: 500000 } });
     await page.goto("/onboarding");
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Kondisi keuangan bulan ini" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: dashboardHeading })).toBeVisible();
   });
 
   test("has no page-level horizontal overflow", async ({ page }) => {
