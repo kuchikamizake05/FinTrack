@@ -18,7 +18,7 @@ describe("password authentication feedback", () => {
       "Email atau kata sandi tidak cocok.",
     );
     expect(getAuthErrorMessage("signup", new Error("User already registered"))).toBe(
-      "Email ini sudah terdaftar. Silakan masuk.",
+      AUTH_SUCCESS_MESSAGES.signUp,
     );
     expect(getAuthErrorMessage("reset", new Error("email rate limit exceeded"))).toBe(
       "Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.",

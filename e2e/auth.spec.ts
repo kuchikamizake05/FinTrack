@@ -91,7 +91,7 @@ test.describe("password and Google login @critical", () => {
     await expect(page.getByRole("heading", { name: "Pulihkan kata sandi" })).toBeVisible();
     await page.getByLabel("Alamat email").fill("qa@fintrack.local");
     await page.getByRole("button", { name: "Kirim tautan pemulihan" }).click();
-    await expect(page.getByText(/Tautan pemulihan sudah dikirim/)).toBeVisible();
+    await expect(page.getByText(/Jika email terdaftar/)).toBeVisible();
   });
 
   test("submits account creation and requests email confirmation", async ({ page }) => {

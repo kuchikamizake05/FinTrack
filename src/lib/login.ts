@@ -2,8 +2,8 @@ export type AuthAction = "login" | "signup" | "reset" | "update-password" | "oau
 export type AuthMode = "login" | "signup" | "reset" | "update-password";
 
 export const AUTH_SUCCESS_MESSAGES = {
-  signUp: "Akun dibuat. Periksa email untuk konfirmasi sebelum masuk.",
-  reset: "Tautan pemulihan sudah dikirim. Periksa inbox atau folder spam kamu.",
+  signUp: "Periksa email untuk konfirmasi. Jika akun sudah ada, silakan masuk.",
+  reset: "Jika email terdaftar, tautan pemulihan akan dikirim.",
   passwordUpdated: "Kata sandi berhasil diperbarui.",
 } as const;
 
@@ -16,7 +16,7 @@ export function getAuthErrorMessage(action: AuthAction, error: unknown) {
     return "Email atau kata sandi tidak cocok.";
   }
   if (action === "signup" && (message.includes("already registered") || message.includes("already exists"))) {
-    return "Email ini sudah terdaftar. Silakan masuk.";
+    return AUTH_SUCCESS_MESSAGES.signUp;
   }
   if (action === "oauth") return "Login dengan Google belum berhasil. Coba lagi.";
   if (action === "signup") return "Pendaftaran belum berhasil. Coba lagi beberapa saat lagi.";
