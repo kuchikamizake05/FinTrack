@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono } from "next/font/google";
+import { Archivo_Black, JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import AppBoundary from "@/components/AppBoundary";
 import OnboardingBoundary from "@/components/OnboardingBoundary";
@@ -8,6 +8,19 @@ import PWARegister from "@/components/PWARegister";
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const archivoBlack = Archivo_Black({
+  variable: "--font-archivo-black",
+  subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -38,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${jetbrainsMono.variable} h-full antialiased`}>
+    <html lang="id" className={`${jetbrainsMono.variable} ${manrope.variable} ${archivoBlack.variable} h-full antialiased`}>
       <head />
       <body className="flex min-h-full flex-col bg-[#f7faf7] font-sans text-slate-900">
         <PWARegister />
