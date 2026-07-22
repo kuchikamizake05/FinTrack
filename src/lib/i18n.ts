@@ -214,6 +214,8 @@ const englishTranslations: Record<string, string> = {
   "Masuk menggunakan email dan kata sandi atau akun Google.": "Sign in with email and password or your Google account.",
   "Keuangan pribadi, lebih jernih": "Clearer personal finances",
   "Kembali ke angka yang benar-benar penting.": "Get back to the numbers that truly matter.",
+  "Pantau arus kas, tinjau transaksi, dan jaga tujuan keuanganmu tetap bergerak—tanpa dashboard yang terasa ramai.":
+    "Track cash flow, review transactions, and keep your financial goals moving—without a cluttered dashboard.",
   "Arus kas jelas": "Clear cash flow",
   "Lihat ritme bulan ini dalam sekali pandang.": "See this month's rhythm at a glance.",
   "Review cepat": "Quick review",
