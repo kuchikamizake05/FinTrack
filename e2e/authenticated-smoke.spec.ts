@@ -11,10 +11,12 @@ const routes = [
   ["/insights", "Smart Insights"],
 ] as const;
 
-test("authenticated application routes render with controlled read-only data @smoke", async ({ page }) => {
-  await mockSupabase(page, true);
+test.describe("authenticated application routes render with controlled read-only data @smoke", () => {
   for (const [route, heading] of routes) {
-    await page.goto(route);
-    await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+    test(`${route} renders`, async ({ page }) => {
+      await mockSupabase(page, true);
+      await page.goto(route);
+      await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+    });
   }
 });
