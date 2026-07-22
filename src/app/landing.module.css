@@ -185,6 +185,20 @@
 @keyframes morph { 0%,100% { border-radius: 42% 58% 52% 48% / 46% 42% 58% 54%; } 50% { border-radius: 57% 43% 42% 58% / 55% 58% 42% 45%; } }
 @keyframes marquee { to { transform: translateX(-24%); } }
 
+/* Keep the conversion actions above the fold on laptop and zoomed desktop viewports. */
+@media (min-width: 781px) and (max-height: 1000px) {
+  .hero { min-height: 880px; }
+  .nav { height: 80px; }
+  .heroCopy { margin-top: clamp(36px, 5.5vh, 56px); }
+  .eyebrow { margin-bottom: 16px; }
+  .heroCopy h1 { font-size: clamp(68px, min(8.2vw, 13vh), 126px); line-height: .8; }
+  .heroText { margin-top: 22px; font-size: clamp(16px, 1.4vw, 19px); }
+  .heroActions { margin-top: 22px; }
+  .primaryCta, .secondaryCta { min-height: 52px; }
+  .reassurance { margin-top: 14px; }
+  .productStage { margin-top: 48px; }
+}
+
 @media (max-width: 1024px) {
   .hero { min-height: 920px; }
   .navLinks { display: none; }
