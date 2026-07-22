@@ -44,7 +44,7 @@ export default function BrandLockup({
       </span>
       <span
         className={cn(
-          "font-black leading-none tracking-[-0.06em] transition-colors group-hover:text-[var(--brand-primary)]",
+          "font-[family-name:var(--font-manrope)] font-black leading-none tracking-[-0.06em] transition-colors group-hover:text-[var(--brand-primary)]",
           compact ? "text-xl" : "text-[23px] max-[520px]:text-xl",
         )}
       >

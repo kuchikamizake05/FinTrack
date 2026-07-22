@@ -26,6 +26,7 @@ import {
   validatePassword,
 } from "@/lib/login";
 import { isSupabaseConfigured, supabase } from "@/infrastructure/supabase/browser-client";
+import styles from "./login.module.css";
 
 type Feedback = { type: "success" | "error"; text: string };
 
@@ -196,13 +197,13 @@ export default function LoginPage() {
         : "Masuk menggunakan email dan kata sandi atau akun Google.";
 
   return (
-    <div className="min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#e9f8ee_0%,#dff5e7_55%,#c8efd5_100%)] bg-[length:24px_24px,auto] text-[var(--brand-ink)]">
+    <div className={`${styles.page} min-h-[100svh] overflow-x-hidden bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#e9f8ee_0%,#dff5e7_55%,#c8efd5_100%)] bg-[length:24px_24px,auto] text-[var(--brand-ink)]`}>
       <header className="mx-auto flex h-[68px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between border-b border-[color:rgba(18,53,36,0.14)] sm:h-[72px] sm:w-[calc(100%-3rem)]">
         <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
       </header>
 
-      <main className="mx-auto grid h-[calc(100svh-68px)] w-full max-w-7xl items-center gap-8 px-4 py-3 sm:h-[calc(100svh-72px)] sm:px-6 sm:py-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-14 lg:px-10 xl:gap-20">
+      <main className={`${styles.main} mx-auto grid min-h-[calc(100svh-68px)] w-full max-w-7xl items-center gap-8 px-4 py-3 sm:min-h-[calc(100svh-72px)] sm:px-6 sm:py-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-14 lg:px-10 xl:gap-20`}>
         <section className="hidden max-w-2xl lg:block" aria-labelledby="login-benefit-title">
           <p className="mb-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--brand-primary)]"><span className="grid h-7 w-7 place-items-center rounded-full bg-white/70"><ShieldCheck className="h-4 w-4" /></span> {t("Keuangan pribadi, lebih jernih")}</p>
           <h1 id="login-benefit-title" className="max-w-2xl font-[family-name:var(--font-archivo-black)] text-[clamp(3.2rem,4.5vw,5.25rem)] font-normal uppercase leading-[0.9] tracking-[-0.07em] text-[var(--brand-ink)]">{t("Kembali ke angka yang benar-benar penting.")}</h1>
@@ -214,15 +215,15 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[420px] rounded-[24px] border border-[color:rgba(18,53,36,0.14)] bg-white/95 p-4 shadow-[0_24px_70px_rgba(18,53,36,0.12)] backdrop-blur-sm sm:p-6" aria-labelledby="login-title">
-          <div className="mb-4">
+        <section className={`${styles.card} mx-auto w-full max-w-[420px] rounded-[24px] border border-[color:rgba(18,53,36,0.14)] bg-white/95 p-4 shadow-[0_24px_70px_rgba(18,53,36,0.12)] backdrop-blur-sm sm:p-6`} aria-labelledby="login-title">
+          <div className={`${styles.cardHeader} mb-4`}>
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
-            <h2 id="login-title" className="mt-3 text-2xl font-black tracking-[-0.045em] text-[var(--brand-ink)] sm:text-[28px]">{title}</h2>
+            <h2 id="login-title" className={`${styles.cardTitle} mt-3 text-2xl font-black tracking-[-0.045em] text-[var(--brand-ink)] sm:text-[28px]`}>{title}</h2>
             <p className="mt-1.5 text-[13px] leading-5 text-slate-500">{t(description)}</p>
           </div>
 
           {!isUpdate && mode !== "reset" && (
-            <div className="mb-3 grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label="Pilih mode autentikasi">
+            <div className={`${styles.modeTabs} mb-3 grid grid-cols-2 rounded-xl bg-slate-100 p-1`} aria-label="Pilih mode autentikasi">
               {(["login", "signup"] as const).map((item) => (
                 <button key={item} type="button" onClick={() => changeMode(item)} disabled={busy} className={`min-h-9 rounded-lg px-3 text-sm font-bold transition ${mode === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500"}`}>
                   {t(item === "login" ? "Masuk" : "Daftar")}
@@ -236,11 +237,11 @@ export default function LoginPage() {
               <button type="button" onClick={handleGoogle} disabled={busy || !isSupabaseConfigured} className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-[var(--brand-mint)] disabled:cursor-not-allowed disabled:opacity-50">
                 <GoogleMark /> {t(loading === "oauth" ? "Menghubungkan..." : "Masuk dengan Google")}
               </button>
-              <div className="my-3 flex items-center gap-3 text-[11px] font-bold text-slate-400"><span className="h-px flex-1 bg-slate-100" /><span>{t("atau dengan email")}</span><span className="h-px flex-1 bg-slate-100" /></div>
+              <div className={`${styles.divider} my-3 flex items-center gap-3 text-[11px] font-bold text-slate-400`}><span className="h-px flex-1 bg-slate-100" /><span>{t("atau dengan email")}</span><span className="h-px flex-1 bg-slate-100" /></div>
             </>
           )}
 
-          <form onSubmit={isUpdate ? handlePasswordUpdate : handleCredentials} className="space-y-3">
+          <form onSubmit={isUpdate ? handlePasswordUpdate : handleCredentials} className="space-y-2">
             {!isSupabaseConfigured && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">Konfigurasi Supabase belum valid. Lengkapi <code className="font-bold">.env.local</code> sebelum masuk.</p>}
 
             {!isUpdate && <EmailField value={email} onChange={setEmail} disabled={busy} />}
@@ -261,7 +262,7 @@ export default function LoginPage() {
             {message && <div role={message.type === "error" ? "alert" : "status"} className={`mt-5 flex items-start gap-3 rounded-xl border p-3.5 text-sm leading-6 ${message.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{message.type === "success" ? <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0" /> : <Mail className="mt-0.5 h-4.5 w-4.5 shrink-0" />}<p>{t(message.text)}</p></div>}
           </div>
 
-          <div className="mt-4 flex items-start gap-2.5 border-t border-slate-100 pt-3.5"><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
+          <div className={`${styles.privacyNote} mt-4 flex items-start gap-2.5 border-t border-slate-100 pt-3.5`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
         </section>
       </main>
     </div>

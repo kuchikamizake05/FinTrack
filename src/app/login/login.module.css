@@ -1,0 +1,35 @@
+.page {
+  font-family: var(--font-manrope), sans-serif;
+}
+
+@media (min-width: 64rem) and (max-height: 44rem) {
+  .main {
+    padding-block: 0.5rem !important;
+  }
+
+  .card {
+    padding: 1rem !important;
+  }
+
+  .cardHeader {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .cardTitle {
+    margin-top: 0.5rem !important;
+    font-size: 1.5rem !important;
+  }
+
+  .modeTabs {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .divider {
+    margin-block: 0.5rem !important;
+  }
+
+  .privacyNote {
+    margin-top: 0.5rem !important;
+    padding-top: 0.5rem !important;
+  }
+}
