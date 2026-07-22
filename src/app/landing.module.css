@@ -18,7 +18,7 @@
 
 .hero {
   position: relative;
-  min-height: 960px;
+  min-height: 880px;
   background:
     radial-gradient(circle at 9% 36%, rgba(255,255,255,.35) 0 2px, transparent 2.5px) 0 0/24px 24px,
     linear-gradient(145deg, #e9f8ee 0%, var(--mint) 54%, #c8efd5 100%);
@@ -28,7 +28,7 @@
 
 .nav {
   width: min(1440px, calc(100% - 48px));
-  height: 88px;
+  height: 80px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -55,21 +55,22 @@
 .mobileMenu > div a { padding: 11px 13px; color: var(--ink); border-radius: 10px; font-size: 13px; font-weight: 800; text-decoration: none; }
 .mobileMenu > div a:hover { background: var(--mint); }
 
-.heroCopy { width: min(850px, calc(100% - 40px)); margin: 88px auto 0; text-align: center; position: relative; z-index: 3; animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
-.eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 22px; font-size: 12px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+.heroCopy { width: min(850px, calc(100% - 40px)); margin: 52px auto 0; text-align: center; position: relative; z-index: 3; animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+.eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 16px; font-size: 12px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
 .eyebrow span { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 5px rgba(22,51,0,.12); }
 .heroCopy h1, .sectionIntro h2, .controlCopy h2, .securityCopy h2, .finalCta h2 { font-family: var(--font-archivo-black), var(--font-manrope), sans-serif; font-weight: 400; letter-spacing: -.075em; }
-.heroCopy h1 { margin: 0; color: var(--ink); font-size: clamp(72px, 10vw, 148px); line-height: .78; text-transform: uppercase; }
+.heroCopy h1 { margin: 0; color: var(--ink); font-size: clamp(64px, 8vw, 118px); line-height: .8; text-transform: uppercase; }
 .heroCopy h1 em, .sectionIntro h2 em, .finalCta h2 em { color: var(--paper); font-style: normal; -webkit-text-stroke: 2px var(--ink); text-shadow: 5px 5px 0 var(--ink); }
-.heroText { max-width: 650px; margin: 34px auto 0; font-size: clamp(17px, 2vw, 21px); line-height: 1.55; font-weight: 650; letter-spacing: -.025em; }
-.heroActions { margin-top: 30px; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.primaryCta { min-height: 58px; padding: 0 28px; border-radius: 999px; color: white; background: var(--primary); }
+.heroCopy h1 em { display: inline-block; white-space: nowrap; }
+.heroText { max-width: 650px; margin: 24px auto 0; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.5; font-weight: 650; letter-spacing: -.025em; }
+.heroActions { margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.primaryCta { min-height: 54px; padding: 0 28px; border-radius: 999px; color: white; background: var(--primary); }
 .primaryCta svg, .darkCta svg, .finalCta a svg { width: 18px; }
-.secondaryCta { min-height: 58px; display: inline-flex; align-items: center; padding: 0 25px; border: 2px solid rgba(22,51,0,.75); border-radius: 999px; color: var(--ink); font-weight: 850; text-decoration: none; }
-.reassurance { display: flex; justify-content: center; align-items: center; gap: 7px; margin: 18px 0 0; font-size: 12px; font-weight: 750; opacity: .75; }
+.secondaryCta { min-height: 54px; display: inline-flex; align-items: center; padding: 0 25px; border: 2px solid rgba(22,51,0,.75); border-radius: 999px; color: var(--ink); font-weight: 850; text-decoration: none; }
+.reassurance { display: flex; justify-content: center; align-items: center; gap: 7px; margin: 14px 0 0; font-size: 12px; font-weight: 750; opacity: .75; }
 .reassurance svg { width: 15px; }
 
-.productStage { width: min(1020px, calc(100% - 40px)); height: 380px; margin: 70px auto 0; position: relative; }
+.productStage { width: min(1020px, calc(100% - 40px)); height: 380px; margin: 54px auto 0; position: relative; }
 .productStage::before { content: ""; position: absolute; width: 780px; height: 360px; left: 50%; top: 28px; transform: translateX(-50%); border-radius: 50% 50% 0 0; background: var(--forest); box-shadow: 0 35px 80px rgba(14,43,22,.28); }
 .orbitOne, .orbitTwo { position: absolute; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; left: 50%; top: 180px; transform: translate(-50%,-50%); }
 .orbitOne { width: 870px; height: 290px; }
@@ -187,20 +188,20 @@
 
 /* Keep the conversion actions above the fold on laptop and zoomed desktop viewports. */
 @media (min-width: 781px) and (max-height: 1000px) {
-  .hero { min-height: 880px; }
-  .nav { height: 80px; }
-  .heroCopy { margin-top: clamp(36px, 5.5vh, 56px); }
-  .eyebrow { margin-bottom: 16px; }
-  .heroCopy h1 { font-size: clamp(68px, min(8.2vw, 13vh), 126px); line-height: .8; }
-  .heroText { margin-top: 22px; font-size: clamp(16px, 1.4vw, 19px); }
-  .heroActions { margin-top: 22px; }
-  .primaryCta, .secondaryCta { min-height: 52px; }
-  .reassurance { margin-top: 14px; }
-  .productStage { margin-top: 48px; }
+  .hero { min-height: 810px; }
+  .nav { height: 72px; }
+  .heroCopy { margin-top: clamp(22px, 3.8vh, 36px); }
+  .eyebrow { margin-bottom: 12px; }
+  .heroCopy h1 { font-size: clamp(58px, min(7vw, 10.5vh), 102px); line-height: .8; }
+  .heroText { margin-top: 18px; font-size: clamp(15px, 1.3vw, 18px); line-height: 1.45; }
+  .heroActions { margin-top: 18px; }
+  .primaryCta, .secondaryCta { min-height: 50px; }
+  .reassurance { margin-top: 11px; }
+  .productStage { margin-top: 38px; }
 }
 
 @media (max-width: 1024px) {
-  .hero { min-height: 920px; }
+  .hero { min-height: 840px; }
   .navLinks { display: none; }
   .controlSection { padding: 60px 42px; gap: 50px; }
   .security { grid-template-columns: .9fr 1.1fr; }
@@ -209,15 +210,19 @@
 }
 
 @media (max-width: 780px) {
-  .hero { min-height: 880px; border-radius: 0 0 32px 32px; }
-  .nav { width: calc(100% - 32px); height: 74px; }
+  .hero { min-height: 760px; border-radius: 0 0 32px 32px; }
+  .nav { width: calc(100% - 32px); height: 68px; }
   .navActions { display: none; }
   .mobileMenu { display: block; }
-  .heroCopy { margin-top: 70px; }
-  .heroCopy h1 { font-size: clamp(62px, 20vw, 98px); }
+  .heroCopy { margin-top: 34px; }
+  .eyebrow { margin-bottom: 14px; }
+  .heroCopy h1 { font-size: clamp(38px, 12.5vw, 68px); line-height: .82; }
   .heroCopy h1 em, .finalCta h2 em { -webkit-text-stroke-width: 1.5px; text-shadow: 3px 3px 0 var(--ink); }
-  .heroText { max-width: 520px; font-size: 16px; }
-  .productStage { margin-top: 55px; height: 340px; }
+  .heroText { max-width: 520px; margin-top: 22px; font-size: 15px; line-height: 1.45; }
+  .heroActions { margin-top: 22px; }
+  .primaryCta, .secondaryCta { min-height: 50px; }
+  .reassurance { margin-top: 12px; }
+  .productStage { margin-top: 38px; height: 340px; }
   .productStage::before { width: 680px; }
   .balanceCard { width: min(440px, calc(100vw - 64px)); }
   .goalCard { left: -12px; top: 190px; transform: scale(.82) rotate(-5deg); transform-origin: left; }
@@ -235,14 +240,17 @@
 }
 
 @media (max-width: 520px) {
-  .hero { min-height: 820px; }
-  .heroCopy { margin-top: 58px; }
-  .heroCopy h1 { font-size: 17vw; }
-  .heroActions { flex-direction: column; }
+  .hero { min-height: 720px; }
+  .heroCopy { margin-top: 28px; }
+  .eyebrow { margin-bottom: 12px; font-size: 10px; }
+  .heroCopy h1 { font-size: clamp(38px, 12.5vw, 64px); }
+  .heroText { margin-top: 18px; }
+  .heroActions { margin-top: 18px; flex-direction: column; gap: 10px; }
   .primaryCta, .secondaryCta { width: min(310px, 100%); }
+  .primaryCta, .secondaryCta { min-height: 48px; }
   .secondaryCta { justify-content: center; }
-  .reassurance { font-size: 10px; }
-  .productStage { margin-top: 44px; }
+  .reassurance { margin-top: 10px; font-size: 10px; }
+  .productStage { margin-top: 32px; }
   .balanceCard { height: 275px; padding: 22px; border-radius: 24px; }
   .balance { font-size: 29px; }
   .chart { height: 72px; }
