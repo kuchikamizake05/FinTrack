@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { RefreshCw, WifiOff } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
-import { buttonStyles } from "@/components/ui/Button";
+import { buttonStyles } from "@/components/ui/button-styles";
 
 export default function OfflinePage() {
   return (

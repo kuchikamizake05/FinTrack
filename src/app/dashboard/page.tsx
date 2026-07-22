@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, getDaysInMonth, parseISO, startOfMonth, endOfMonth } from "date-fns";
-import { id } from "date-fns/locale";
+import { enUS, id } from "date-fns/locale";
 import {
   AlertCircle,
   ArrowDownRight,
@@ -47,6 +47,7 @@ import { normalizeClientError } from "@/lib/errors";
 import type { FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { shouldShowOnboardingResume } from "@/lib/onboarding";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Transaction = {
   id: string;
@@ -99,6 +100,8 @@ function withTimeout<T>(promise: PromiseLike<T>, milliseconds: number) {
 }
 
 export default function DashboardPage() {
+  const { language, t } = useLanguage();
+  const dateLocale = language === "en" ? enUS : id;
   const router = useRouter();
   const { eligibility: onboardingEligibility, progress: onboardingProgress, saveProgress } = useOnboarding();
   const [today] = useState(() => new Date());
@@ -286,15 +289,15 @@ export default function DashboardPage() {
 
       <main className="relative mx-auto w-full px-5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-5 md:hidden">
         <section aria-labelledby="mobile-dashboard-title">
-          <p className="text-[13px] font-semibold text-emerald-700">Selamat datang, {firstName}</p>
+          <p className="text-[13px] font-semibold text-emerald-700">{t("Selamat datang, {name}", { name: firstName })}</p>
           <div className="mt-1 flex items-end justify-between gap-4">
             <div>
-              <h1 id="mobile-dashboard-title" className="text-[26px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">Keuanganmu</h1>
-              <p className="mt-1 text-xs font-medium text-slate-500">{format(today, "EEEE, dd MMMM yyyy", { locale: id })}</p>
+              <h1 id="mobile-dashboard-title" className="text-[26px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">{t("Keuanganmu")}</h1>
+              <p className="mt-1 text-xs font-medium text-slate-500">{format(today, "EEEE, dd MMMM yyyy", { locale: dateLocale })}</p>
             </div>
             {!loading && (
               <span className={`mb-0.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${balance >= 0 ? "bg-emerald-100/80 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
-                <Sparkles className="h-3 w-3" /> {balance >= 0 ? "Terkendali" : "Perlu dicek"}
+                <Sparkles className="h-3 w-3" /> {t(balance >= 0 ? "Terkendali" : "Perlu dicek")}
               </span>
             )}
           </div>
@@ -305,7 +308,7 @@ export default function DashboardPage() {
             <button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-xs font-bold text-slate-700">{format(selectedMonth, "MMMM yyyy", { locale: id })}</span>
+            <span className="text-xs font-bold text-slate-700">{format(selectedMonth, "MMMM yyyy", { locale: dateLocale })}</span>
             <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -319,7 +322,7 @@ export default function DashboardPage() {
           <div role="alert" className="mt-3 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1">{loadError}</span>
-            <button onClick={() => void fetchDashboardData()} className="shrink-0 font-bold">Coba lagi</button>
+            <button onClick={() => void fetchDashboardData()} className="shrink-0 font-bold">{t("Coba lagi")}</button>
           </div>
         )}
 
@@ -333,19 +336,19 @@ export default function DashboardPage() {
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">Arus kas bulan ini</p>
+                    <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">{t("Arus kas bulan ini")}</p>
                     <p className="mt-2 text-[29px] font-extrabold tracking-[-0.05em] text-[#ffffff]">{balance < 0 ? "-" : "+"}{displayIdr(balance)}</p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-emerald-50">
-                    {balance >= 0 ? "Arus kas aman" : "Butuh perhatian"}
+                    {t(balance >= 0 ? "Arus kas aman" : "Butuh perhatian")}
                   </span>
                 </div>
                 <p className="mt-1.5 max-w-[285px] text-xs leading-5 text-emerald-50/65">
-                  {balance >= 0 ? "Pendapatan masih lebih besar dari pengeluaran. Pertahankan ritmemu." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini."}
+                  {t(balance >= 0 ? "Pendapatan masih lebih besar dari pengeluaran. Pertahankan ritmemu." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
                 </p>
                 <div className="mt-5 grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 pt-4">
-                  <MobileMetric icon={ArrowDownRight} label="Masuk" value={displayIdr(totalIncome)} />
-                  <MobileMetric icon={ArrowUpRight} label="Keluar" value={displayIdr(totalExpense)} right />
+                  <MobileMetric icon={ArrowDownRight} label={language === "en" ? "Income" : "Masuk"} value={displayIdr(totalIncome)} />
+                  <MobileMetric icon={ArrowUpRight} label={language === "en" ? "Expenses" : "Keluar"} value={displayIdr(totalExpense)} right />
                 </div>
               </div>
             </section>
@@ -364,15 +367,15 @@ export default function DashboardPage() {
 
             <section aria-labelledby="mobile-quick-actions-title" className="mt-5">
               <div className="flex items-center justify-between">
-                <h2 id="mobile-quick-actions-title" className="text-sm font-extrabold tracking-[-0.02em] text-slate-900">Aksi cepat</h2>
-                <Link href="/insights" className="text-[11px] font-bold text-emerald-700">Lihat insights</Link>
+                <h2 id="mobile-quick-actions-title" className="text-sm font-extrabold tracking-[-0.02em] text-slate-900">{t("Aksi cepat")}</h2>
+                <Link href="/insights" className="text-[11px] font-bold text-emerald-700">{t("Lihat insights")}</Link>
               </div>
               <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                 <Link href="/transactions" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(5,150,105,0.18)] transition active:translate-y-px">
-                  <CircleDollarSign className="h-4 w-4" /> Catat transaksi
+                  <CircleDollarSign className="h-4 w-4" /> {t("Catat transaksi")}
                 </Link>
                 <Link href="/accounts" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-900/[0.08] bg-white px-4 text-xs font-extrabold text-slate-700 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:translate-y-px">
-                  <WalletCards className="h-4 w-4 text-emerald-700" /> Lihat akun
+                  <WalletCards className="h-4 w-4 text-emerald-700" /> {t("Lihat akun")}
                 </Link>
               </div>
             </section>
@@ -380,16 +383,16 @@ export default function DashboardPage() {
             <section aria-labelledby="mobile-activity-title" className="mt-5 overflow-hidden rounded-[20px] border border-emerald-900/[0.07] bg-white shadow-[0_8px_24px_rgba(23,35,59,0.045)]">
               <div className="flex items-center justify-between px-4 pb-3 pt-4">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Bulan ini</p>
-                  <h2 id="mobile-activity-title" className="mt-0.5 text-sm font-extrabold text-slate-900">Aktivitas terbaru</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{t("Bulan ini")}</p>
+                  <h2 id="mobile-activity-title" className="mt-0.5 text-sm font-extrabold text-slate-900">{t("Aktivitas terbaru")}</h2>
                 </div>
-                <Link href="/transactions" className="text-[11px] font-bold text-emerald-700">Semua</Link>
+                <Link href="/transactions" className="text-[11px] font-bold text-emerald-700">{t("Semua")}</Link>
               </div>
               {recentTransactions.length === 0 ? (
                 <div className="border-t border-slate-100 px-5 py-8 text-center">
                   <ReceiptText className="mx-auto h-6 w-6 text-emerald-600" />
-                  <p className="mt-2 text-xs font-bold text-slate-700">Belum ada transaksi</p>
-                  <p className="mt-1 text-[11px] text-slate-400">Catat transaksi pertama untuk melihat aktivitasmu.</p>
+                  <p className="mt-2 text-xs font-bold text-slate-700">{t("Belum ada transaksi")}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{t("Catat transaksi pertama untuk melihat aktivitasmu.")}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 border-t border-slate-100">
@@ -407,12 +410,12 @@ export default function DashboardPage() {
         <section className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700">
-              Selamat datang, {firstName} <Sparkles className="h-4 w-4" />
+              {t("Selamat datang, {name}", { name: firstName })} <Sparkles className="h-4 w-4" />
             </p>
             <h1 className="max-w-2xl text-3xl font-bold tracking-[-0.035em] text-slate-900 sm:text-4xl">
-              Kondisi keuangan bulan ini
+              {t("Kondisi keuangan bulan ini")}
             </h1>
-            <p className="mt-2 text-sm font-medium text-slate-500">{format(today, "EEEE, dd MMMM yyyy", { locale: id })}</p>
+            <p className="mt-2 text-sm font-medium text-slate-500">{format(today, "EEEE, dd MMMM yyyy", { locale: dateLocale })}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -421,7 +424,7 @@ export default function DashboardPage() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="min-w-32 px-2 text-center text-sm font-semibold text-slate-700">
-                {format(selectedMonth, "MMMM yyyy", { locale: id })}
+                {format(selectedMonth, "MMMM yyyy", { locale: dateLocale })}
               </span>
               <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
                 <ChevronRight className="h-4 w-4" />
@@ -467,17 +470,17 @@ export default function DashboardPage() {
                   <div className="flex flex-col justify-between">
                     <div>
                       <h2 className={`text-lg font-bold tracking-tight ${balance >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                        {balance >= 0 ? "Arus kas aman" : "Arus kas perlu perhatian"}
+                        {t(balance >= 0 ? "Arus kas aman" : "Arus kas perlu perhatian")}
                       </h2>
                       <p className={`mt-3 text-3xl font-bold tracking-[-0.045em] sm:text-[2.5rem] ${balance >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
                         {balance < 0 ? "-" : "+"}{displayIdr(balance)}
                       </p>
                       <p className="mt-4 text-sm leading-6 text-slate-500">
-                        {balance >= 0 ? "Pendapatan lebih besar dari pengeluaran. Pertahankan ritme keuangan yang sehat." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini."}
+                        {t(balance >= 0 ? "Pendapatan lebih besar dari pengeluaran. Pertahankan ritme keuangan yang sehat." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
                       </p>
                     </div>
                     <Link href="/insights" className="mt-5 inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
-                      <CircleDollarSign className="h-4 w-4" /> Lihat ringkasan
+                      <CircleDollarSign className="h-4 w-4" /> {t("Lihat ringkasan")}
                     </Link>
                   </div>
 
@@ -520,10 +523,10 @@ export default function DashboardPage() {
               <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_8px_28px_rgba(22,101,52,0.05)]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900">Transaksi terbaru</h2>
+                    <h2 className="text-lg font-bold tracking-tight text-slate-900">{t("Transaksi terbaru")}</h2>
                   </div>
                   <Link href="/transactions" className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900">
-                    Lihat semua <ArrowRight className="h-4 w-4" />
+                    {t("Lihat semua")} <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
 

@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingBoundary";
 import BrandLogo from "@/components/BrandLogo";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { reportHandledError } from "@/lib/errors";
@@ -106,6 +108,7 @@ function formatMoney(value: number, currency: string) {
 }
 
 export default function OnboardingPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { userId, progress, saveProgress, refresh } = useOnboarding();
   const [localProgress, setLocalProgress] = useState<OnboardingProgress>(() => progress ?? createProgress(userId));
@@ -304,18 +307,21 @@ export default function OnboardingPage() {
           <BrandLogo size={40} priority />
           <span className="text-xl">FinTrack</span>
         </Link>
-        {step !== "welcome" && step !== "summary" && (
-          <button onClick={deferSetup} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-white hover:text-emerald-800">Lanjutkan nanti</button>
-        )}
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher compact />
+          {step !== "welcome" && step !== "summary" && (
+            <button onClick={deferSetup} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-white hover:text-emerald-800">{t("Lanjutkan nanti")}</button>
+          )}
+        </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-7xl gap-8 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:px-8 lg:min-h-[calc(100svh-96px)] lg:grid-cols-[340px_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-10 lg:pb-16">
         <aside className="lg:self-stretch lg:border-r lg:border-emerald-100 lg:py-14 lg:pr-12">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700"><ShieldCheck className="h-4 w-4" /> Penyiapan privat</p>
-          <h2 className="mt-4 text-2xl font-bold tracking-[-0.035em] text-slate-900 lg:text-3xl">Mulai dari angka yang paling berguna.</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">Satu akun dan satu transaksi sudah cukup untuk membuka ringkasan pertamamu.</p>
-          <div className="mt-6" aria-label={`Langkah ${progressInfo.current} dari ${progressInfo.total}`}>
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500"><span>Langkah {progressInfo.current} dari {progressInfo.total}</span><span>{progressInfo.percentage}%</span></div>
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700"><ShieldCheck className="h-4 w-4" /> {t("Penyiapan privat")}</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-[-0.035em] text-slate-900 lg:text-3xl">{t("Mulai dari angka yang paling berguna.")}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-500">{t("Satu akun dan satu transaksi sudah cukup untuk membuka ringkasan pertamamu.")}</p>
+          <div className="mt-6" aria-label={t("Langkah {current} dari {total}", { current: progressInfo.current, total: progressInfo.total })}>
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500"><span>{t("Langkah {current} dari {total}", { current: progressInfo.current, total: progressInfo.total })}</span><span>{progressInfo.percentage}%</span></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-600 transition-[width] motion-reduce:transition-none" style={{ width: `${progressInfo.percentage}%` }} /></div>
           </div>
           <ol className="mt-7 hidden space-y-4 lg:block">

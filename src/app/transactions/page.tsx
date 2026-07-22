@@ -34,7 +34,8 @@ import {
   X,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { Button, buttonStyles } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
+import { buttonStyles } from "@/components/ui/button-styles";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";

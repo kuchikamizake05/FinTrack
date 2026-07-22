@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import {
   DEFAULT_LANGUAGE,
   LANGUAGE_STORAGE_KEY,
@@ -18,36 +18,33 @@ type LanguageContextValue = {
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+const LANGUAGE_CHANGE_EVENT = "fintrack-language-change";
+
+function subscribeToLanguage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(LANGUAGE_CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(LANGUAGE_CHANGE_EVENT, callback);
+  };
+}
+
+function getLanguageSnapshot(): Language {
+  const savedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return isSupportedLanguage(savedLanguage) ? savedLanguage : DEFAULT_LANGUAGE;
+}
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(DEFAULT_LANGUAGE);
-
-  const applyLanguage = useCallback((nextLanguage: Language) => {
-    setLanguageState(nextLanguage);
-    document.documentElement.lang = nextLanguage;
-  }, []);
+  const language = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, () => DEFAULT_LANGUAGE);
 
   useEffect(() => {
-    const savedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (isSupportedLanguage(savedLanguage)) applyLanguage(savedLanguage);
+    document.documentElement.lang = language;
+  }, [language]);
 
-    const syncLanguage = (event: StorageEvent) => {
-      if (event.key === LANGUAGE_STORAGE_KEY && isSupportedLanguage(event.newValue)) {
-        applyLanguage(event.newValue);
-      }
-    };
-
-    window.addEventListener("storage", syncLanguage);
-    return () => window.removeEventListener("storage", syncLanguage);
-  }, [applyLanguage]);
-
-  const setLanguage = useCallback(
-    (nextLanguage: Language) => {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
-      applyLanguage(nextLanguage);
-    },
-    [applyLanguage],
-  );
+  const setLanguage = useCallback((nextLanguage: Language) => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+    window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT));
+  }, []);
 
   const t = useCallback(
     (source: string, values?: TranslationValues) => getTranslation(language, source, values),
