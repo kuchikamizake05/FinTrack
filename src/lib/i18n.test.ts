@@ -21,6 +21,8 @@ describe("i18n", () => {
 
   it("returns the English translation when one exists", () => {
     expect(getTranslation("en", "Pengaturan")).toBe("Settings");
+    expect(getTranslation("en", "Tampilkan kata sandi")).toBe("Show password");
+    expect(getTranslation("en", "Sembunyikan kata sandi")).toBe("Hide password");
   });
 
   it("falls back to the Indonesian source when a translation is missing", () => {

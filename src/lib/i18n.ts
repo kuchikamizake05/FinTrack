@@ -231,6 +231,8 @@ const englishTranslations: Record<string, string> = {
   "Konfirmasi kata sandi": "Confirm password",
   "Alamat email": "Email address",
   "Lupa kata sandi?": "Forgot password?",
+  "Tampilkan kata sandi": "Show password",
+  "Sembunyikan kata sandi": "Hide password",
   "Memproses...": "Processing...",
   "Simpan kata sandi baru": "Save new password",
   "Kirim tautan pemulihan": "Send recovery link",

@@ -42,14 +42,47 @@ test("the complete login card stays within a short desktop viewport", async ({ p
   await expect(privacyNote).toBeVisible();
 
   const layout = await page.evaluate(() => ({
+    viewportWidth: document.documentElement.clientWidth,
     viewportHeight: document.documentElement.clientHeight,
     documentHeight: document.documentElement.scrollHeight,
   }));
   const cardBox = await card.boundingBox();
+  const headerBox = await page.locator("header").boundingBox();
+  const cardCenterX = (cardBox?.x ?? 0) + (cardBox?.width ?? 0) / 2;
+  const cardCenterY = (cardBox?.y ?? 0) + (cardBox?.height ?? 0) / 2;
+  const mainCenterY = (headerBox?.height ?? 0) + (layout.viewportHeight - (headerBox?.height ?? 0)) / 2;
 
+  await expect(page.getByText("Kembali ke angka yang benar-benar penting.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Arus kas jelas", { exact: true })).toHaveCount(0);
   expect(layout.documentHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
   expect(cardBox).not.toBeNull();
+  expect(headerBox).not.toBeNull();
+  expect(Math.abs(cardCenterX - layout.viewportWidth / 2)).toBeLessThanOrEqual(2);
+  expect(Math.abs(cardCenterY - mainCenterY)).toBeLessThanOrEqual(2);
   expect((cardBox?.y ?? layout.viewportHeight) + (cardBox?.height ?? 0)).toBeLessThanOrEqual(layout.viewportHeight);
+});
+
+test("password controls are compact and preserve the password value", async ({ page }) => {
+  await mockSupabase(page, false);
+  await page.goto("/login");
+
+  const password = page.getByLabel("Kata sandi", { exact: true });
+  const passwordLabel = page.getByText("Kata sandi", { exact: true });
+  const recovery = page.getByRole("button", { name: "Lupa kata sandi?", exact: true });
+  const showPassword = page.getByRole("button", { name: "Tampilkan kata sandi", exact: true });
+
+  await password.fill("rahasia123");
+  await expect(password).toHaveAttribute("type", "password");
+  await showPassword.click();
+  await expect(password).toHaveAttribute("type", "text");
+  await expect(password).toHaveValue("rahasia123");
+  await expect(page.getByRole("button", { name: "Sembunyikan kata sandi", exact: true })).toBeVisible();
+
+  const labelBox = await passwordLabel.boundingBox();
+  const recoveryBox = await recovery.boundingBox();
+  expect(labelBox).not.toBeNull();
+  expect(recoveryBox).not.toBeNull();
+  expect(Math.abs((labelBox?.y ?? 0) - (recoveryBox?.y ?? 0))).toBeLessThanOrEqual(2);
 });
 
 test("taller authentication modes remain vertically reachable", async ({ page }) => {
