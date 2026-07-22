@@ -1,11 +1,11 @@
 .page {
-  --ink: #123524;
-  --forest: #0b2a1d;
-  --primary: #15803d;
-  --lime: #4ade80;
+  --ink: var(--brand-ink);
+  --forest: var(--brand-forest);
+  --primary: var(--brand-primary);
+  --lime: var(--brand-lime);
   --lime-bright: #ecfdf3;
-  --mint: #dcf7e5;
-  --cream: #f4fbf6;
+  --mint: var(--brand-mint);
+  --cream: var(--brand-cream);
   --paper: #ffffff;
   min-height: 100svh;
   overflow: hidden;
@@ -38,9 +38,6 @@
   z-index: 10;
 }
 
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 900; font-size: 23px; letter-spacing: -.06em; text-decoration: none; }
-.brandMark { width: 42px; height: 42px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; overflow: hidden; }
-.brandMark img { width: 32px; height: 32px; filter: brightness(0) invert(1); }
 .navLinks { display: flex; gap: 34px; margin-left: 9%; }
 .navLinks a, .loginLink { color: var(--ink); font-size: 14px; font-weight: 800; text-decoration: none; }
 .navLinks a { position: relative; }
@@ -225,8 +222,6 @@
 
 @media (max-width: 520px) {
   .hero { min-height: 820px; }
-  .brand { font-size: 20px; }
-  .brandMark { width: 38px; height: 38px; }
   .heroCopy { margin-top: 58px; }
   .heroCopy h1 { font-size: 17vw; }
   .heroActions { flex-direction: column; }

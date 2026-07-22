@@ -34,6 +34,12 @@
 }
 
 :root {
+  --brand-ink: #123524;
+  --brand-forest: #0b2a1d;
+  --brand-primary: #15803d;
+  --brand-lime: #4ade80;
+  --brand-mint: #dcf7e5;
+  --brand-cream: #f4fbf6;
   --background: 145 35% 97%;
   --foreground: 151 32% 16%;
   --card: 0 0% 100%;

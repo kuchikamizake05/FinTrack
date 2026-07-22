@@ -16,7 +16,7 @@ import {
   TrendingUp,
   WalletCards,
 } from "lucide-react";
-import BrandLogo from "@/components/BrandLogo";
+import BrandLockup from "@/components/BrandLockup";
 import styles from "./landing.module.css";
 
 const features = [
@@ -51,10 +51,7 @@ export default function LandingPage() {
     <main className={styles.page}>
       <section className={styles.hero}>
         <header className={styles.nav}>
-          <Link className={styles.brand} href="/" aria-label="FinTrack beranda">
-            <span className={styles.brandMark}><BrandLogo size={34} priority /></span>
-            <span>FinTrack</span>
-          </Link>
+          <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
 
           <nav className={styles.navLinks} aria-label="Navigasi utama">
             <a href="#fitur">Fitur</a>
@@ -223,10 +220,7 @@ export default function LandingPage() {
       </section>
 
       <footer className={styles.footer}>
-        <Link className={styles.brand} href="/" aria-label="FinTrack beranda">
-          <span className={styles.brandMark}><BrandLogo size={30} /></span>
-          <span>FinTrack</span>
-        </Link>
+        <BrandLockup href="/" compact ariaLabel="FinTrack beranda" />
         <p>Ruang tenang untuk keuangan pribadimu.</p>
         <div><a href="#fitur">Fitur</a><a href="#keamanan">Keamanan</a><Link href="/login">Masuk</Link></div>
         <span>© 2026 FinTrack</span>
