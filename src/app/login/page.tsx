@@ -197,7 +197,7 @@ export default function LoginPage() {
         : "Masuk menggunakan email dan kata sandi atau akun Google.";
 
   return (
-    <div className="min-h-[100svh] overflow-x-hidden bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#e9f8ee_0%,#dff5e7_55%,#c8efd5_100%)] bg-[length:24px_24px,auto] text-[var(--brand-ink)]">
+    <div className={`${styles.page} min-h-[100svh] overflow-x-hidden bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#e9f8ee_0%,#dff5e7_55%,#c8efd5_100%)] bg-[length:24px_24px,auto] text-[var(--brand-ink)]`}>
       <header className="mx-auto flex h-[68px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between border-b border-[color:rgba(18,53,36,0.14)] sm:h-[72px] sm:w-[calc(100%-3rem)]">
         <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
