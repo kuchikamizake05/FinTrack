@@ -4,6 +4,7 @@ import "./globals.css";
 import AppBoundary from "@/components/AppBoundary";
 import OnboardingBoundary from "@/components/OnboardingBoundary";
 import PWARegister from "@/components/PWARegister";
+import { LanguageProvider } from "@/components/LanguageProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -55,7 +56,9 @@ export default function RootLayout({
       <head />
       <body className="flex min-h-full flex-col bg-[#f7faf7] font-sans text-slate-900">
         <PWARegister />
-        <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
+        <LanguageProvider>
+          <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
+        </LanguageProvider>
       </body>
     </html>
   );
