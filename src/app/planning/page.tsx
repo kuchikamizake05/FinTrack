@@ -40,7 +40,10 @@ export default function PlanningPage() {
     else { setAccounts((accountsResult.data ?? []) as Account[]); setTransactions((txResult.data ?? []) as Transaction[]); setBudgets((budgetsResult.data ?? []) as Budget[]); setRecurring((recurringResult.data ?? []) as Recurring[]); }
     setLoading(false);
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
   const alerts = useMemo(() => buildFinancialAlerts({ budgets: budgets.map((b) => ({ category: b.category, limitAmount: Number(b.limit_amount), month: b.month.slice(0, 7) })), transactions, accountFreshness: accounts.map((a) => ({ accountName: a.name, lastUpdatedAt: a.updated_at })), today }), [accounts, budgets, transactions]);
   const categories = useMemo(() => [...new Set(transactions.filter((tx) => tx.type === "expense").map((tx) => tx.category))], [transactions]);
 
