@@ -107,6 +107,14 @@ The application is designed as a self-hosted personal workspace rather than a ba
 - Authenticated, rate-limited, no-store API responses
 - Deterministic fallback when the AI provider is unavailable
 
+### Planning and data control
+
+- Monthly category budgets with warning thresholds
+- Recurring income and expense rules that create ledger entries atomically when due
+- Account reconciliation that preserves a statement-versus-ledger audit trail
+- CSV export and guarded import; imported entries always start in review state
+- Receipt storage is private and scoped to the authenticated user
+
 ### Authentication and PWA
 
 - Email/password sign-in, account creation, and password recovery
@@ -130,6 +138,7 @@ The application is designed as a self-hosted personal workspace rather than a ba
 | `/investments` | Stock execution journal and portfolio snapshots |
 | `/trading` | Forex journal, analytics, and AI review requests |
 | `/insights` | Verified metrics and optional AI explanations |
+| `/planning` | Budgets, recurring transactions, reconciliation, and CSV portability |
 | `/settings` | Session, language, environment, and integration guidance |
 | `/offline` | PWA offline fallback |
 

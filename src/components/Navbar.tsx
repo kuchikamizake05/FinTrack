@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BrainCircuit, ChevronDown, LogOut, Settings, Tags, User, WalletCards, X } from "lucide-react";
+import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Settings, Tags, User, WalletCards, X } from "lucide-react";
 import { primaryNavigation } from "@/lib/navigation";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import BrandLockup from "@/components/BrandLockup";
@@ -14,6 +14,7 @@ const profileItems = [
   { name: "Akun & saldo", href: "/accounts", icon: WalletCards },
   { name: "Kategori", href: "/categories", icon: Tags },
   { name: "Smart Insights", href: "/insights", icon: BrainCircuit },
+  { name: "Rencana & kontrol", href: "/planning", icon: CalendarClock },
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
 

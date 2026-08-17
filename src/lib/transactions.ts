@@ -35,6 +35,7 @@ export function validateTransactionForm(form: { accountId: string; amount: strin
 export function getTransactionSourceLabel(source: string) {
   if (source === "telegram_text") return "Bot Telegram";
   if (source === "telegram_receipt") return "Scan struk";
+  if (source === "recurring") return "Jadwal berulang";
   return "Input manual";
 }
 

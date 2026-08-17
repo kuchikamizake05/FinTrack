@@ -86,6 +86,7 @@ describe("transaction presentation helpers", () => {
     expect(getTransactionSourceLabel("telegram_text")).toBe("Bot Telegram");
     expect(getTransactionSourceLabel("telegram_receipt")).toBe("Scan struk");
     expect(getTransactionSourceLabel("manual")).toBe("Input manual");
+    expect(getTransactionSourceLabel("recurring")).toBe("Jadwal berulang");
     expect(getTransactionStatusLabel("pending_approval")).toBe("Perlu persetujuan");
     expect(getTransactionStatusLabel("needs_review")).toBe("Perlu ditinjau");
   });
