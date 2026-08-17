@@ -23,5 +23,16 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: "Buka transaksi", short_name: "Transaksi", url: "/transactions", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Lihat dashboard", short_name: "Dashboard", url: "/dashboard", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
     ],
+    share_target: {
+      action: "/shared-receipt-intake",
+      method: "POST",
+      enctype: "multipart/form-data",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+        files: [{ name: "receipt", accept: ["image/jpeg", "image/png", "image/webp", "application/pdf"] }] as never,
+      },
+    },
   };
 }

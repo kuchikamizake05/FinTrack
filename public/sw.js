@@ -1,5 +1,6 @@
-const STATIC_CACHE = "fintrack-static-v6";
-const PAGE_CACHE = "fintrack-pages-v6";
+const STATIC_CACHE = "fintrack-static-v7";
+const PAGE_CACHE = "fintrack-pages-v7";
+const SHARE_CACHE = "fintrack-shared-receipts-v1";
 const PRECACHE_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -25,6 +26,19 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
+  if (request.method === "POST" && new URL(request.url).pathname === "/shared-receipt-intake") {
+    event.respondWith((async () => {
+      const formData = await request.formData();
+      const id = self.crypto.randomUUID();
+      const file = formData.get("receipt");
+      const metadata = { title: String(formData.get("title") || ""), text: String(formData.get("text") || ""), url: String(formData.get("url") || ""), fileName: file instanceof File ? file.name : null, fileType: file instanceof File ? file.type : null };
+      const cache = await caches.open(SHARE_CACHE);
+      await cache.put(`/__shared-receipts/${id}/metadata`, new Response(JSON.stringify(metadata), { headers: { "Content-Type": "application/json" } }));
+      if (file instanceof File) await cache.put(`/__shared-receipts/${id}/file`, new Response(file));
+      return Response.redirect(new URL(`/shared-receipt?id=${id}`, self.location.origin), 303);
+    })());
+    return;
+  }
   if (request.method !== "GET" || !request.url.startsWith(self.location.origin)) return;
 
   if (request.mode === "navigate") {
