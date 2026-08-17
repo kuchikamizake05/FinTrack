@@ -12,6 +12,7 @@ create table if not exists financial_budgets (
 );
 create index if not exists financial_budgets_user_month_idx on financial_budgets (user_id, month desc);
 alter table financial_budgets enable row level security;
+drop policy if exists "Users can manage their financial budgets" on financial_budgets;
 create policy "Users can manage their financial budgets" on financial_budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop trigger if exists update_financial_budgets_updated_at on financial_budgets;
 create trigger update_financial_budgets_updated_at before update on financial_budgets for each row execute function update_updated_at_column();
@@ -33,6 +34,7 @@ create table if not exists recurring_transactions (
 );
 create index if not exists recurring_transactions_user_due_idx on recurring_transactions (user_id, is_active, next_run_date);
 alter table recurring_transactions enable row level security;
+drop policy if exists "Users can manage their recurring transactions" on recurring_transactions;
 create policy "Users can manage their recurring transactions" on recurring_transactions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop trigger if exists validate_recurring_transaction_account on recurring_transactions;
 create trigger validate_recurring_transaction_account before insert or update on recurring_transactions for each row execute function validate_financial_account_links();
@@ -78,6 +80,7 @@ create table if not exists account_reconciliations (
 );
 create index if not exists account_reconciliations_user_account_idx on account_reconciliations (user_id, account_id, reconciled_at desc);
 alter table account_reconciliations enable row level security;
+drop policy if exists "Users can manage their reconciliations" on account_reconciliations;
 create policy "Users can manage their reconciliations" on account_reconciliations for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop trigger if exists validate_reconciliation_account on account_reconciliations;
 create trigger validate_reconciliation_account before insert or update on account_reconciliations for each row execute function validate_financial_account_links();
@@ -90,10 +93,15 @@ create table if not exists financial_alert_dismissals (
   unique (user_id, alert_key)
 );
 alter table financial_alert_dismissals enable row level security;
+drop policy if exists "Users can manage their alert dismissals" on financial_alert_dismissals;
 create policy "Users can manage their alert dismissals" on financial_alert_dismissals for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 insert into storage.buckets (id, name, public) values ('receipts', 'receipts', false) on conflict (id) do nothing;
+drop policy if exists "Users can view their own receipts" on storage.objects;
 create policy "Users can view their own receipts" on storage.objects for select using (bucket_id = 'receipts' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "Users can upload their own receipts" on storage.objects;
 create policy "Users can upload their own receipts" on storage.objects for insert with check (bucket_id = 'receipts' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "Users can update their own receipts" on storage.objects;
 create policy "Users can update their own receipts" on storage.objects for update using (bucket_id = 'receipts' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists "Users can remove their own receipts" on storage.objects;
 create policy "Users can remove their own receipts" on storage.objects for delete using (bucket_id = 'receipts' and auth.uid()::text = (storage.foldername(name))[1]);
