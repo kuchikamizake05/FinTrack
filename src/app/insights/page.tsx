@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import {
   buildDeterministicInsight,
   buildInsightSnapshot,
@@ -146,6 +147,10 @@ export default function InsightsPage() {
       setLoadingData(false);
 
       if (nextSnapshot.current.confirmedCount === 0) return;
+      if (!canWriteOnline()) {
+        setAiError(offlineWriteMessage);
+        return;
+      }
       setLoadingAi(true);
       const response = await fetch("/api/insights/generate", {
         method: "POST",

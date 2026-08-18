@@ -16,6 +16,8 @@ import { Surface } from "@/components/ui/Surface";
 import { buildPortfolioWeeklyEquitySeries } from "@/lib/analytics";
 import { reportHandledError } from "@/lib/errors";
 import { buildInvestmentPositions, filterStockExecutions, validateExecutionForm, validateSnapshotForm, type InvestmentExecution } from "@/lib/investments";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { formatLocalDateTime } from "@/lib/planning";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +26,7 @@ type Execution = InvestmentExecution & { currency: string; note: string | null }
 type Snapshot = { id: string; account_id: string; recorded_at: string; equity: number; currency: string; note: string | null };
 type SideFilter = "all" | "buy" | "sell";
 
-function nowLocal() { return new Date().toISOString().slice(0, 16); }
+function nowLocal() { return formatLocalDateTime(new Date()); }
 function createExecutionForm(accountId = "") { return { accountId, ticker: "", side: "buy" as "buy" | "sell", quantity: "", price: "", fee: "0", executedAt: nowLocal(), note: "" }; }
 function createSnapshotForm(accountId = "") { return { accountId, equity: "", recordedAt: nowLocal(), note: "" }; }
 
@@ -84,6 +86,10 @@ export default function InvestmentsPage() {
 
   async function saveExecution(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateExecutionForm(executionForm);
     if (validation) { setFormError(validation); return; }
     setSaving(true); setFormError(null);
@@ -100,6 +106,10 @@ export default function InvestmentsPage() {
 
   async function saveSnapshot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateSnapshotForm(snapshotForm);
     if (validation) { setFormError(validation); return; }
     setSaving(true); setFormError(null);

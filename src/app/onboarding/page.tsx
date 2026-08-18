@@ -23,6 +23,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { reportHandledError } from "@/lib/errors";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { formatLocalDate } from "@/lib/planning";
 import type { FinancialAccountKind } from "@/lib/ledger";
 import {
   buildOnboardingSummary,
@@ -128,7 +130,7 @@ export default function OnboardingPage() {
     const timer = window.setTimeout(() => {
       setTransactionForm((current) => current.date ? current : {
         ...current,
-        date: new Date().toISOString().slice(0, 10),
+        date: formatLocalDate(new Date()),
       });
     }, 0);
     return () => window.clearTimeout(timer);
@@ -186,6 +188,10 @@ export default function OnboardingPage() {
 
   const saveAccount = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateOnboardingAccount(accountForm);
     if (!validation.valid) {
       setAccountErrors(validation.errors as Record<string, string>);
@@ -232,6 +238,10 @@ export default function OnboardingPage() {
 
   const saveTransaction = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateOnboardingTransaction({
       ...transactionForm,
       accountId: localProgress.accountId ?? "",

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Settings, Tags, User, WalletCards, X } from "lucide-react";
 import { primaryNavigation } from "@/lib/navigation";
+import { reportHandledError } from "@/lib/errors";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import BrandLockup from "@/components/BrandLockup";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -29,6 +30,8 @@ export default function Navbar() {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const closeProfile = useCallback((restoreFocus = false) => {
     const origin = profileOrigin;
@@ -76,9 +79,20 @@ export default function Navbar() {
   }, [closeProfile, profileOrigin]);
 
   const handleLogout = async () => {
-    closeProfile();
-    await supabase.auth.signOut();
-    router.replace("/login");
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      closeProfile();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace("/login");
+    } catch (error) {
+      reportHandledError("Navbar logout failed", error, "Sesi belum dapat ditutup. Coba lagi.");
+      setLogoutError("Sesi belum dapat ditutup. Coba lagi.");
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -129,7 +143,7 @@ export default function Navbar() {
                 <span className="max-w-[170px] truncate">{userEmail || t("Profil")}</span>
                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${profileOrigin === "desktop" ? "rotate-180" : ""}`} aria-hidden="true" />
               </button>
-              {profileOrigin === "desktop" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} />}
+              {profileOrigin === "desktop" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} loggingOut={loggingOut} error={logoutError} />}
             </div>
           </div>
         </div>
@@ -152,7 +166,7 @@ export default function Navbar() {
             <User className="h-[18px] w-[18px]" aria-hidden="true" />
           </button>
         </div>
-        {profileOrigin === "mobile" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} mobile />}
+        {profileOrigin === "mobile" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} mobile loggingOut={loggingOut} error={logoutError} />}
       </header>
 
       <nav
@@ -187,9 +201,11 @@ type ProfileMenuProps = {
   onClose: () => void;
   onLogout: () => void;
   mobile?: boolean;
+  loggingOut: boolean;
+  error: string | null;
 };
 
-const ProfileMenu = ({ onClose, onLogout, mobile = false, ref }: ProfileMenuProps & { ref: Ref<HTMLDivElement> }) => {
+const ProfileMenu = ({ onClose, onLogout, mobile = false, loggingOut, error, ref }: ProfileMenuProps & { ref: Ref<HTMLDivElement> }) => {
   const { t } = useLanguage();
   return (
     <div
@@ -224,14 +240,17 @@ const ProfileMenu = ({ onClose, onLogout, mobile = false, ref }: ProfileMenuProp
           );
         })}
       </div>
+      {error && <p role="alert" className="border-t border-rose-100 px-3 py-2 text-xs leading-5 text-rose-700">{error}</p>}
       <button
         type="button"
         role="menuitem"
         onClick={onLogout}
-        className="flex min-h-11 w-full items-center gap-3 rounded-xl border-t border-[color:rgba(18,53,36,0.08)] px-3 py-2.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+        disabled={loggingOut}
+        aria-busy={loggingOut || undefined}
+        className="flex min-h-11 w-full items-center gap-3 rounded-xl border-t border-[color:rgba(18,53,36,0.08)] px-3 py-2.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-wait disabled:opacity-60"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
-        {t("Keluar")}
+        {loggingOut ? t("Menutup sesi...") : t("Keluar")}
       </button>
     </div>
   );

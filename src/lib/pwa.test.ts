@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  canWriteOnline,
   getInstallPromptState,
   getNetworkSnapshot,
   getServerNetworkSnapshot,
+  getWriteAvailability,
+  offlineWriteMessage,
   shouldRegisterServiceWorker,
 } from "./pwa";
 
@@ -41,5 +44,11 @@ describe("network status snapshots", () => {
 
   it("falls back to online outside a browser", () => {
     expect(getNetworkSnapshot()).toBe(true);
+    expect(canWriteOnline()).toBe(true);
+  });
+
+  it("allows writes online and blocks them offline", () => {
+    expect(getWriteAvailability(true)).toEqual({ allowed: true });
+    expect(getWriteAvailability(false)).toEqual({ allowed: false, message: offlineWriteMessage });
   });
 });

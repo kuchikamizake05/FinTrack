@@ -16,6 +16,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
 import { calculateForexRMultiple, calculateTradingJournalMetrics, filterForexTrades, validateForexTradeForm } from "@/lib/trading";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { formatLocalDateTime } from "@/lib/planning";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +31,7 @@ type Trade = {
 type Snapshot = { id: string; account_id: string; recorded_at: string; equity: number; currency: string; note: string | null };
 type TradeStatusFilter = "all" | Trade["status"];
 
-function nowLocal() { return new Date().toISOString().slice(0, 16); }
+function nowLocal() { return formatLocalDateTime(new Date()); }
 function createTradeForm(accountId = "") { return { accountId, symbol: "", direction: "long" as "long" | "short", status: "open" as "open" | "closed", lotSize: "", entryPrice: "", exitPrice: "", stopLoss: "", takeProfit: "", riskAmount: "", grossPnl: "0", commission: "0", swap: "0", openedAt: nowLocal(), closedAt: nowLocal(), setupTag: "", thesis: "", emotion: "", lesson: "" }; }
 function createSnapshotForm(accountId = "") { return { accountId, equity: "", recordedAt: nowLocal(), note: "" }; }
 const asNullableNumber = (value: string) => value.trim() === "" ? null : Number(value);
@@ -85,6 +87,10 @@ export default function TradingPage() {
 
   async function saveTrade(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateForexTradeForm(form);
     if (validation) { setFormError(validation); return; }
     setSaving(true); setFormError(null);
@@ -105,6 +111,10 @@ export default function TradingPage() {
 
   async function saveSnapshot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const equity = Number(snapshotForm.equity);
     if (!snapshotForm.accountId || !snapshotForm.recordedAt || !Number.isFinite(equity) || equity < 0) { setFormError("Pilih akun, waktu, dan masukkan equity yang valid."); return; }
     setSaving(true); setFormError(null);
@@ -120,6 +130,10 @@ export default function TradingPage() {
   }
 
   async function requestAiReview(tradeId: string) {
+    if (!canWriteOnline()) {
+      setPageError(offlineWriteMessage);
+      return;
+    }
     setRequestingReviewId(tradeId); setPageError(null); setReviewMessage(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -128,7 +142,10 @@ export default function TradingPage() {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Review belum dapat diminta.");
       setReviewMessage("Permintaan review diterima. Hasil akan muncul di tab Review setelah workflow selesai.");
-    } catch (error) { setPageError(error instanceof Error ? error.message : "Review belum dapat diminta."); }
+    } catch (error) {
+      reportHandledError("Trade review request failed", error, "Review belum dapat diminta.");
+      setPageError("Review belum dapat diminta. Coba lagi saat koneksi tersedia.");
+    }
     finally { setRequestingReviewId(null); }
   }
 
