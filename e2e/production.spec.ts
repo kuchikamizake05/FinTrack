@@ -86,6 +86,29 @@ test.describe("offline PWA", () => {
   });
 });
 
+test.describe("error recovery", () => {
+  test.use({
+    allowedConsoleErrors: [
+      "Failed to load resource: the server responded with a status of 500",
+      "Minified React error #441",
+    ],
+  });
+
+  test("renders branded recovery for a contained route crash", async ({ page, context }) => {
+    await context.setExtraHTTPHeaders({ "x-fintrack-e2e-error-surface": "segment" });
+    await page.goto("/error-probe");
+
+    const heading = page.getByRole("heading", { name: "Ruang keuangan belum bisa dimuat" });
+    await expect(heading).toBeVisible();
+    await expect(heading).toBeFocused();
+    await expect(page.getByRole("button", { name: "Coba lagi" })).toBeVisible();
+    const dashboardLink = page.getByRole("link", { name: "Buka dashboard" });
+    await expect(dashboardLink).toBeVisible();
+    await expect(dashboardLink).toHaveAttribute("href", "/dashboard");
+    await expect(page.locator("body")).not.toContainText("FinTrack e2e segment error");
+  });
+});
+
 test("has no page-level horizontal overflow on mobile", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "Mobile-only layout assertion");
   await mockSupabase(page, false);
