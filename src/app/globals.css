@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-manrope), -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
 
   --color-background: var(--background);
@@ -40,6 +40,31 @@
   --brand-lime: #4ade80;
   --brand-mint: #dcf7e5;
   --brand-cream: #f4fbf6;
+
+  --canvas: #f7faf7;
+  --canvas-soft: #edf9f1;
+  --surface: #ffffff;
+  --surface-muted: #f5fbf7;
+  --surface-raised: rgba(255, 255, 255, 0.94);
+  --ink: #0f2b1d;
+  --ink-soft: #425f50;
+  --border-subtle: rgba(22, 101, 52, 0.13);
+  --border-strong: rgba(21, 128, 61, 0.3);
+  --status-success: #047857;
+  --status-warning: #a16207;
+  --status-danger: #be123c;
+  --status-info: #0369a1;
+
+  --shadow-control: 0 2px 8px rgba(22, 101, 52, 0.045);
+  --shadow-surface: 0 12px 36px rgba(22, 101, 52, 0.065);
+  --shadow-elevated: 0 22px 55px rgba(18, 53, 36, 0.14);
+  --shadow-action: 0 8px 20px rgba(21, 128, 61, 0.16);
+  --radius-control: 0.75rem;
+  --radius-surface: 1.375rem;
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
   --background: 145 35% 97%;
   --foreground: 151 32% 16%;
   --card: 0 0% 100%;
@@ -59,27 +84,59 @@
   --border: 145 20% 87%;
   --input: 145 20% 87%;
   --ring: 152 61% 35%;
-  --radius: 0.5rem;                  /* 8px compact technical border radius */
+  --radius: 0.5rem;
 }
 
 html {
   min-height: 100%;
-  background: #f7faf7;
+  background: var(--canvas);
+  color-scheme: light;
+  scroll-behavior: smooth;
 }
 
-/* Base style overrides */
 body {
-  background: linear-gradient(180deg, #dcf7e5 0, #f4fbf6 300px, #ffffff 680px) fixed;
-  color: hsl(var(--foreground));
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   min-height: 100vh;
   min-height: 100svh;
-  overflow-x: hidden;
+  overflow-x: clip;
+  background: linear-gradient(180deg, var(--brand-mint) 0, var(--brand-cream) 18.75rem, #ffffff 42.5rem) fixed;
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   letter-spacing: -0.01em;
 }
 
-/* Shared feature-page rhythm. The dashboard remains intentionally bespoke,
-   while secondary screens inherit the same mint atmosphere and mobile density. */
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 0.75rem;
+  left: 50%;
+  transform: translate(-50%, -180%);
+  border-radius: var(--radius-control);
+  background: var(--brand-ink);
+  color: white;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-elevated);
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+  transform: translate(-50%, 0);
+}
+
 .app-page {
   min-height: 100vh;
   min-height: 100svh;
@@ -109,27 +166,26 @@ body {
   }
 }
 
-/* Bright, bank-like surfaces: clear hierarchy without an AI-dashboard feel. */
 .linear-panel {
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 2px 12px rgba(31, 47, 78, 0.05);
   position: relative;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  box-shadow: var(--shadow-control);
 }
 
 .linear-card {
-  background-color: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(22, 101, 52, 0.10);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-raised);
+  transition: border-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
 }
 
 .linear-card:hover {
+  border-color: var(--border-strong);
   background-color: #ffffff;
-  border-color: rgba(22, 163, 74, 0.28);
-  box-shadow: 0 10px 24px rgba(22, 101, 52, 0.10);
+  box-shadow: var(--shadow-surface);
 }
 
-/* Legacy utility colors are normalized here while the screens are migrated. */
+/* Keep previous dark-surface utilities readable during incremental route migration. */
 [class*="bg-[#050507]"], [class*="bg-[#030604]"] { background-color: transparent !important; }
 [class*="bg-[#07070f]"] { background-color: #ffffff !important; }
 [class*="bg-[#101012]"], [class*="bg-[#0a0a0d]"], [class*="bg-[#0b0b0f]"], [class*="bg-[#0f0f1b]"] { background-color: #ffffff !important; }
@@ -137,44 +193,36 @@ body {
 .linear-panel .text-white, .linear-panel .text-\[\#f7f8f8\] { color: #1b2740 !important; }
 .linear-panel .border-neutral-800 { border-color: #e2e8f3 !important; }
 .linear-panel .border-neutral-900 { border-color: #edf1f7 !important; }
-
-/* Text carried over from the dark theme: keep content readable on white cards
-   while leaving white labels on colored buttons untouched. */
 main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-white,
 main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-\[\#f7f8f8\] { color: #17233b !important; }
 main :is(p, span, td, th, label, li).text-neutral-200,
 main :is(p, span, td, th, label, li).text-neutral-300 { color: #42526b !important; }
 main :is(input, textarea, select).text-white { color: #17233b !important; }
-main :is(input, textarea, select) { caret-color: #15803d; }
-
-:where(a, button, input, textarea, select):focus-visible {
-  outline: 2px solid #16a34a;
-  outline-offset: 3px;
-}
-
-/* Warning and error text was originally tuned for the dark interface.
-   Keep it legible against the bright alert surfaces. */
+main :is(input, textarea, select) { caret-color: var(--brand-primary); }
 main [class~="text-amber-100"], main [class~="text-amber-200"], main [class~="text-amber-300"] { color: #92400e !important; }
 main [class~="text-rose-100"], main [class~="text-rose-200"], main [class~="text-rose-300"] { color: #be123c !important; }
 main [class~="text-emerald-300"] { color: #047857 !important; }
 
-/* Status Badges */
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
 .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 600;
-  border-radius: 9999px;
-  text-transform: uppercase;
   letter-spacing: 0.03em;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  text-transform: uppercase;
 }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 0.375rem;
+  height: 0.375rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -182,17 +230,16 @@ main [class~="text-emerald-300"] { color: #047857 !important; }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  border-radius: 999px;
+  background: rgba(21, 128, 61, 0.22);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 194, 120, 0.25);
+  background: rgba(21, 128, 61, 0.38);
 }
 
-/* Click feedback scaling */
 .click-active {
-  transition: transform 0.1s ease;
+  transition: transform var(--motion-fast) var(--ease-out);
 }
 
 .click-active:active {
@@ -202,7 +249,7 @@ main [class~="text-emerald-300"] { color: #047857 !important; }
 .field {
   width: 100%;
   border: 1px solid #dbe3ef;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   background: #ffffff;
   color: #17233b;
   padding: 0.65rem 0.75rem;
@@ -210,11 +257,12 @@ main [class~="text-emerald-300"] { color: #047857 !important; }
 }
 
 .field:focus {
-  outline: 2px solid #4ade80;
+  outline: 2px solid var(--brand-lime);
   outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;

@@ -53,7 +53,7 @@ const activity = [
 export default function LandingPage() {
   const { t } = useLanguage();
   return (
-    <main className={styles.page}>
+    <main id="main-content" tabIndex={-1} className={styles.page}>
       <section className={styles.hero}>
         <header className={styles.nav}>
           <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
@@ -97,7 +97,7 @@ export default function LandingPage() {
           <p className={styles.reassurance}><Check aria-hidden="true" /> {t("Gratis untuk memulai. Tidak perlu kartu.")}</p>
         </div>
 
-        <div className={styles.productStage} aria-label={t("Pratinjau dashboard FinTrack")}>
+        <section className={styles.productStage} aria-label={t("Pratinjau dashboard FinTrack")}>
           <div className={styles.orbitOne} />
           <div className={styles.orbitTwo} />
 
@@ -130,17 +130,17 @@ export default function LandingPage() {
             <Sparkles aria-hidden="true" />
             <div><span>{t("Insight minggu ini")}</span><strong>{t("Pengeluaran makan turun 18%")}</strong></div>
           </div>
-        </div>
+        </section>
       </section>
 
-      <div className={styles.ticker} aria-label={t("Ringkasan manfaat FinTrack")}>
+      <section className={styles.ticker} aria-label={t("Ringkasan manfaat FinTrack")}>
         <div>
           <span>Arus kas terbaca</span><i>✦</i>
           <span>Target lebih dekat</span><i>✦</i>
           <span>Data tetap milikmu</span><i>✦</i>
           <span>Keputusan lebih tenang</span><i>✦</i>
         </div>
-      </div>
+      </section>
 
       <section className={styles.features} id="fitur">
         <div className={styles.sectionIntro}>

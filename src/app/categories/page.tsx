@@ -13,7 +13,6 @@ import {
   HeartPulse,
   Home,
   Layers3,
-  Loader2,
   Palette,
   PiggyBank,
   Plus,
@@ -31,6 +30,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
@@ -136,24 +136,6 @@ export default function CategoriesPage() {
     return () => window.clearTimeout(timer);
   }, [fetchCategories]);
 
-  useEffect(() => {
-    if (!formOpen && !deleteTarget) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const focusTimer = formOpen ? window.setTimeout(() => nameInputRef.current?.focus(), 80) : undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || saving) return;
-      setFormOpen(false);
-      setDeleteTarget(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      if (focusTimer) window.clearTimeout(focusTimer);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [deleteTarget, formOpen, saving]);
-
   const filteredCategories = useMemo(
     () => filterCategories(categories, { search, type: typeFilter }),
     [categories, search, typeFilter],
@@ -240,7 +222,7 @@ export default function CategoriesPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main className="app-page-content space-y-5 sm:space-y-6">
+      <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader
           eyebrow="Category ledger"
           title="Kategori"
@@ -268,8 +250,11 @@ export default function CategoriesPage() {
                 {(["expense", "income", "all"] as const).map((type) => (
                   <button
                     key={type}
+                    id={`category-filter-tab-${type}`}
                     type="button"
                     role="tab"
+                    aria-controls="category-filter-results"
+                    tabIndex={typeFilter === type ? 0 : -1}
                     aria-selected={typeFilter === type}
                     onClick={() => setTypeFilter(type)}
                     className={cn("min-h-10 shrink-0 rounded-lg px-4 text-sm font-bold transition", typeFilter === type ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}
@@ -289,6 +274,7 @@ export default function CategoriesPage() {
             </div>
           </div>
 
+          <div id="category-filter-results" role="tabpanel" aria-labelledby={`category-filter-tab-${typeFilter}`}>
           {loading ? <CategorySkeleton /> : filteredCategories.length === 0 ? (
             <EmptyState
               icon={Tags}
@@ -313,6 +299,7 @@ export default function CategoriesPage() {
               </div>
             </>
           )}
+          </div>
         </Surface>
       </main>
 
@@ -352,11 +339,89 @@ function CategoryCard({ category, usage, allTimeCount, onEdit, onDelete }: Categ
 
 function CategoryFormDialog({ category, allTimeUsage, form, setForm, errors, saving, nameInputRef, onClose, onSubmit }: { category: CategoryRecord | null; allTimeUsage: Record<string, number>; form: typeof defaultForm; setForm: React.Dispatch<React.SetStateAction<typeof defaultForm>>; errors: CategoryFormErrors; saving: boolean; nameInputRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const identityLocked = category ? getCategoryEditLocks(category, allTimeUsage).identityLocked : false;
-  return <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}><form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="category-dialog-title" className="max-h-[calc(100svh-0.75rem)] w-full overflow-y-auto rounded-t-[28px] border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:max-w-xl sm:rounded-2xl"><div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6"><div><p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{category ? "Perbarui kategori" : "Kategori baru"}</p><h2 id="category-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">{category ? `Edit ${category.name}` : "Tambah kategori"}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{identityLocked ? "Kategori sudah digunakan. Nama dan tipe dikunci agar riwayat tetap konsisten." : "Pilih identitas yang mudah dikenali saat mencatat transaksi."}</p></div><Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label="Tutup form kategori"><X className="h-5 w-5" /></Button></div><div className="space-y-5 px-5 py-5 sm:px-6"><div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label="Tipe kategori">{(["expense", "income"] as const).map((type) => <button key={type} type="button" disabled={identityLocked} aria-pressed={form.type === type} onClick={() => setForm((current) => ({ ...current, type }))} className={cn("min-h-11 rounded-lg text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60", form.type === type ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{type === "expense" ? "Pengeluaran" : "Pemasukan"}</button>)}</div><Field label="Nama kategori" htmlFor="category-name" error={errors.name} hint={identityLocked ? "Nama tetap mengikuti transaksi sebelumnya." : "Maksimal 48 karakter."}><input ref={nameInputRef} id="category-name" maxLength={48} disabled={identityLocked} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Hewan peliharaan" className={fieldControlStyles} aria-invalid={Boolean(errors.name)} /></Field><Field label="Ikon" htmlFor="category-icon" error={errors.icon}><div id="category-icon" className="grid grid-cols-4 gap-2 sm:grid-cols-6">{CATEGORY_ICONS.map((icon) => { const Icon = iconMap[icon]; return <button key={icon} type="button" title={iconLabels[icon]} aria-label={iconLabels[icon]} aria-pressed={form.icon === icon} onClick={() => setForm((current) => ({ ...current, icon }))} className={cn("flex min-h-12 items-center justify-center rounded-xl border transition", form.icon === icon ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100" : "border-slate-200 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50")}><Icon className="h-5 w-5" /></button>; })}</div></Field><Field label="Warna" htmlFor="category-color" error={errors.color}><div className="flex flex-wrap items-center gap-2">{presetColors.map((color) => <button key={color} type="button" aria-label={`Pilih warna ${color}`} aria-pressed={form.color === color} onClick={() => setForm((current) => ({ ...current, color }))} className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 transition", form.color === color ? "border-slate-900 ring-2 ring-slate-200 ring-offset-2" : "border-white")} style={{ backgroundColor: color }}>{form.color === color && <CircleDot className="h-4 w-4 text-white" />}</button>)}<label htmlFor="category-color" className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-slate-500" title="Pilih warna lain"><Palette className="h-4 w-4" /><input id="category-color" type="color" value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} className="absolute inset-0 cursor-pointer opacity-0" /></label></div></Field></div><div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4"><Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button><Button type="submit" disabled={saving} className="flex-[1.4] sm:flex-none">{saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : category ? "Simpan perubahan" : "Tambah kategori"}</Button></div></form></div>;
+  const description = identityLocked
+    ? "Kategori sudah digunakan. Nama dan tipe dikunci agar riwayat tetap konsisten."
+    : "Pilih identitas yang mudah dikenali saat mencatat transaksi.";
+
+  return (
+    <DialogFrame
+      titleId="category-dialog-title"
+      descriptionId="category-dialog-description"
+      initialFocusRef={nameInputRef}
+      onClose={onClose}
+      closeDisabled={saving}
+    >
+      <form onSubmit={onSubmit}>
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{category ? "Perbarui kategori" : "Kategori baru"}</p>
+            <h2 id="category-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">{category ? `Edit ${category.name}` : "Tambah kategori"}</h2>
+            <p id="category-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label="Tutup form kategori"><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="space-y-5 px-5 py-5 sm:px-6">
+          <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label="Tipe kategori">
+            {(["expense", "income"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                disabled={identityLocked}
+                aria-pressed={form.type === type}
+                onClick={() => setForm((current) => ({ ...current, type }))}
+                className={cn("min-h-11 rounded-lg text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60", form.type === type ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}
+              >
+                {type === "expense" ? "Pengeluaran" : "Pemasukan"}
+              </button>
+            ))}
+          </div>
+          <Field label="Nama kategori" htmlFor="category-name" error={errors.name} hint={identityLocked ? "Nama tetap mengikuti transaksi sebelumnya." : "Maksimal 48 karakter."}>
+            <input ref={nameInputRef} id="category-name" maxLength={48} disabled={identityLocked} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Hewan peliharaan" className={fieldControlStyles} />
+          </Field>
+          <Field label="Ikon" htmlFor="category-icon" error={errors.icon}>
+            <div id="category-icon" className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {CATEGORY_ICONS.map((icon) => {
+                const Icon = iconMap[icon];
+                return <button key={icon} type="button" title={iconLabels[icon]} aria-label={iconLabels[icon]} aria-pressed={form.icon === icon} onClick={() => setForm((current) => ({ ...current, icon }))} className={cn("flex min-h-12 items-center justify-center rounded-xl border transition", form.icon === icon ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100" : "border-slate-200 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50")}><Icon className="h-5 w-5" aria-hidden="true" /></button>;
+              })}
+            </div>
+          </Field>
+          <Field label="Warna" htmlFor="category-color" error={errors.color}>
+            <div className="flex flex-wrap items-center gap-2">
+              {presetColors.map((color) => <button key={color} type="button" aria-label={`Pilih warna ${color}`} aria-pressed={form.color === color} onClick={() => setForm((current) => ({ ...current, color }))} className={cn("flex h-11 w-11 items-center justify-center rounded-full border-2 transition", form.color === color ? "border-slate-900 ring-2 ring-slate-200 ring-offset-2" : "border-white")} style={{ backgroundColor: color }}>{form.color === color && <CircleDot className="h-4 w-4 text-white" aria-hidden="true" />}</button>)}
+              <label htmlFor="category-color" className="relative flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-slate-500" title="Pilih warna lain"><Palette className="h-4 w-4" aria-hidden="true" /><input id="category-color" type="color" value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} className="absolute inset-0 cursor-pointer opacity-0" /></label>
+            </div>
+          </Field>
+        </div>
+        <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4">
+          <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button>
+          <Button type="submit" loading={saving} className="flex-[1.4] sm:flex-none">{category ? "Simpan perubahan" : "Tambah kategori"}</Button>
+        </div>
+      </form>
+    </DialogFrame>
+  );
 }
 
 function DeleteCategoryDialog({ category, usageCount, saving, onClose, onConfirm }: { category: CategoryRecord; usageCount: number; saving: boolean; onClose: () => void; onConfirm: () => void }) {
-  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}><section role="alertdialog" aria-modal="true" aria-labelledby="delete-category-title" className="w-full rounded-t-[28px] border border-rose-100 bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:max-w-md sm:rounded-2xl sm:p-6"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><Trash2 className="h-5 w-5" /></span><h2 id="delete-category-title" className="mt-4 text-xl font-bold tracking-tight text-slate-900">Hapus “{category.name}”?</h2><p className="mt-2 text-sm leading-6 text-slate-500">Kategori akan hilang dari pilihan baru. {usageCount > 0 ? `${usageCount} transaksi lama tetap menyimpan label kategori ini dan tidak ikut terhapus.` : "Tidak ada transaksi aktif yang memakai kategori ini."}</p><div className="mt-6 flex gap-2 pb-[env(safe-area-inset-bottom)] sm:justify-end"><Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button><Button variant="destructive" onClick={onConfirm} disabled={saving} className="flex-1 sm:flex-none">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Hapus kategori</Button></div></section></div>;
+  return (
+    <DialogFrame
+      role="alertdialog"
+      titleId="delete-category-title"
+      descriptionId="delete-category-description"
+      onClose={onClose}
+      closeDisabled={saving}
+      className="z-[70]"
+      contentClassName="max-w-md border-rose-100 p-5 sm:p-6"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><Trash2 className="h-5 w-5" aria-hidden="true" /></span>
+      <h2 id="delete-category-title" className="mt-4 text-xl font-bold tracking-tight text-slate-900">Hapus “{category.name}”?</h2>
+      <p id="delete-category-description" className="mt-2 text-sm leading-6 text-slate-500">Kategori akan hilang dari pilihan baru. {usageCount > 0 ? `${usageCount} transaksi lama tetap menyimpan label kategori ini dan tidak ikut terhapus.` : "Tidak ada transaksi aktif yang memakai kategori ini."}</p>
+      <div className="mt-6 flex gap-2 pb-[env(safe-area-inset-bottom)] sm:justify-end">
+        <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button>
+        <Button variant="destructive" onClick={onConfirm} loading={saving} className="flex-1 sm:flex-none"><Trash2 className="h-4 w-4" /> Hapus kategori</Button>
+      </div>
+    </DialogFrame>
+  );
 }
 
 function CategorySkeleton() {
