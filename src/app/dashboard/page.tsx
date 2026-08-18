@@ -43,7 +43,7 @@ import {
   calculateGoalProgress,
   maskAmount,
 } from "@/lib/home";
-import { normalizeClientError } from "@/lib/errors";
+import { reportHandledError } from "@/lib/errors";
 import type { FinancialAccountKind } from "@/lib/ledger";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { shouldShowOnboardingResume } from "@/lib/onboarding";
@@ -214,8 +214,7 @@ export default function DashboardPage() {
         }
       })(), 12_000);
     } catch (error) {
-      const normalizedError = normalizeClientError(error, "Data dashboard belum bisa dimuat.");
-      console.warn("Dashboard data unavailable:", normalizedError);
+      const normalizedError = reportHandledError("Dashboard data unavailable", error, "Data dashboard belum bisa dimuat.");
       setLoadError(normalizedError.message);
     } finally {
       setLoading(false);

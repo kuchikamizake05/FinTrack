@@ -48,6 +48,8 @@ import {
   type AccountOverviewRecord,
 } from "@/lib/accounts";
 import type { FinancialAccountKind } from "@/lib/ledger";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { formatLocalDate } from "@/lib/planning";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +91,7 @@ const createTransferForm = () => ({
   destinationAccountId: "",
   amount: "",
   destinationAmount: "",
-  date: new Date().toISOString().slice(0, 10),
+  date: formatLocalDate(new Date()),
   kind: "transfer",
   note: "",
 });
@@ -208,6 +210,10 @@ export default function AccountsPage() {
 
   async function saveAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateAccountForm(accountForm);
     if (!validation.valid) {
       setFormErrors(validation.errors as Record<string, string>);
@@ -243,6 +249,10 @@ export default function AccountsPage() {
 
   async function saveTransfer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     const validation = validateTransferForm({
       sourceAccountId: transferForm.sourceAccountId,
       destinationAccountId: transferForm.destinationAccountId,
@@ -289,6 +299,10 @@ export default function AccountsPage() {
 
   async function saveBalance(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
     if (!balanceAccount) return;
     const validation = validateBalanceForm({ ...balanceForm, currency: balanceAccount.currency });
     if (!validation.valid) {

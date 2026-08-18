@@ -6,10 +6,20 @@ export function getServerNetworkSnapshot() {
   return true;
 }
 
+export const offlineWriteMessage = "Perubahan memerlukan koneksi internet. Hubungkan kembali lalu coba lagi.";
+
 export function getNetworkSnapshot() {
   return typeof navigator !== "undefined" && typeof navigator.onLine === "boolean"
     ? navigator.onLine
     : getServerNetworkSnapshot();
+}
+
+export function getWriteAvailability(online: boolean) {
+  return online ? { allowed: true as const } : { allowed: false as const, message: offlineWriteMessage };
+}
+
+export function canWriteOnline() {
+  return getNetworkSnapshot();
 }
 
 export function subscribeToNetworkStatus(onStoreChange: () => void) {

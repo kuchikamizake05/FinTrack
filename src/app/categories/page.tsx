@@ -30,6 +30,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -51,6 +52,7 @@ import {
   type CategoryUsage,
 } from "@/lib/categories";
 import { supabase } from "@/infrastructure/supabase/browser-client";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<CategoryIcon, LucideIcon> = {
@@ -98,6 +100,7 @@ export default function CategoriesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CategoryRecord | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [formErrors, setFormErrors] = useState<CategoryFormErrors>({});
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -175,6 +178,11 @@ export default function CategoriesPage() {
       setFormErrors(errors);
       return;
     }
+    if (!canWriteOnline()) {
+      setFormErrors({ name: offlineWriteMessage });
+      return;
+    }
+
     setSaving(true);
     setFormErrors({});
     try {
@@ -199,8 +207,14 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || saving) return;
+    if (!canWriteOnline()) {
+      setDeleteError(offlineWriteMessage);
+      return;
+    }
+
     setSaving(true);
+    setDeleteError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -210,8 +224,7 @@ export default function CategoriesPage() {
       await fetchCategories();
     } catch (error) {
       reportHandledError("Category delete failed", error, "Kategori belum berhasil dihapus.");
-      setPageError("Kategori belum berhasil dihapus. Riwayat transaksi Anda tetap aman.");
-      setDeleteTarget(null);
+      setDeleteError("Kategori belum berhasil dihapus. Riwayat transaksi Anda tetap aman.");
     } finally {
       setSaving(false);
     }
@@ -304,7 +317,7 @@ export default function CategoriesPage() {
       </main>
 
       {formOpen && <CategoryFormDialog category={editingCategory} allTimeUsage={allTimeUsage} form={form} setForm={setForm} errors={formErrors} saving={saving} nameInputRef={nameInputRef} onClose={closeForm} onSubmit={handleSave} />}
-      {deleteTarget && <DeleteCategoryDialog category={deleteTarget} usageCount={allTimeUsage[deleteTarget.name] ?? 0} saving={saving} onClose={() => !saving && setDeleteTarget(null)} onConfirm={() => void handleDelete()} />}
+      {deleteTarget && <DeleteCategoryDialog category={deleteTarget} usageCount={allTimeUsage[deleteTarget.name] ?? 0} saving={saving} error={deleteError} onClose={() => { if (!saving) { setDeleteTarget(null); setDeleteError(null); } }} onConfirm={() => void handleDelete()} />}
     </div>
   );
 }
@@ -402,25 +415,19 @@ function CategoryFormDialog({ category, allTimeUsage, form, setForm, errors, sav
   );
 }
 
-function DeleteCategoryDialog({ category, usageCount, saving, onClose, onConfirm }: { category: CategoryRecord; usageCount: number; saving: boolean; onClose: () => void; onConfirm: () => void }) {
+function DeleteCategoryDialog({ category, usageCount, saving, error, onClose, onConfirm }: { category: CategoryRecord; usageCount: number; saving: boolean; error: string | null; onClose: () => void; onConfirm: () => void }) {
   return (
-    <DialogFrame
-      role="alertdialog"
+    <ConfirmDialog
       titleId="delete-category-title"
       descriptionId="delete-category-description"
+      title={`Hapus “${category.name}”?`}
+      description={<>Kategori akan hilang dari pilihan baru. {usageCount > 0 ? `${usageCount} transaksi lama tetap menyimpan label kategori ini dan tidak ikut terhapus.` : "Tidak ada transaksi aktif yang memakai kategori ini."}</>}
+      confirmLabel="Hapus kategori"
       onClose={onClose}
-      closeDisabled={saving}
-      className="z-[70]"
-      contentClassName="max-w-md border-rose-100 p-5 sm:p-6"
-    >
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><Trash2 className="h-5 w-5" aria-hidden="true" /></span>
-      <h2 id="delete-category-title" className="mt-4 text-xl font-bold tracking-tight text-slate-900">Hapus “{category.name}”?</h2>
-      <p id="delete-category-description" className="mt-2 text-sm leading-6 text-slate-500">Kategori akan hilang dari pilihan baru. {usageCount > 0 ? `${usageCount} transaksi lama tetap menyimpan label kategori ini dan tidak ikut terhapus.` : "Tidak ada transaksi aktif yang memakai kategori ini."}</p>
-      <div className="mt-6 flex gap-2 pb-[env(safe-area-inset-bottom)] sm:justify-end">
-        <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button>
-        <Button variant="destructive" onClick={onConfirm} loading={saving} className="flex-1 sm:flex-none"><Trash2 className="h-4 w-4" /> Hapus kategori</Button>
-      </div>
-    </DialogFrame>
+      onConfirm={onConfirm}
+      loading={saving}
+      error={error}
+    />
   );
 }
 

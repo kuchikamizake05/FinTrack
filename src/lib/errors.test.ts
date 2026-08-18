@@ -4,22 +4,17 @@ import { normalizeClientError, reportHandledError } from "./errors";
 describe("normalizeClientError", () => {
   const fallback = "Data belum bisa dimuat.";
 
-  it("preserves a regular Error message", () => {
-    expect(normalizeClientError(new Error("Koneksi terlalu lama."), fallback)).toEqual({
-      message: "Koneksi terlalu lama.",
+  it("always returns safe fallback text for provider errors", () => {
+    expect(normalizeClientError(new Error("private database detail"), fallback)).toEqual({
+      message: fallback,
     });
-  });
-
-  it("preserves useful Supabase error fields", () => {
     expect(normalizeClientError({
       message: "relation does not exist",
       code: "42P01",
-      details: "Missing public.transactions",
-      hint: null,
+      details: "private table detail",
+      hint: "private hint",
     }, fallback)).toEqual({
-      message: "relation does not exist",
-      code: "42P01",
-      details: "Missing public.transactions",
+      message: fallback,
     });
   });
 
@@ -30,12 +25,14 @@ describe("normalizeClientError", () => {
 });
 
 describe("reportHandledError", () => {
-  it("logs a serializable warning and returns the normalized error", () => {
+  it("logs fixed context without provider error payload", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const result = reportHandledError("Transactions unavailable", {}, "Data belum bisa dimuat.");
+    const result = reportHandledError("Transactions unavailable", { message: "private detail", code: "secret" }, "Data belum bisa dimuat.");
 
     expect(result).toEqual({ message: "Data belum bisa dimuat." });
-    expect(warning).toHaveBeenCalledWith("Transactions unavailable", { message: "Data belum bisa dimuat." });
+    expect(warning).toHaveBeenCalledWith("FinTrack: Transactions unavailable");
+    expect(warning.mock.calls.flat().join(" ")).not.toContain("private detail");
+    expect(warning.mock.calls.flat().join(" ")).not.toContain("secret");
     warning.mockRestore();
   });
 });

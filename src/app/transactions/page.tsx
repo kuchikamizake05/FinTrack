@@ -38,6 +38,7 @@ import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { buttonStyles } from "@/components/ui/button-styles";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -58,6 +59,8 @@ import {
   summarizeTransactionList,
   validateTransactionForm,
 } from "@/lib/transactions";
+import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { formatLocalDate } from "@/lib/planning";
 import { cn } from "@/lib/utils";
 
 type Transaction = {
@@ -103,7 +106,7 @@ const defaultFilters: TransactionFilters = {
 
 function createDefaultForm(): TransactionFormState {
   return {
-    date: new Date().toISOString().split("T")[0],
+    date: formatLocalDate(new Date()),
     type: "expense",
     merchant: "",
     category: "",
@@ -116,6 +119,10 @@ function createDefaultForm(): TransactionFormState {
 export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -231,6 +238,11 @@ export default function TransactionsPage() {
       return;
     }
 
+    if (!canWriteOnline()) {
+      setFormError(offlineWriteMessage);
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
@@ -265,19 +277,42 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleDelete = async (transactionId: string) => {
-    if (!window.confirm("Hapus transaksi ini? Kamu masih dapat memulihkannya dari Sampah.")) return;
+  const requestDelete = (transaction: Transaction) => {
+    setDeleteTarget(transaction);
+    setDeleteError(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deletingId) return;
+    if (!canWriteOnline()) {
+      setDeleteError(offlineWriteMessage);
+      return;
+    }
+
+    const transactionId = deleteTarget.id;
+    setDeletingId(transactionId);
+    setDeleteError(null);
     try {
       const { error } = await supabase.from("transactions").update({ status: "deleted" }).eq("id", transactionId);
       if (error) throw error;
+      setDeleteTarget(null);
       await fetchTransactions();
     } catch (error) {
       reportHandledError("Transaction delete failed", error, "Transaksi belum berhasil dihapus.");
-      setPageError("Transaksi belum berhasil dihapus. Coba lagi.");
+      setDeleteError("Transaksi belum berhasil dihapus. Coba lagi.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleRestore = async (transactionId: string) => {
+    if (restoringId) return;
+    if (!canWriteOnline()) {
+      setPageError(offlineWriteMessage);
+      return;
+    }
+
+    setRestoringId(transactionId);
     try {
       const { error } = await supabase.from("transactions").update({ status: "confirmed" }).eq("id", transactionId);
       if (error) throw error;
@@ -285,6 +320,8 @@ export default function TransactionsPage() {
     } catch (error) {
       reportHandledError("Transaction restore failed", error, "Transaksi belum berhasil dipulihkan.");
       setPageError("Transaksi belum berhasil dipulihkan. Coba lagi.");
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -438,11 +475,32 @@ export default function TransactionsPage() {
             transactions={filteredTx}
             accountNames={accountNames}
             onEdit={openEdit}
-            onDelete={handleDelete}
+            onDelete={requestDelete}
             onRestore={handleRestore}
+            deletingId={deletingId}
+            restoringId={restoringId}
           />
         )}
       </main>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          titleId="delete-transaction-title"
+          descriptionId="delete-transaction-description"
+          title={`Hapus “${deleteTarget.merchant || deleteTarget.category}”?`}
+          description="Transaksi akan dipindahkan ke Sampah. Saldo dan riwayat tetap dapat dipulihkan dari sana."
+          confirmLabel="Hapus transaksi"
+          onClose={() => {
+            if (!deletingId) {
+              setDeleteTarget(null);
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => void handleDelete()}
+          loading={Boolean(deletingId)}
+          error={deleteError}
+        />
+      )}
 
       {modalOpen && (
         <TransactionDialog
@@ -481,12 +539,14 @@ function SummaryMetric({ icon: Icon, label, value, tone }: {
   );
 }
 
-function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRestore }: {
+function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRestore, deletingId, restoringId }: {
   transactions: Transaction[];
   accountNames: ReadonlyMap<string, string>;
   onEdit: (transaction: Transaction) => void;
-  onDelete: (transactionId: string) => Promise<void>;
+  onDelete: (transaction: Transaction) => void;
   onRestore: (transactionId: string) => Promise<void>;
+  deletingId: string | null;
+  restoringId: string | null;
 }) {
   return (
     <>
@@ -533,7 +593,7 @@ function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRe
                     <p className="mt-1.5 text-[11px] font-medium text-slate-400">{getTransactionSourceLabel(transaction.source)}</p>
                   </td>
                   <td className="px-5 py-4">
-                    <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} />
+                    <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
                   </td>
                 </tr>
               ))}
@@ -566,7 +626,7 @@ function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRe
                   <span className="text-[11px] text-slate-400">{getTransactionSourceLabel(transaction.source)}</span>
                 </div>
               </div>
-              <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} />
+              <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
             </div>
             {transaction.note && <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">{transaction.note}</p>}
           </Surface>
@@ -576,11 +636,13 @@ function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRe
   );
 }
 
-function TransactionActions({ transaction, onEdit, onDelete, onRestore }: {
+function TransactionActions({ transaction, onEdit, onDelete, onRestore, deletingId, restoringId }: {
   transaction: Transaction;
   onEdit: (transaction: Transaction) => void;
-  onDelete: (transactionId: string) => Promise<void>;
+  onDelete: (transaction: Transaction) => void;
   onRestore: (transactionId: string) => Promise<void>;
+  deletingId: string | null;
+  restoringId: string | null;
 }) {
   return (
     <div className="flex items-center justify-end gap-1">
@@ -596,7 +658,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore }: {
         </a>
       )}
       {transaction.status === "deleted" ? (
-        <Button variant="secondary" size="compact" onClick={() => void onRestore(transaction.id)}>
+        <Button variant="secondary" size="compact" onClick={() => void onRestore(transaction.id)} loading={restoringId === transaction.id}>
           <RotateCcw className="h-3.5 w-3.5" /> Pulihkan
         </Button>
       ) : (
@@ -604,7 +666,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore }: {
           <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => onEdit(transaction)} aria-label={`Edit ${transaction.merchant || transaction.category}`}>
             <Edit3 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => void onDelete(transaction.id)} aria-label={`Hapus ${transaction.merchant || transaction.category}`}>
+          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => onDelete(transaction)} disabled={Boolean(deletingId)} aria-label={`Hapus ${transaction.merchant || transaction.category}`}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </>

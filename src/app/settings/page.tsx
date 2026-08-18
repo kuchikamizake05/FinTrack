@@ -22,6 +22,8 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const online = useSyncExternalStore(subscribeToNetworkStatus, getNetworkSnapshot, getServerNetworkSnapshot);
   const [standalone, setStandalone] = useState(false);
   const copyTimer = useRef<number | null>(null);
@@ -53,8 +55,18 @@ export default function SettingsPage() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push("/login");
+    } catch {
+      setLogoutError("Sesi belum dapat ditutup. Coba lagi.");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   async function copyUserId() {
@@ -102,7 +114,8 @@ export default function SettingsPage() {
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-700"><ShieldCheck className="h-4 w-4 text-emerald-700" /> {t("Sesi privat")}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{t("Data keuangan hanya dibuka lewat akun terautentikasi ini.")}</p>
               </div>
-              <Button variant="destructive" onClick={() => void handleLogout()} className="mt-5 w-full"><LogOut className="h-4 w-4" /> {t("Keluar dari sesi")}</Button>
+              {logoutError && <p role="alert" className="mt-4 text-xs leading-5 text-rose-700">{t(logoutError)}</p>}
+              <Button variant="destructive" loading={loggingOut} onClick={() => void handleLogout()} className="mt-5 w-full"><LogOut className="h-4 w-4" /> {t("Keluar dari sesi")}</Button>
             </Surface>
 
             <Surface className="overflow-hidden">
