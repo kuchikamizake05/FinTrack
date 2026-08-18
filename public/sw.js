@@ -1,5 +1,4 @@
-const STATIC_CACHE = "fintrack-static-v7";
-const PAGE_CACHE = "fintrack-pages-v7";
+const STATIC_CACHE = "fintrack-static-v8";
 const SHARE_CACHE = "fintrack-shared-receipts-v1";
 const PRECACHE_URLS = [
   "/offline",
@@ -19,7 +18,7 @@ self.addEventListener("message", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((names) => Promise.all(names.filter((name) => name.startsWith("fintrack-") && ![STATIC_CACHE, PAGE_CACHE].includes(name)).map((name) => caches.delete(name))))
+      .then((names) => Promise.all(names.filter((name) => name.startsWith("fintrack-") && ![STATIC_CACHE, SHARE_CACHE].includes(name)).map((name) => caches.delete(name))))
       .then(() => self.clients.claim()),
   );
 });
@@ -50,14 +49,7 @@ self.addEventListener("fetch", (event) => {
     ));
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          if (!response.ok && self.navigator.onLine === false) return offlineFallback();
-          if (response.ok && new URL(request.url).pathname === "/offline") {
-            const copy = response.clone();
-            void caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
+        .then((response) => response.ok || self.navigator.onLine ? response : offlineFallback())
         .catch(offlineFallback),
     );
     return;

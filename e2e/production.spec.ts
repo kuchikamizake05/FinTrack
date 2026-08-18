@@ -64,6 +64,26 @@ test.describe("offline PWA", () => {
     await expect(page.getByRole("heading", { name: "Koneksi sedang terputus" })).toBeVisible();
     await context.setOffline(false);
   });
+
+  test("renders PWA controls inside language provider", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "Install-prompt coverage uses Chromium");
+    await mockSupabase(page, false);
+    await page.goto("/login");
+    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await page.evaluate(() => {
+      const installEvent = new Event("beforeinstallprompt", { cancelable: true }) as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+      };
+      Object.assign(installEvent, {
+        prompt: async () => undefined,
+        userChoice: Promise.resolve({ outcome: "dismissed" as const }),
+      });
+      window.dispatchEvent(installEvent);
+    });
+
+    await expect(page.getByText("Pasang FinTrack")).toBeVisible();
+  });
 });
 
 test("has no page-level horizontal overflow on mobile", async ({ page }, testInfo) => {

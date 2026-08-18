@@ -54,8 +54,8 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${jetbrainsMono.variable} ${manrope.variable} ${archivoBlack.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-[var(--canvas)] font-sans text-slate-900">
-        <PWARegister />
         <LanguageProvider>
+          <PWARegister />
           <a className="skip-link" href="#main-content">Lewati ke konten utama</a>
           <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
         </LanguageProvider>
