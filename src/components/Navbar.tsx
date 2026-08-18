@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Settings, Tags, User, WalletCards, X } from "lucide-react";
@@ -18,12 +18,25 @@ const profileItems = [
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
 
+type ProfileOrigin = "desktop" | "mobile" | null;
+
 export default function Navbar() {
   const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
+  const desktopProfileTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileProfileTriggerRef = useRef<HTMLButtonElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin>(null);
+
+  const closeProfile = useCallback((restoreFocus = false) => {
+    const origin = profileOrigin;
+    setProfileOrigin(null);
+    if (restoreFocus && origin) {
+      window.setTimeout(() => (origin === "desktop" ? desktopProfileTriggerRef : mobileProfileTriggerRef).current?.focus(), 0);
+    }
+  }, [profileOrigin]);
 
   useEffect(() => {
     let active = true;
@@ -39,12 +52,39 @@ export default function Navbar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!profileOrigin) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const trigger = profileOrigin === "desktop" ? desktopProfileTriggerRef.current : mobileProfileTriggerRef.current;
+      if (!profileMenuRef.current?.contains(target) && !trigger?.contains(target)) closeProfile();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeProfile(true);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeProfile, profileOrigin]);
+
   const handleLogout = async () => {
+    closeProfile();
     await supabase.auth.signOut();
     router.replace("/login");
   };
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const toggleProfile = (origin: Exclude<ProfileOrigin, null>) => {
+    setProfileOrigin((current) => current === origin ? null : origin);
+  };
 
   return (
     <>
@@ -76,18 +116,20 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <div className="relative">
-            <button
-              type="button"
-              onClick={() => setProfileOpen((value) => !value)}
-              aria-expanded={profileOpen}
-              aria-haspopup="menu"
-              className="flex min-h-11 items-center gap-2.5 rounded-full bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white shadow-[0_8px_0_rgba(18,53,36,0.10)] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-[var(--brand-ink)] hover:shadow-[0_10px_0_rgba(18,53,36,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-ink)] focus-visible:ring-offset-2"
-            >
-              <User className="h-4 w-4" aria-hidden="true" />
-              <span className="max-w-[170px] truncate">{userEmail || t("Profil")}</span>
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${profileOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-            </button>
-            {profileOpen && <ProfileMenu onClose={() => setProfileOpen(false)} onLogout={handleLogout} />}
+              <button
+                ref={desktopProfileTriggerRef}
+                type="button"
+                onClick={() => toggleProfile("desktop")}
+                aria-expanded={profileOrigin === "desktop"}
+                aria-haspopup="menu"
+                aria-controls="profile-menu"
+                className="flex min-h-11 items-center gap-2.5 rounded-full bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white shadow-[0_8px_0_rgba(18,53,36,0.10)] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-[var(--brand-ink)] hover:shadow-[0_10px_0_rgba(18,53,36,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-ink)] focus-visible:ring-offset-2"
+              >
+                <User className="h-4 w-4" aria-hidden="true" />
+                <span className="max-w-[170px] truncate">{userEmail || t("Profil")}</span>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${profileOrigin === "desktop" ? "rotate-180" : ""}`} aria-hidden="true" />
+              </button>
+              {profileOrigin === "desktop" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} />}
             </div>
           </div>
         </div>
@@ -96,19 +138,21 @@ export default function Navbar() {
       <header className="sticky top-0 z-40 flex min-h-[74px] items-center justify-between border-b border-[color:rgba(18,53,36,0.15)] bg-[color:rgba(233,248,238,0.94)] px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-xl md:hidden">
         <BrandLockup href="/dashboard" priority compact ariaLabel="FinTrack dashboard" />
         <div className="flex items-center gap-2">
-        <LanguageSwitcher compact />
-        <button
-          type="button"
-          onClick={() => setProfileOpen((value) => !value)}
-          aria-label={profileOpen ? t("Tutup menu profil") : t("Buka menu profil")}
-          aria-expanded={profileOpen}
-          aria-haspopup="menu"
-          className="grid h-[42px] w-[42px] place-items-center rounded-full bg-[var(--brand-ink)] text-[var(--brand-lime)] shadow-[0_6px_0_rgba(18,53,36,0.10)] transition-transform active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"
-        >
-          <User className="h-[18px] w-[18px]" aria-hidden="true" />
-        </button>
+          <LanguageSwitcher compact />
+          <button
+            ref={mobileProfileTriggerRef}
+            type="button"
+            onClick={() => toggleProfile("mobile")}
+            aria-label={profileOrigin === "mobile" ? t("Tutup menu profil") : t("Buka menu profil")}
+            aria-expanded={profileOrigin === "mobile"}
+            aria-haspopup="menu"
+            aria-controls="profile-menu"
+            className="grid h-[42px] w-[42px] place-items-center rounded-full bg-[var(--brand-ink)] text-[var(--brand-lime)] shadow-[0_6px_0_rgba(18,53,36,0.10)] transition-transform active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"
+          >
+            <User className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
         </div>
-        {profileOpen && <ProfileMenu onClose={() => setProfileOpen(false)} onLogout={handleLogout} mobile />}
+        {profileOrigin === "mobile" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} mobile />}
       </header>
 
       <nav
@@ -139,17 +183,26 @@ export default function Navbar() {
   );
 }
 
-function ProfileMenu({ onClose, onLogout, mobile = false }: { onClose: () => void; onLogout: () => void; mobile?: boolean }) {
+type ProfileMenuProps = {
+  onClose: () => void;
+  onLogout: () => void;
+  mobile?: boolean;
+};
+
+const ProfileMenu = ({ onClose, onLogout, mobile = false, ref }: ProfileMenuProps & { ref: Ref<HTMLDivElement> }) => {
   const { t } = useLanguage();
   return (
     <div
+      ref={ref}
+      id="profile-menu"
       role="menu"
-      className={`${mobile ? "fixed inset-x-4 top-[calc(4.75rem+env(safe-area-inset-top))] mx-auto" : "absolute right-0 top-14"} z-50 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-[color:rgba(18,53,36,0.14)] bg-white p-2.5 text-[var(--brand-ink)] shadow-[0_22px_55px_rgba(18,53,36,0.18)]`}
+      aria-label={t("Profil dan navigasi lainnya")}
+      className={`${mobile ? "fixed inset-x-4 top-[calc(4.75rem+env(safe-area-inset-top))] mx-auto" : "absolute right-0 top-14"} z-50 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-[color:rgba(18,53,36,0.14)] bg-white p-2.5 text-[var(--brand-ink)] shadow-[var(--shadow-elevated)]`}
     >
       <div className="flex items-center justify-between border-b border-[color:rgba(18,53,36,0.10)] px-2.5 py-2.5 text-[11px] font-black uppercase tracking-[0.13em] text-[color:rgba(18,53,36,0.58)]">
         <span>{t("Profil & lainnya")}</span>
         {mobile && (
-          <button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-7 w-7 place-items-center rounded-full hover:bg-[var(--brand-mint)]">
+          <button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-8 w-8 place-items-center rounded-full hover:bg-[var(--brand-mint)]">
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
@@ -163,7 +216,7 @@ function ProfileMenu({ onClose, onLogout, mobile = false }: { onClose: () => voi
               onClick={onClose}
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[color:rgba(18,53,36,0.72)] transition-colors hover:bg-[var(--brand-mint)] hover:text-[var(--brand-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+              className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[color:rgba(18,53,36,0.72)] transition-colors hover:bg-[var(--brand-mint)] hover:text-[var(--brand-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
             >
               <Icon className="h-4 w-4 text-[var(--brand-primary)]" aria-hidden="true" />
               {t(item.name)}
@@ -175,11 +228,11 @@ function ProfileMenu({ onClose, onLogout, mobile = false }: { onClose: () => voi
         type="button"
         role="menuitem"
         onClick={onLogout}
-        className="flex w-full items-center gap-3 rounded-xl border-t border-[color:rgba(18,53,36,0.08)] px-3 py-2.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+        className="flex min-h-11 w-full items-center gap-3 rounded-xl border-t border-[color:rgba(18,53,36,0.08)] px-3 py-2.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
         {t("Keluar")}
       </button>
     </div>
   );
-}
+};

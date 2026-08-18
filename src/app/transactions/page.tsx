@@ -8,6 +8,7 @@ import {
   useState,
   type Dispatch,
   type FormEvent,
+  type RefObject,
   type SetStateAction,
 } from "react";
 import Link from "next/link";
@@ -37,6 +38,7 @@ import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { buttonStyles } from "@/components/ui/button-styles";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
@@ -173,22 +175,6 @@ export default function TransactionsPage() {
     return () => window.clearTimeout(timer);
   }, [fetchTransactions]);
 
-  useEffect(() => {
-    if (!modalOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const focusTimer = window.setTimeout(() => merchantInputRef.current?.focus(), 80);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) setModalOpen(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [modalOpen, saving]);
-
   const filteredTx = useMemo(
     () => filterTransactions(transactions, filters),
     [filters, transactions],
@@ -310,7 +296,7 @@ export default function TransactionsPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main className="app-page-content space-y-5 sm:space-y-6">
+      <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader
           eyebrow="Ledger keuangan"
           title="Transaksi"
@@ -646,7 +632,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
   isEditMode: boolean;
   saving: boolean;
   error: string | null;
-  merchantInputRef: React.RefObject<HTMLInputElement | null>;
+  merchantInputRef: RefObject<HTMLInputElement | null>;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
@@ -655,24 +641,21 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
     setForm((current) => ({ ...current, type, category: options.includes(current.category) ? current.category : options[0] ?? "" }));
   };
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
-      onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}
+    <DialogFrame
+      titleId="transaction-dialog-title"
+      descriptionId="transaction-dialog-description"
+      initialFocusRef={merchantInputRef}
+      onClose={onClose}
+      closeDisabled={saving}
     >
-      <form
-        onSubmit={onSubmit}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="transaction-dialog-title"
-        className="max-h-[calc(100svh-0.75rem)] w-full overflow-y-auto rounded-t-[28px] border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:max-w-xl sm:rounded-2xl"
-      >
+      <form onSubmit={onSubmit}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{isEditMode ? "Perbarui ledger" : "Transaksi baru"}</p>
             <h2 id="transaction-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">
               {isEditMode ? "Edit transaksi" : "Catat transaksi"}
             </h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Isi detail utama. Biasanya selesai kurang dari satu menit.</p>
+            <p id="transaction-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">Isi detail utama. Biasanya selesai kurang dari satu menit.</p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label="Tutup form transaksi">
             <X className="h-5 w-5" />
@@ -735,11 +718,12 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
             </select>
           </Field>
 
-          <Field label="Nominal" htmlFor="transaction-amount" hint="Masukkan angka tanpa tanda titik atau koma.">
+          <Field label="Nominal" htmlFor="transaction-amount" hint="Masukkan angka tanpa tanda titik atau koma." descriptionId="transaction-amount-hint">
             <div className="relative">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">Rp</span>
               <input
                 id="transaction-amount"
+                aria-describedby="transaction-amount-hint"
                 type="number"
                 inputMode="numeric"
                 min="1"
@@ -790,7 +774,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
           </Button>
         </div>
       </form>
-    </div>
+    </DialogFrame>
   );
 }
 

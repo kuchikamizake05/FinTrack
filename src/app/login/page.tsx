@@ -203,7 +203,7 @@ export default function LoginPage() {
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
       </header>
 
-      <main className={`${styles.main} mx-auto flex min-h-[calc(100svh-68px)] w-full items-center justify-center px-4 py-3 sm:min-h-[calc(100svh-72px)] sm:px-6`}>
+      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex min-h-[calc(100svh-68px)] w-full items-center justify-center px-4 py-3 sm:min-h-[calc(100svh-72px)] sm:px-6`}>
         <section className={`${styles.card} mx-auto w-full max-w-[400px] rounded-[24px] border border-[color:rgba(18,53,36,0.14)] bg-white/95 p-4 shadow-[0_24px_70px_rgba(18,53,36,0.12)] backdrop-blur-sm sm:p-5`} aria-labelledby="login-title">
           <div className={`${styles.cardHeader} mb-3`}>
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
@@ -212,9 +212,9 @@ export default function LoginPage() {
           </div>
 
           {!isUpdate && mode !== "reset" && (
-            <div className={`${styles.modeTabs} mb-2 grid grid-cols-2 rounded-xl bg-slate-100 p-1`} aria-label="Pilih mode autentikasi">
+            <div className={`${styles.modeTabs} mb-2 grid grid-cols-2 rounded-xl bg-slate-100 p-1`} role="group" aria-label="Pilih mode autentikasi">
               {(["login", "signup"] as const).map((item) => (
-                <button key={item} type="button" onClick={() => changeMode(item)} disabled={busy} className={`min-h-9 rounded-lg px-3 text-sm font-bold transition ${mode === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500"}`}>
+                <button key={item} type="button" aria-pressed={mode === item} onClick={() => changeMode(item)} disabled={busy} className={`min-h-9 rounded-lg px-3 text-sm font-bold transition ${mode === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500"}`}>
                   {t(item === "login" ? "Masuk" : "Daftar")}
                 </button>
               ))}

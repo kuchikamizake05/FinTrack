@@ -73,7 +73,7 @@ export default function SettingsPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main className="app-page-content max-w-6xl space-y-5 sm:space-y-6">
+      <main id="main-content" tabIndex={-1} className="app-page-content max-w-6xl space-y-5 outline-none sm:space-y-6">
         <PageHeader
           eyebrow={t("Workspace settings")}
           title={t("Pengaturan")}

@@ -64,6 +64,49 @@ test.describe("offline PWA", () => {
     await expect(page.getByRole("heading", { name: "Koneksi sedang terputus" })).toBeVisible();
     await context.setOffline(false);
   });
+
+  test("renders PWA controls inside language provider", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "Install-prompt coverage uses Chromium");
+    await mockSupabase(page, false);
+    await page.goto("/login");
+    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await page.evaluate(() => {
+      const installEvent = new Event("beforeinstallprompt", { cancelable: true }) as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+      };
+      Object.assign(installEvent, {
+        prompt: async () => undefined,
+        userChoice: Promise.resolve({ outcome: "dismissed" as const }),
+      });
+      window.dispatchEvent(installEvent);
+    });
+
+    await expect(page.getByText("Pasang FinTrack")).toBeVisible();
+  });
+});
+
+test.describe("error recovery", () => {
+  test.use({
+    allowedConsoleErrors: [
+      "Failed to load resource: the server responded with a status of 500",
+      "Minified React error #441",
+    ],
+  });
+
+  test("renders branded recovery for a contained route crash", async ({ page, context }) => {
+    await context.setExtraHTTPHeaders({ "x-fintrack-e2e-error-surface": "segment" });
+    await page.goto("/error-probe");
+
+    const heading = page.getByRole("heading", { name: "Ruang keuangan belum bisa dimuat" });
+    await expect(heading).toBeVisible();
+    await expect(heading).toBeFocused();
+    await expect(page.getByRole("button", { name: "Coba lagi" })).toBeVisible();
+    const dashboardLink = page.getByRole("link", { name: "Buka dashboard" });
+    await expect(dashboardLink).toBeVisible();
+    await expect(dashboardLink).toHaveAttribute("href", "/dashboard");
+    await expect(page.locator("body")).not.toContainText("FinTrack e2e segment error");
+  });
 });
 
 test("has no page-level horizontal overflow on mobile", async ({ page }, testInfo) => {

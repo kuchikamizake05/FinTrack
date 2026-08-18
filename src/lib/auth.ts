@@ -6,6 +6,7 @@ const PROTECTED_ROUTE_PREFIXES = [
   "/insights",
   "/investments",
   "/onboarding",
+  "/planning",
   "/settings",
   "/trading",
   "/transactions",

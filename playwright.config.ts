@@ -40,6 +40,7 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "e2e-anon-key",
       N8N_TRADE_REVIEW_WEBHOOK_URL: "https://workflow.invalid/review",
       N8N_TRADE_REVIEW_SHARED_SECRET: "e2e-only-secret",
+      FINTRACK_ENABLE_ERROR_RECOVERY_E2E: "1",
     },
   },
 });

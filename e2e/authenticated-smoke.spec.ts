@@ -7,6 +7,7 @@ const routes = [
   ["/categories", "Kategori"],
   ["/investments", "Investasi"],
   ["/trading", "Trading"],
+  ["/planning", "Rencana & kontrol"],
   ["/settings", "Pengaturan"],
   ["/insights", "Smart Insights"],
 ] as const;

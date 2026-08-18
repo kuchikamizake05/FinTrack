@@ -5,7 +5,7 @@ import { buttonStyles } from "@/components/ui/button-styles";
 
 export default function OfflinePage() {
   return (
-    <main className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0px,#f7fbf8_55%,#ffffff_100%)] px-5 py-10 text-slate-900">
+    <main id="main-content" tabIndex={-1} className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0px,#f7fbf8_55%,#ffffff_100%)] px-5 py-10 text-slate-900 outline-none">
       <section className="w-full max-w-md rounded-[28px] border border-emerald-100 bg-white p-6 text-center shadow-[0_20px_65px_rgba(22,101,52,0.10)] sm:p-8">
         <BrandLogo size={56} alt="FinTrack" priority className="mx-auto" />
         <p className="mt-6 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Mode offline</p>

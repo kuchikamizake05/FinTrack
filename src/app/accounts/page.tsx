@@ -22,7 +22,6 @@ import {
   Building2,
   ChartNoAxesCombined,
   Landmark,
-  Loader2,
   Plus,
   RefreshCw,
   Smartphone,
@@ -32,6 +31,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DialogFrame as AccessibleDialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
@@ -165,26 +165,6 @@ export default function AccountsPage() {
     setFormErrors({});
     window.setTimeout(() => lastTriggerRef.current?.focus(), 0);
   }, [saving]);
-
-  useEffect(() => {
-    if (!activeDialog) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const focusTimer = window.setTimeout(() => {
-      if (activeDialog === "account") nameInputRef.current?.focus();
-      if (activeDialog === "transfer") sourceInputRef.current?.focus();
-      if (activeDialog === "balance") balanceInputRef.current?.focus();
-    }, 80);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDialog();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [activeDialog, closeDialog]);
 
   const summary = useMemo(() => summarizeAccounts(accounts), [accounts]);
   const missingForeignAccounts = useMemo(() => getMissingForeignAccounts(accounts), [accounts]);
@@ -345,16 +325,19 @@ export default function AccountsPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main className="app-page-content space-y-5 sm:space-y-6">
+      <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader
           eyebrow="Pusat akun"
           title="Akun & saldo"
           description="Lihat kekayaan bersih, cek kesegaran saldo, dan pindahkan dana tanpa kehilangan konteks."
           actions={
             <>
-              <Button variant="secondary" onClick={openTransferDialog} disabled={activeAccounts.length < 2}>
-                <ArrowLeftRight className="h-4 w-4" /> Transfer
-              </Button>
+              <div className="min-w-0">
+                <Button variant="secondary" onClick={openTransferDialog} disabled={activeAccounts.length < 2} aria-describedby={activeAccounts.length < 2 ? "transfer-prerequisite" : undefined}>
+                  <ArrowLeftRight className="h-4 w-4" /> Transfer
+                </Button>
+                {activeAccounts.length < 2 && <p id="transfer-prerequisite" className="mt-1 max-w-48 text-xs leading-4 text-slate-500">Tambahkan satu akun aktif lagi untuk transfer.</p>}
+              </div>
               <Button onClick={openAccountDialog}>
                 <Plus className="h-4 w-4" /> Tambah akun
               </Button>
@@ -596,12 +579,13 @@ function AccountCard({ account, onUpdateBalance }: { account: AccountOverviewRec
   );
 }
 
-function DialogFrame({ title, eyebrow, description, saving, error, onClose, onSubmit, children, submitLabel, submitDisabled = false }: {
+function AccountDialogFrame({ title, eyebrow, description, saving, error, initialFocusRef, onClose, onSubmit, children, submitLabel, submitDisabled = false }: {
   title: string;
   eyebrow: string;
   description: string;
   saving: boolean;
   error: string | null;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   children: ReactNode;
@@ -609,13 +593,19 @@ function DialogFrame({ title, eyebrow, description, saving, error, onClose, onSu
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-      <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" className="max-h-[calc(100svh-0.75rem)] w-full overflow-y-auto rounded-t-[28px] border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:max-w-xl sm:rounded-2xl">
+    <AccessibleDialogFrame
+      titleId="account-dialog-title"
+      descriptionId="account-dialog-description"
+      initialFocusRef={initialFocusRef}
+      onClose={onClose}
+      closeDisabled={saving}
+    >
+      <form onSubmit={onSubmit}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{eyebrow}</p>
             <h2 id="account-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">{title}</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+            <p id="account-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label={`Tutup ${title.toLowerCase()}`}><X className="h-5 w-5" /></Button>
         </div>
@@ -625,12 +615,10 @@ function DialogFrame({ title, eyebrow, description, saving, error, onClose, onSu
         </div>
         <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4">
           <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button>
-          <Button type="submit" disabled={saving || submitDisabled} className="flex-[1.4] sm:flex-none">
-            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : submitLabel}
-          </Button>
+          <Button type="submit" loading={saving} disabled={submitDisabled} className="flex-[1.4] sm:flex-none">{submitLabel}</Button>
         </div>
       </form>
-    </div>
+    </AccessibleDialogFrame>
   );
 }
 
@@ -646,7 +634,7 @@ function AccountDialog({ form, setForm, errors, error, saving, nameInputRef, onC
 }) {
   const validation = validateAccountForm(form);
   return (
-    <DialogFrame title="Tambah akun" eyebrow="Akun baru" description="Hubungkan satu sumber dana atau kewajiban ke overview FinTrack." saving={saving} error={error} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan akun" submitDisabled={!validation.valid}>
+    <AccountDialogFrame title="Tambah akun" eyebrow="Akun baru" description="Hubungkan satu sumber dana atau kewajiban ke overview FinTrack." saving={saving} error={error} initialFocusRef={nameInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan akun" submitDisabled={!validation.valid}>
       <Field label="Nama akun" htmlFor="account-name" error={errors.name} hint="Contoh: Jago Utama atau Stockbit.">
         <input ref={nameInputRef} id="account-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Nama yang mudah dikenali" className={fieldControlStyles} />
       </Field>
@@ -671,7 +659,7 @@ function AccountDialog({ form, setForm, errors, error, saving, nameInputRef, onC
           <input id="account-reporting-balance" type="number" min="0" step="any" inputMode="decimal" value={form.reportingBalanceIdr} onChange={(event) => setForm((current) => ({ ...current, reportingBalanceIdr: event.target.value }))} placeholder="0" className={fieldControlStyles} />
         </Field>
       )}
-    </DialogFrame>
+    </AccountDialogFrame>
   );
 }
 
@@ -691,7 +679,7 @@ function TransferDialog({ form, setForm, accounts, sourceAccount, destinationAcc
 }) {
   const validation = validateTransferForm({ sourceAccountId: form.sourceAccountId, destinationAccountId: form.destinationAccountId, sourceAmount: form.amount, destinationAmount: form.destinationAmount, sourceCurrency: sourceAccount?.currency ?? "", destinationCurrency: destinationAccount?.currency ?? "", date: form.date });
   return (
-    <DialogFrame title="Transfer antar akun" eyebrow="Pindahkan dana" description="Saldo akun akan diperbarui otomatis setelah transfer tersimpan." saving={saving} error={error} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan transfer" submitDisabled={!validation.valid}>
+    <AccountDialogFrame title="Transfer antar akun" eyebrow="Pindahkan dana" description="Saldo akun akan diperbarui otomatis setelah transfer tersimpan." saving={saving} error={error} initialFocusRef={sourceInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan transfer" submitDisabled={!validation.valid}>
       <Field label="Dari akun" htmlFor="transfer-source" error={errors.sourceAccountId}>
         <select ref={sourceInputRef} id="transfer-source" value={form.sourceAccountId} onChange={(event) => setForm((current) => ({ ...current, sourceAccountId: event.target.value }))} className={fieldControlStyles}>
           <option value="">Pilih akun asal</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
@@ -723,7 +711,7 @@ function TransferDialog({ form, setForm, accounts, sourceAccount, destinationAcc
       <Field label="Catatan" htmlFor="transfer-note" hint="Opsional—tambahkan konteks untuk peninjauan berikutnya.">
         <textarea id="transfer-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} placeholder="Catatan singkat" className={cn(fieldControlStyles, "resize-none")} />
       </Field>
-    </DialogFrame>
+    </AccountDialogFrame>
   );
 }
 
@@ -740,7 +728,7 @@ function BalanceDialog({ account, form, setForm, errors, error, saving, balanceI
 }) {
   const validation = validateBalanceForm({ ...form, currency: account.currency });
   return (
-    <DialogFrame title={`Perbarui ${account.name}`} eyebrow="Snapshot saldo" description="Gunakan angka terbaru dari bank atau platform. Riwayat transaksi tetap tercatat terpisah." saving={saving} error={error} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan saldo" submitDisabled={!validation.valid}>
+    <AccountDialogFrame title={`Perbarui ${account.name}`} eyebrow="Snapshot saldo" description="Gunakan angka terbaru dari bank atau platform. Riwayat transaksi tetap tercatat terpisah." saving={saving} error={error} initialFocusRef={balanceInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel="Simpan saldo" submitDisabled={!validation.valid}>
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4">
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-emerald-700">Saldo saat ini</p>
         <p className="mt-2 font-mono text-xl font-bold text-slate-900">{formatMoney(Number(account.current_balance), account.currency)}</p>
@@ -753,7 +741,7 @@ function BalanceDialog({ account, form, setForm, errors, error, saving, balanceI
           <input id="balance-reporting" type="number" min="0" step="any" inputMode="decimal" value={form.reportingBalanceIdr} onChange={(event) => setForm((current) => ({ ...current, reportingBalanceIdr: event.target.value }))} placeholder="0" className={fieldControlStyles} />
         </Field>
       )}
-    </DialogFrame>
+    </AccountDialogFrame>
   );
 }
 

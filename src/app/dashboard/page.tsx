@@ -287,7 +287,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[linear-gradient(180deg,#e9f8ee_0px,#f7fbf8_340px,#f8faf9_100%)] pb-24 text-slate-900 md:pb-10">
       <Navbar />
 
-      <main className="relative mx-auto w-full px-5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-5 md:hidden">
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        <div className="relative mx-auto w-full px-5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-5 md:hidden">
         <section aria-labelledby="mobile-dashboard-title">
           <p className="text-[13px] font-semibold text-emerald-700">{t("Selamat datang, {name}", { name: firstName })}</p>
           <div className="mt-1 flex items-end justify-between gap-4">
@@ -304,16 +305,16 @@ export default function DashboardPage() {
         </section>
 
         <section aria-label="Pilih periode" className="mt-4 flex items-center gap-2">
-          <div className="flex h-10 flex-1 items-center justify-between rounded-xl border border-emerald-900/[0.08] bg-white/90 px-1 shadow-[0_3px_14px_rgba(23,35,59,0.04)]">
-            <button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
+          <div className="flex min-h-11 flex-1 items-center justify-between rounded-xl border border-emerald-900/[0.08] bg-white/90 px-1 shadow-[0_3px_14px_rgba(23,35,59,0.04)]">
+            <button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="text-xs font-bold text-slate-700">{format(selectedMonth, "MMMM yyyy", { locale: dateLocale })}</span>
-            <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
+            <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <button onClick={toggleBalances} aria-label={showBalances ? "Sembunyikan nominal" : "Tampilkan nominal"} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-900/[0.08] bg-white text-slate-500 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:scale-95">
+          <button onClick={toggleBalances} aria-label={showBalances ? "Sembunyikan nominal" : "Tampilkan nominal"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-900/[0.08] bg-white text-slate-500 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:scale-95">
             {showBalances ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </button>
         </section>
@@ -404,9 +405,9 @@ export default function DashboardPage() {
             </section>
           </>
         )}
-      </main>
+        </div>
 
-      <main className="mx-auto hidden w-full max-w-7xl px-4 py-7 sm:px-6 md:block md:py-10">
+        <div className="mx-auto hidden w-full max-w-7xl px-4 py-7 sm:px-6 md:block md:py-10">
         <section className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700">
@@ -485,33 +486,58 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="min-w-0">
-                    <div className="mb-2 flex items-center gap-4 text-xs font-semibold text-slate-500">
-                      <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-emerald-600" />Pendapatan</span>
-                      <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-rose-500" />Pengeluaran</span>
-                    </div>
+                    <ul aria-label="Legenda arus kas" className="mb-2 flex items-center gap-4 text-xs font-semibold text-slate-500">
+                      <li className="flex items-center gap-2"><span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-emerald-600" />Pendapatan</li>
+                      <li className="flex items-center gap-2"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-rose-500" />Pengeluaran</li>
+                    </ul>
                     {transactions.length === 0 ? (
                       <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-emerald-50/55 px-6 text-center">
-                        <CircleDollarSign className="mb-2 h-7 w-7 text-emerald-600" />
+                        <CircleDollarSign className="mb-2 h-7 w-7 text-emerald-600" aria-hidden="true" />
                         <p className="font-semibold text-slate-800">Belum ada arus kas bulan ini</p>
                         <p className="mt-1 text-xs text-slate-500">Catat transaksi pertama agar polanya mulai terlihat.</p>
                       </div>
                     ) : (
-                    <div className="h-40 w-full" aria-label="Grafik arus kas bulanan">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={cashFlowData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
-                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
-                          <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => `${Math.round(Number(value) / 1_000_000)}jt`} />
-                          <Tooltip
-                            cursor={{ stroke: "#d1fae5", strokeWidth: 1 }}
-                            contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }}
-                            formatter={(value) => formatIdr(Number(value || 0))}
-                          />
-                          <Line type="monotone" dataKey="income" name="Pemasukan" stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
-                          <Line type="monotone" dataKey="expense" name="Pengeluaran" stroke="#fb7185" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
+                      <>
+                        <figure aria-labelledby="cash-flow-chart-caption">
+                          <figcaption id="cash-flow-chart-caption" className="sr-only">Grafik akumulasi pendapatan dan pengeluaran bulan terpilih.</figcaption>
+                          <div className="h-40 w-full" aria-hidden="true">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={cashFlowData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
+                                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
+                                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => `${Math.round(Number(value) / 1_000_000)}jt`} />
+                                <Tooltip
+                                  cursor={{ stroke: "#d1fae5", strokeWidth: 1 }}
+                                  contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }}
+                                  formatter={(value) => formatIdr(Number(value || 0))}
+                                />
+                                <Line type="monotone" dataKey="income" name="Pemasukan" stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
+                                <Line type="monotone" dataKey="expense" name="Pengeluaran" stroke="#fb7185" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </figure>
+                        <details className="group mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+                          <summary className="cursor-pointer text-xs font-semibold text-emerald-700 marker:text-emerald-700">Lihat data tabel arus kas</summary>
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="w-full min-w-[360px] text-left text-xs">
+                              <caption className="sr-only">Data akumulasi pendapatan dan pengeluaran bulan terpilih.</caption>
+                              <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500">
+                                <tr><th scope="col" className="pb-2 pr-4">Tanggal</th><th scope="col" className="pb-2 pr-4 text-right">Pendapatan</th><th scope="col" className="pb-2 text-right">Pengeluaran</th></tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-slate-700">
+                                {cashFlowData.map((point) => (
+                                  <tr key={point.day}>
+                                    <th scope="row" className="py-2 pr-4 font-semibold">{point.label}</th>
+                                    <td className="py-2 pr-4 text-right font-medium">{displayIdr(point.income)}</td>
+                                    <td className="py-2 text-right font-medium">{displayIdr(point.expense)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      </>
+                    )}
                     <div className="mt-5 grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 pt-4">
                       <CompactMetric icon={ArrowUpRight} label="Pendapatan" value={displayIdr(totalIncome)} detail={`${transactions.filter((item) => item.type === "income").length} transaksi masuk`} tone="emerald" />
                       <CompactMetric icon={ArrowDownRight} label="Pengeluaran" value={displayIdr(totalExpense)} detail={expenseChange === null ? "Belum ada pembanding" : `${expenseChange > 0 ? "+" : ""}${expenseChange}% vs bulan lalu`} tone="rose" />
@@ -607,6 +633,7 @@ export default function DashboardPage() {
           </div>
           </>
         )}
+        </div>
       </main>
     </div>
   );
