@@ -59,9 +59,9 @@
 .eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 16px; font-size: 12px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
 .eyebrow span { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 5px rgba(22,51,0,.12); }
 .heroCopy h1, .sectionIntro h2, .controlCopy h2, .securityCopy h2, .finalCta h2 { font-family: var(--font-archivo-black), var(--font-manrope), sans-serif; font-weight: 400; letter-spacing: -.075em; }
-.heroCopy h1 { margin: 0; color: var(--ink); font-size: clamp(64px, 8vw, 118px); line-height: .8; text-transform: uppercase; }
-.heroCopy h1 em, .sectionIntro h2 em, .finalCta h2 em { color: var(--paper); font-style: normal; -webkit-text-stroke: 2px var(--ink); text-shadow: 5px 5px 0 var(--ink); }
-.heroCopy h1 em { display: inline-block; white-space: nowrap; }
+.heroCopy h1 { margin: 0; color: var(--ink); font-size: clamp(48px, 6.2vw, 92px); line-height: .88; text-transform: uppercase; }
+.heroCopy h1 em, .sectionIntro h2 em, .finalCta h2 em { color: var(--paper); font-style: normal; -webkit-text-stroke: 2px var(--ink); text-shadow: 4px 4px 0 var(--ink); }
+.heroCopy h1 em { display: inline-block; max-width: 100%; }
 .heroText { max-width: 650px; margin: 24px auto 0; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.5; font-weight: 650; letter-spacing: -.025em; }
 .heroActions { margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 14px; }
 .primaryCta { min-height: 54px; padding: 0 28px; border-radius: 999px; color: white; background: var(--primary); }
@@ -96,7 +96,7 @@
 .insightCard { width: 245px; right: 1%; top: 95px; display: flex; gap: 12px; align-items: flex-start; transform: rotate(5deg); }
 .insightCard > svg { width: 32px; height: 32px; padding: 7px; border-radius: 10px; color: white; background: var(--primary); flex: none; }
 
-.ticker { background: var(--ink); color: var(--lime); overflow: hidden; transform: rotate(-1deg) scale(1.02); position: relative; z-index: 5; }
+.ticker { background: var(--ink); color: var(--lime); overflow: hidden; position: relative; z-index: 5; }
 .ticker div { min-width: max-content; display: flex; align-items: center; gap: 34px; padding: 21px 0; animation: marquee 24s linear infinite; }
 .ticker span { font-family: var(--font-archivo-black), sans-serif; font-size: 21px; letter-spacing: -.035em; text-transform: uppercase; }
 .ticker i { color: white; font-style: normal; }
@@ -192,7 +192,7 @@
   .nav { height: 72px; }
   .heroCopy { margin-top: clamp(22px, 3.8vh, 36px); }
   .eyebrow { margin-bottom: 12px; }
-  .heroCopy h1 { font-size: clamp(58px, min(7vw, 10.5vh), 102px); line-height: .8; }
+  .heroCopy h1 { font-size: clamp(44px, min(5.5vw, 8.5vh), 82px); line-height: .88; }
   .heroText { margin-top: 18px; font-size: clamp(15px, 1.3vw, 18px); line-height: 1.45; }
   .heroActions { margin-top: 18px; }
   .primaryCta, .secondaryCta { min-height: 50px; }
