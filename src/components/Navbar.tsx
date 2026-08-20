@@ -113,13 +113,14 @@ export default function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     aria-current={active ? "page" : undefined}
-                    className={`group relative flex h-full items-center text-sm font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-4 ${active ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.66)] hover:text-[var(--brand-ink)]"}`}
+                    className={`group relative flex h-full items-center text-sm font-extrabold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-4 ${active ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.66)] hover:text-[var(--brand-ink)]"}`}
                   >
                     {t(item.name)}
                     <span
                       aria-hidden="true"
-                      className={`absolute inset-x-0 bottom-0 h-[3px] origin-left rounded-t-full bg-[var(--brand-ink)] transition-transform duration-200 ${active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
+                      className={`absolute inset-x-0 bottom-0 h-[3px] origin-left rounded-t-full bg-[var(--brand-ink)] transition-transform duration-150 ${active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`}
                     />
                   </Link>
                 );
@@ -182,10 +183,11 @@ export default function Navbar() {
               <Link
                 key={item0.href}
                 href={item0.href}
+                prefetch={true}
                 aria-current={active0 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active0 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active0 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active0 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active0 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
                   <Icon0 className={`h-[18px] w-[18px] ${active0 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
                 </span>
                 <span className="truncate px-1">{t(item0.name)}</span>
@@ -201,10 +203,11 @@ export default function Navbar() {
               <Link
                 key={item1.href}
                 href={item1.href}
+                prefetch={true}
                 aria-current={active1 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active1 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active1 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active1 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active1 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
                   <Icon1 className={`h-[18px] w-[18px] ${active1 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
                 </span>
                 <span className="truncate px-1">{t(item1.name)}</span>
@@ -214,10 +217,11 @@ export default function Navbar() {
 
           <Link
             href="/transactions?new=1"
+            prefetch={true}
             aria-label={t("Buka form catat")}
             className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"
           >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-[transform,box-shadow,background-color] group-hover:scale-105 group-hover:bg-[var(--brand-ink)] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-ink)] group-focus-visible:ring-offset-2">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-[transform,box-shadow,background-color] duration-100 group-hover:scale-105 group-hover:bg-[var(--brand-ink)] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-ink)] group-focus-visible:ring-offset-2">
               <Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" />
             </span>
             <span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span>
@@ -231,10 +235,11 @@ export default function Navbar() {
               <Link
                 key={item2.href}
                 href={item2.href}
+                prefetch={true}
                 aria-current={active2 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active2 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active2 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active2 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active2 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
                   <Icon2 className={`h-[18px] w-[18px] ${active2 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
                 </span>
                 <span className="truncate px-1">{t(item2.name)}</span>
@@ -250,10 +255,11 @@ export default function Navbar() {
               <Link
                 key={item3.href}
                 href={item3.href}
+                prefetch={true}
                 aria-current={active3 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active3 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active3 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active3 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active3 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
                   <Icon3 className={`h-[18px] w-[18px] ${active3 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
                 </span>
                 <span className="truncate px-1">{t(item3.name)}</span>
