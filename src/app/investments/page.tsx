@@ -129,9 +129,24 @@ export default function InvestmentsPage() {
     <div className="app-page">
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
-        <PageHeader eyebrow="Portfolio journal" title="Investasi" description="Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang." actions={<><Button variant="secondary" onClick={openSnapshot} disabled={!accounts.length}><Camera className="h-4 w-4" /> Update equity</Button><Button onClick={openExecution} disabled={!accounts.length}><Plus className="h-4 w-4" /> Catat eksekusi</Button></>} />
+        <div className="space-y-4">
+          <PageHeader
+            eyebrow="Portfolio journal"
+            title="Investasi"
+            description="Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang."
+          />
 
-        <PortfolioTabs />
+          <PortfolioTabs />
+
+          <div role="group" aria-label="Aksi investasi" className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
+            <Button variant="secondary" onClick={openSnapshot} disabled={!accounts.length} className="w-full sm:w-auto">
+              <Camera className="h-4 w-4" /> Update equity
+            </Button>
+            <Button onClick={openExecution} disabled={!accounts.length} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4" /> Catat eksekusi
+            </Button>
+          </div>
+        </div>
 
         {pageError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{pageError}</span><Button variant="secondary" size="compact" onClick={() => void loadData()}>Coba lagi</Button></div>}
         {!loading && accounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Tambahkan akun berjenis Investasi terlebih dahulu melalui <Link href="/accounts" className="font-bold underline underline-offset-2">Akun & saldo</Link>.</div>}

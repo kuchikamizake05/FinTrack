@@ -356,7 +356,7 @@ export default function TransactionsPage() {
                 <Tags className="h-4 w-4" /> Kategori
               </Link>
               <Button onClick={openAdd}>
-                <Plus className="h-4 w-4" /> Catat transaksi
+                <Plus className="h-4 w-4" /> Catat
               </Button>
             </>
           )}
@@ -479,7 +479,7 @@ export default function TransactionsPage() {
               description={filtersActive ? "Coba ubah kata kunci atau reset filter untuk melihat transaksi lain." : "Catat pemasukan atau pengeluaran pertama agar arus kas mulai terbaca."}
               action={filtersActive
                 ? <Button variant="secondary" onClick={resetFilters}><RotateCcw className="h-4 w-4" /> Reset filter</Button>
-                : <Button onClick={openAdd}><Plus className="h-4 w-4" /> Catat transaksi</Button>}
+                : <Button onClick={openAdd}><Plus className="h-4 w-4" /> Catat</Button>}
             />
           </Surface>
         ) : (
