@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSyncExternalStore } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Download, FileUp, Loader2, PiggyBank, RefreshCw, Scale, Upload, WifiOff } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -22,9 +23,9 @@ type Recurring = { id: string; merchant: string; category: string; amount: numbe
 type SavingAction = "budget" | "recurring" | "reconcile" | "import" | `run:${string}` | null;
 
 const idr = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
-const loadErrorMessage = "Data planning belum berhasil dimuat. Coba lagi saat koneksi tersedia.";
 
 export default function PlanningPage() {
+  const { t } = useLanguage();
   const [dateContext, setDateContext] = useState(() => getPlanningDateContext(new Date()));
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -78,12 +79,12 @@ export default function PlanningPage() {
       setRecurring((recurringResult.data ?? []) as Recurring[]);
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-      reportHandledError("Planning data unavailable", error, loadErrorMessage);
-      setLoadError(loadErrorMessage);
+      reportHandledError("Planning data unavailable", error, "Data planning belum berhasil dimuat. Coba lagi saat koneksi tersedia.");
+      setLoadError(t("Data planning belum berhasil dimuat. Coba lagi saat koneksi tersedia."));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [dateContext.month, dateContext.monthKey]);
+  }, [dateContext.month, dateContext.monthKey, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
@@ -111,8 +112,8 @@ export default function PlanningPage() {
       if (authError || !user) throw authError ?? new Error("Session unavailable");
       const { error } = await supabase.from("financial_budgets").upsert({ user_id: user.id, category: budgetForm.category.trim(), month: `${budgetForm.month.slice(0, 7)}-01`, limit_amount: Number(budgetForm.limitAmount) }, { onConflict: "user_id,category,month" });
       if (error) throw error;
-      setBudgetForm({ category: "", month: dateContext.month, limitAmount: "" }); setMessage("Budget tersimpan."); await load();
-    } catch (error) { reportHandledError("Planning budget save failed", error, "Budget belum tersimpan."); setMessage("Budget belum tersimpan. Inputmu tetap aman, coba lagi."); }
+      setBudgetForm({ category: "", month: dateContext.month, limitAmount: "" }); setMessage(t("Budget tersimpan.")); await load();
+    } catch (error) { reportHandledError("Planning budget save failed", error, "Budget belum tersimpan."); setMessage(t("Budget belum tersimpan. Inputmu tetap aman, coba lagi.")); }
     finally { setSaving(null); }
   }
 
@@ -125,8 +126,8 @@ export default function PlanningPage() {
       if (authError || !user) throw authError ?? new Error("Session unavailable");
       const { error } = await supabase.from("recurring_transactions").insert({ user_id: user.id, account_id: recurringForm.accountId, merchant: recurringForm.merchant.trim(), category: recurringForm.category.trim(), amount: Number(recurringForm.amount), type: recurringForm.type, interval: recurringForm.interval, next_run_date: recurringForm.nextRunDate });
       if (error) throw error;
-      setRecurringForm({ accountId: "", merchant: "", category: "", amount: "", type: "expense", interval: "monthly", nextRunDate: dateContext.today }); setMessage("Jadwal transaksi tersimpan."); await load();
-    } catch (error) { reportHandledError("Planning recurring save failed", error, "Jadwal transaksi belum tersimpan."); setMessage("Jadwal transaksi belum tersimpan. Inputmu tetap aman, coba lagi."); }
+      setRecurringForm({ accountId: "", merchant: "", category: "", amount: "", type: "expense", interval: "monthly", nextRunDate: dateContext.today }); setMessage(t("Jadwal transaksi tersimpan.")); await load();
+    } catch (error) { reportHandledError("Planning recurring save failed", error, "Jadwal transaksi belum tersimpan."); setMessage(t("Jadwal transaksi belum tersimpan. Inputmu tetap aman, coba lagi.")); }
     finally { setSaving(null); }
   }
 
@@ -140,8 +141,8 @@ export default function PlanningPage() {
       if (authError || !user) throw authError ?? new Error("Session unavailable");
       const { error } = await supabase.from("account_reconciliations").insert({ user_id: user.id, account_id: account.id, statement_balance: Number(reconcileForm.statementBalance), ledger_balance: Number(account.current_balance), reconciled_at: dateContext.today });
       if (error) throw error;
-      setReconcileForm({ accountId: "", statementBalance: "" }); setMessage("Rekonsiliasi tersimpan. Selisihnya tercatat untuk ditindaklanjuti.");
-    } catch (error) { reportHandledError("Planning reconciliation failed", error, "Rekonsiliasi belum tersimpan."); setMessage("Rekonsiliasi belum tersimpan. Inputmu tetap aman, coba lagi."); }
+      setReconcileForm({ accountId: "", statementBalance: "" }); setMessage(t("Rekonsiliasi tersimpan. Selisihnya tercatat untuk ditindaklanjuti."));
+    } catch (error) { reportHandledError("Planning reconciliation failed", error, "Rekonsiliasi belum tersimpan."); setMessage(t("Rekonsiliasi belum tersimpan. Inputmu tetap aman, coba lagi.")); }
     finally { setSaving(null); }
   }
 
@@ -151,8 +152,8 @@ export default function PlanningPage() {
     try {
       const { error } = await supabase.rpc("run_recurring_transaction", { rule_id: ruleId });
       if (error) throw error;
-      setMessage("Transaksi berulang sudah masuk ke ledger dan jadwal berikutnya diperbarui."); await load();
-    } catch (error) { reportHandledError("Planning recurring run failed", error, "Jadwal belum dapat dijalankan. Pastikan tanggalnya sudah jatuh tempo."); setMessage("Jadwal belum dapat dijalankan. Pastikan tanggalnya sudah jatuh tempo."); }
+      setMessage(t("Transaksi berulang sudah masuk ke ledger dan jadwal berikutnya diperbarui.")); await load();
+    } catch (error) { reportHandledError("Planning recurring run failed", error, "Jadwal belum dapat dijalankan. Pastikan tanggalnya sudah jatuh tempo."); setMessage(t("Jadwal belum dapat dijalankan. Pastikan tanggalnya sudah jatuh tempo.")); }
     finally { setSaving(null); }
   }
 
@@ -163,7 +164,7 @@ export default function PlanningPage() {
 
   async function importCsv(file: File) {
     if (!guardWrite()) return;
-    if (!importAccountId) { setMessage("Pilih akun tujuan sebelum impor CSV."); return; }
+    if (!importAccountId) { setMessage(t("Pilih akun tujuan sebelum impor CSV.")); return; }
     setSaving("import"); setMessage(null);
     try {
       const records = parseTransactionCsv(await file.text());
@@ -171,25 +172,128 @@ export default function PlanningPage() {
       if (authError || !user) throw authError ?? new Error("Session unavailable");
       const { error } = await supabase.from("transactions").insert(records.map((row) => ({ ...row, user_id: user.id, account_id: importAccountId, source: "manual", status: "needs_review" })));
       if (error) throw error;
-      setMessage(`${records.length} transaksi diimpor sebagai Perlu ditinjau.`); await load();
-    } catch (error) { reportHandledError("Planning CSV import failed", error, "CSV tidak dapat diimpor."); setMessage("CSV tidak dapat diimpor. Gunakan format ekspor FinTrack."); }
+      setMessage(t("{count} transaksi diimpor sebagai Perlu ditinjau.", { count: records.length })); await load();
+    } catch (error) { reportHandledError("Planning CSV import failed", error, "CSV tidak dapat diimpor."); setMessage(t("CSV tidak dapat diimpor. Gunakan format ekspor FinTrack.")); }
     finally { setSaving(null); }
   }
 
-  return <div className="app-page"><Navbar /><main id="main-content" tabIndex={-1} className="app-page-content max-w-6xl space-y-6 outline-none"><PageHeader eyebrow="Financial control" title="Rencana & kontrol" description="Atur budget, jadwal transaksi, cocokkan saldo, dan pindahkan data dengan aman." actions={<Button variant="secondary" onClick={downloadCsv}><Download className="h-4 w-4" /> Ekspor CSV</Button>} />
-    {!online && <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><WifiOff className="mt-0.5 h-4 w-4 shrink-0" /><span><strong>Mode offline.</strong> {offlineWriteMessage} Ekspor CSV tetap tersedia di perangkat.</span></div>}
-    {message && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{message}</div>}
-    {loading ? <PlanningSkeleton /> : loadError ? <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{loadError}</span><Button variant="secondary" size="compact" onClick={() => void load()}><RefreshCw className="h-4 w-4" /> Coba lagi</Button></div> : <>
-      {alerts.length > 0 && <Surface className="p-5"><h2 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-5 w-5 text-amber-600" /> Perlu perhatian</h2><ul className="mt-3 space-y-2 text-sm text-slate-600">{alerts.map((alert, index) => <li key={`${alert.kind}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">{alert.message}</li>)}</ul></Surface>}
-      <div className="grid gap-6 lg:grid-cols-2"><Surface className="p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><PiggyBank className="h-5 w-5 text-emerald-700" /> Budget kategori</h2><form onSubmit={saveBudget} className="mt-4 grid gap-3 sm:grid-cols-3"><select aria-label="Kategori budget" required value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value })} className={fieldControlStyles}><option value="">Kategori</option>{categories.map((category) => <option key={category}>{category}</option>)}</select><input aria-label="Bulan budget" required type="month" value={budgetForm.month.slice(0, 7)} onChange={(e) => setBudgetForm({ ...budgetForm, month: `${e.target.value}-01` })} className={fieldControlStyles} /><input aria-label="Batas budget dalam Rupiah" required min="1" inputMode="numeric" type="number" placeholder="Batas IDR" value={budgetForm.limitAmount} onChange={(e) => setBudgetForm({ ...budgetForm, limitAmount: e.target.value })} className={fieldControlStyles} /><Button disabled={writeDisabled} loading={saving === "budget"} className="sm:col-span-3">Simpan budget</Button></form><div className="mt-5 space-y-3">{budgets.map((budget) => { const progress = buildBudgetProgress({ category: budget.category, limitAmount: Number(budget.limit_amount), month: budget.month.slice(0, 7) }, transactions); return <div key={budget.id}><div className="flex justify-between text-sm"><span className="font-bold">{budget.category}</span><span>{idr.format(progress.spentAmount)} / {idr.format(progress.limitAmount)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Penggunaan budget ${budget.category}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(progress.percentage, 100)} aria-valuetext={`${progress.percentage.toFixed(0)}% terpakai, ${idr.format(progress.spentAmount)} dari ${idr.format(progress.limitAmount)}`}><div className={progress.state === "over" ? "h-full bg-rose-500" : progress.state === "warning" ? "h-full bg-amber-500" : "h-full bg-emerald-500"} style={{ width: `${Math.min(progress.percentage, 100)}%` }} /></div></div>; })}</div></Surface>
-        <Surface className="p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><CalendarClock className="h-5 w-5 text-emerald-700" /> Transaksi berulang</h2><form onSubmit={saveRecurring} className="mt-4 grid gap-3 sm:grid-cols-2"><select aria-label="Akun transaksi berulang" required value={recurringForm.accountId} onChange={(e) => setRecurringForm({ ...recurringForm, accountId: e.target.value })} className={fieldControlStyles}><option value="">Akun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select><input aria-label="Merchant atau nama transaksi berulang" required placeholder="Merchant / nama" value={recurringForm.merchant} onChange={(e) => setRecurringForm({ ...recurringForm, merchant: e.target.value })} className={fieldControlStyles} /><input aria-label="Kategori transaksi berulang" required placeholder="Kategori" value={recurringForm.category} onChange={(e) => setRecurringForm({ ...recurringForm, category: e.target.value })} className={fieldControlStyles} /><input aria-label="Nominal transaksi berulang" required type="number" min="1" placeholder="Nominal" value={recurringForm.amount} onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })} className={fieldControlStyles} /><select aria-label="Frekuensi transaksi berulang" value={recurringForm.interval} onChange={(e) => setRecurringForm({ ...recurringForm, interval: e.target.value })} className={fieldControlStyles}><option value="weekly">Mingguan</option><option value="monthly">Bulanan</option><option value="yearly">Tahunan</option></select><input aria-label="Tanggal transaksi berulang berikutnya" required type="date" value={recurringForm.nextRunDate} onChange={(e) => setRecurringForm({ ...recurringForm, nextRunDate: e.target.value })} className={fieldControlStyles} /><Button disabled={writeDisabled} loading={saving === "recurring"} className="sm:col-span-2">Tambah jadwal</Button></form><div className="mt-5 space-y-2">{recurring.map((rule) => <div key={rule.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"><span className="font-bold">{rule.merchant} · {rule.category}</span><span className="text-right">{rule.next_run_date} · {idr.format(Number(rule.amount))}<Button size="compact" variant="ghost" disabled={writeDisabled || rule.next_run_date > dateContext.today} loading={saving === `run:${rule.id}`} onClick={() => void runRecurring(rule.id)}>Jalankan</Button></span></div>)}</div></Surface></div>
-      <div className="grid gap-6 lg:grid-cols-2"><Surface className="p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><Scale className="h-5 w-5 text-emerald-700" /> Rekonsiliasi saldo</h2><form onSubmit={reconcile} className="mt-4 space-y-3"><select aria-label="Akun untuk rekonsiliasi saldo" required value={reconcileForm.accountId} onChange={(e) => setReconcileForm({ ...reconcileForm, accountId: e.target.value })} className={fieldControlStyles}><option value="">Pilih akun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · catatan {idr.format(Number(a.current_balance))}</option>)}</select><Field label="Saldo menurut mutasi / statement" htmlFor="statement-balance"><input id="statement-balance" required type="number" value={reconcileForm.statementBalance} onChange={(e) => setReconcileForm({ ...reconcileForm, statementBalance: e.target.value })} className={fieldControlStyles} /></Field>{reconcileForm.accountId && reconcileForm.statementBalance && <p className="text-sm text-slate-600">{buildReconciliation({ expectedBalance: Number(accounts.find((a) => a.id === reconcileForm.accountId)?.current_balance), statementBalance: Number(reconcileForm.statementBalance) }).isMatched ? "Saldo cocok." : "Ada selisih yang perlu dicek."}</p>}<Button disabled={writeDisabled} loading={saving === "reconcile"}><CheckCircle2 className="h-4 w-4" /> Simpan rekonsiliasi</Button></form></Surface>
-        <Surface className="p-5"><h2 className="flex items-center gap-2 text-lg font-bold"><FileUp className="h-5 w-5 text-emerald-700" /> Impor CSV</h2><p className="mt-1 text-sm text-slate-500">Pilih CSV hasil ekspor FinTrack. Semua data masuk sebagai “Perlu ditinjau” agar aman.</p><select aria-label="Akun tujuan impor CSV" value={importAccountId} onChange={(e) => setImportAccountId(e.target.value)} className={`mt-4 w-full ${fieldControlStyles}`}><option value="">Akun tujuan</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select><input ref={importRef} aria-label="Pilih file CSV untuk diimpor" className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) void importCsv(file); e.currentTarget.value = ""; }} /><Button variant="secondary" className="mt-3" disabled={writeDisabled} loading={saving === "import"} onClick={() => importRef.current?.click()}><Upload className="h-4 w-4" /> Pilih file CSV</Button></Surface></div>
-      {!loading && accounts.length === 0 && <Surface><EmptyState icon={RefreshCw} title="Buat akun dulu" description="Budget dan transaksi berulang membutuhkan akun tujuan untuk menjaga saldo tetap akurat." /></Surface>}
-    </>}
-  </main></div>;
+  return (
+    <div className="app-page">
+      <Navbar />
+      <main id="main-content" tabIndex={-1} className="app-page-content max-w-6xl space-y-6 outline-none">
+        <PageHeader
+          eyebrow={t("Financial control")}
+          title={t("Rencana & kontrol")}
+          description={t("Atur budget, jadwal transaksi, cocokkan saldo, dan pindahkan data dengan aman.")}
+          actions={<Button variant="secondary" onClick={downloadCsv}><Download className="h-4 w-4" /> {t("Ekspor CSV")}</Button>}
+        />
+        {!online && <div role="status" className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><WifiOff className="mt-0.5 h-4 w-4 shrink-0" /><span><strong>{t("Mode offline.")}</strong> {offlineWriteMessage} {t("Ekspor CSV tetap tersedia di perangkat.")}</span></div>}
+        {message && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{message}</div>}
+        {loading ? <PlanningSkeleton /> : loadError ? <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{loadError}</span><Button variant="secondary" size="compact" onClick={() => void load()}><RefreshCw className="h-4 w-4" /> {t("Coba lagi")}</Button></div> : <>
+          {alerts.length > 0 && <Surface className="p-5"><h2 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-5 w-5 text-amber-600" /> {t("Perlu perhatian")}</h2><ul className="mt-3 space-y-2 text-sm text-slate-600">{alerts.map((alert, index) => <li key={`${alert.kind}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">{alert.message}</li>)}</ul></Surface>}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Surface className="p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><PiggyBank className="h-5 w-5 text-emerald-700" /> {t("Budget kategori")}</h2>
+              <form onSubmit={saveBudget} className="mt-4 grid gap-3 sm:grid-cols-3">
+                <select aria-label={t("Kategori budget")} required value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value })} className={fieldControlStyles}>
+                  <option value="">{t("Kategori")}</option>
+                  {categories.map((category) => <option key={category} value={category}>{t(category)}</option>)}
+                </select>
+                <input aria-label={t("Bulan budget")} required type="month" value={budgetForm.month.slice(0, 7)} onChange={(e) => setBudgetForm({ ...budgetForm, month: `${e.target.value}-01` })} className={fieldControlStyles} />
+                <input aria-label={t("Batas budget dalam Rupiah")} required min="1" inputMode="numeric" type="number" placeholder={t("Batas IDR")} value={budgetForm.limitAmount} onChange={(e) => setBudgetForm({ ...budgetForm, limitAmount: e.target.value })} className={fieldControlStyles} />
+                <Button disabled={writeDisabled} loading={saving === "budget"} className="sm:col-span-3">{t("Simpan budget")}</Button>
+              </form>
+              <div className="mt-5 space-y-3">
+                {budgets.map((budget) => {
+                  const progress = buildBudgetProgress({ category: budget.category, limitAmount: Number(budget.limit_amount), month: budget.month.slice(0, 7) }, transactions);
+                  return (
+                    <div key={budget.id}>
+                      <div className="flex justify-between text-sm">
+                        <span className="font-bold">{t(budget.category)}</span>
+                        <span>{idr.format(progress.spentAmount)} / {idr.format(progress.limitAmount)}</span>
+                      </div>
+                      <div
+                        className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"
+                        role="progressbar"
+                        aria-label={t("Penggunaan budget {category}", { category: t(budget.category) })}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.min(progress.percentage, 100)}
+                        aria-valuetext={t("{percentage}% terpakai, {spent} dari {limit}", { percentage: progress.percentage.toFixed(0), spent: idr.format(progress.spentAmount), limit: idr.format(progress.limitAmount) })}
+                      >
+                        <div className={progress.state === "over" ? "h-full bg-rose-500" : progress.state === "warning" ? "h-full bg-amber-500" : "h-full bg-emerald-500"} style={{ width: `${Math.min(progress.percentage, 100)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Surface>
+            <Surface className="p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><CalendarClock className="h-5 w-5 text-emerald-700" /> {t("Transaksi berulang")}</h2>
+              <form onSubmit={saveRecurring} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <select aria-label={t("Akun transaksi berulang")} required value={recurringForm.accountId} onChange={(e) => setRecurringForm({ ...recurringForm, accountId: e.target.value })} className={fieldControlStyles}>
+                  <option value="">{t("Akun")}</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <input aria-label={t("Merchant atau nama transaksi berulang")} required placeholder={t("Merchant / nama")} value={recurringForm.merchant} onChange={(e) => setRecurringForm({ ...recurringForm, merchant: e.target.value })} className={fieldControlStyles} />
+                <input aria-label={t("Kategori transaksi berulang")} required placeholder={t("Kategori")} value={recurringForm.category} onChange={(e) => setRecurringForm({ ...recurringForm, category: e.target.value })} className={fieldControlStyles} />
+                <input aria-label={t("Nominal transaksi berulang")} required type="number" min="1" placeholder={t("Nominal")} value={recurringForm.amount} onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })} className={fieldControlStyles} />
+                <select aria-label={t("Frekuensi transaksi berulang")} value={recurringForm.interval} onChange={(e) => setRecurringForm({ ...recurringForm, interval: e.target.value })} className={fieldControlStyles}>
+                  <option value="weekly">{t("Mingguan")}</option>
+                  <option value="monthly">{t("Bulanan")}</option>
+                  <option value="yearly">{t("Tahunan")}</option>
+                </select>
+                <input aria-label={t("Tanggal transaksi berulang berikutnya")} required type="date" value={recurringForm.nextRunDate} onChange={(e) => setRecurringForm({ ...recurringForm, nextRunDate: e.target.value })} className={fieldControlStyles} />
+                <Button disabled={writeDisabled} loading={saving === "recurring"} className="sm:col-span-2">{t("Tambah jadwal")}</Button>
+              </form>
+              <div className="mt-5 space-y-2">
+                {recurring.map((rule) => (
+                  <div key={rule.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <span className="font-bold">{rule.merchant} · {t(rule.category)}</span>
+                    <span className="text-right">{rule.next_run_date} · {idr.format(Number(rule.amount))}<Button size="compact" variant="ghost" disabled={writeDisabled || rule.next_run_date > dateContext.today} loading={saving === `run:${rule.id}`} onClick={() => void runRecurring(rule.id)} className="ml-2">{t("Jalankan")}</Button></span>
+                  </div>
+                ))}
+              </div>
+            </Surface>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Surface className="p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><Scale className="h-5 w-5 text-emerald-700" /> {t("Rekonsiliasi saldo")}</h2>
+              <form onSubmit={reconcile} className="mt-4 space-y-3">
+                <select aria-label={t("Akun untuk rekonsiliasi saldo")} required value={reconcileForm.accountId} onChange={(e) => setReconcileForm({ ...reconcileForm, accountId: e.target.value })} className={fieldControlStyles}>
+                  <option value="">{t("Pilih akun")}</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{t("{name} · catatan {balance}", { name: a.name, balance: idr.format(Number(a.current_balance)) })}</option>)}
+                </select>
+                <Field label={t("Saldo menurut mutasi / statement")} htmlFor="statement-balance">
+                  <input id="statement-balance" required type="number" value={reconcileForm.statementBalance} onChange={(e) => setReconcileForm({ ...reconcileForm, statementBalance: e.target.value })} className={fieldControlStyles} />
+                </Field>
+                {reconcileForm.accountId && reconcileForm.statementBalance && (
+                  <p className="text-sm text-slate-600">
+                    {buildReconciliation({ expectedBalance: Number(accounts.find((a) => a.id === reconcileForm.accountId)?.current_balance), statementBalance: Number(reconcileForm.statementBalance) }).isMatched ? t("Saldo cocok.") : t("Ada selisih yang perlu dicek.")}
+                  </p>
+                )}
+                <Button disabled={writeDisabled} loading={saving === "reconcile"}><CheckCircle2 className="h-4 w-4" /> {t("Simpan rekonsiliasi")}</Button>
+              </form>
+            </Surface>
+            <Surface className="p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><FileUp className="h-5 w-5 text-emerald-700" /> {t("Impor CSV")}</h2>
+              <p className="mt-1 text-sm text-slate-500">{t("Pilih CSV hasil ekspor FinTrack. Semua data masuk sebagai “Perlu ditinjau” agar aman.")}</p>
+              <select aria-label={t("Akun tujuan impor CSV")} value={importAccountId} onChange={(e) => setImportAccountId(e.target.value)} className={`mt-4 w-full ${fieldControlStyles}`}>
+                <option value="">{t("Akun tujuan")}</option>
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <input ref={importRef} aria-label={t("Pilih file CSV untuk diimpor")} className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) void importCsv(file); e.currentTarget.value = ""; }} />
+              <Button variant="secondary" className="mt-3" disabled={writeDisabled} loading={saving === "import"} onClick={() => importRef.current?.click()}><Upload className="h-4 w-4" /> {t("Pilih file CSV")}</Button>
+            </Surface>
+          </div>
+          {!loading && accounts.length === 0 && <Surface><EmptyState icon={RefreshCw} title={t("Buat akun dulu")} description={t("Budget dan transaksi berulang membutuhkan akun tujuan untuk menjaga saldo tetap akurat.")} /></Surface>}
+        </>}
+      </main>
+    </div>
+  );
 }
 
 function PlanningSkeleton() {
-  return <div className="grid animate-pulse gap-6 lg:grid-cols-2" aria-label="Memuat planning"><div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-72 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-72 rounded-2xl border border-emerald-100 bg-white/80" /><span className="sr-only"><Loader2 className="h-4 w-4" /> Memuat planning...</span></div>;
+  const { t } = useLanguage();
+  return <div className="grid animate-pulse gap-6 lg:grid-cols-2" aria-label={t("Memuat planning")}><div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-72 rounded-2xl border border-emerald-100 bg-white/80" /><div className="h-72 rounded-2xl border border-emerald-100 bg-white/80" /><span className="sr-only"><Loader2 className="h-4 w-4" /> {t("Memuat planning...")}</span></div>;
 }
