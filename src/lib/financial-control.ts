@@ -13,6 +13,22 @@ export function buildBudgetProgress(budget: Budget, transactions: readonly Contr
   return { ...budget, spentAmount, remainingAmount: budget.limitAmount - spentAmount, percentage, state: percentage >= 100 ? "over" : percentage >= 80 ? "warning" : "on_track" } as const;
 }
 
+export function getIdrBudgetScope<T extends Pick<FinanceTransaction, "status" | "type"> & { account_id: string | null }>(
+  transactions: readonly T[],
+  accountCurrencies: ReadonlyMap<string, string>,
+) {
+  const idrTransactions: T[] = [];
+  let excludedExpenseCount = 0;
+
+  for (const transaction of transactions) {
+    const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined;
+    if (currency === "IDR") idrTransactions.push(transaction);
+    else if (transaction.status === "confirmed" && transaction.type === "expense") excludedExpenseCount += 1;
+  }
+
+  return { idrTransactions, excludedExpenseCount };
+}
+
 export type RecurringTransaction = { merchant: string; category: string; amount: number; type: TransactionType; accountId: string; nextRunDate: string; interval: "weekly" | "monthly" | "yearly"; note?: string | null };
 
 export function buildRecurringTransactionDraft(rule: RecurringTransaction) {

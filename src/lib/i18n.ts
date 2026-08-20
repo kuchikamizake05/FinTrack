@@ -114,6 +114,9 @@ const englishTranslations: Record<string, string> = {
   "Minta review": "Request review",
   "Update equity": "Update equity",
   "Catat eksekusi": "Record execution",
+  "Aksi investasi": "Investment actions",
+  Edit: "Edit",
+  Hapus: "Delete",
   "Catat pembelian": "Record purchase",
   "Transfer dana": "Transfer funds",
   "Tambah akun": "Add account",
@@ -382,6 +385,31 @@ const englishTranslations: Record<string, string> = {
   "Transaksi belum berhasil dihapus. Coba lagi.": "Transaction could not be deleted. Try again.",
   "Transaksi belum berhasil dipulihkan.": "Transaction could not be restored.",
   "Transaksi belum berhasil dipulihkan. Coba lagi.": "Transaction could not be restored. Try again.",
+  "Perlu ditinjau & persetujuan": "Needs review & approval",
+  Setujui: "Approve",
+  "Setujui “{name}”?": "Approve “{name}”?",
+  "Transaksi ini akan menjadi terkonfirmasi dan mengubah saldo akun.":
+    "This transaction will become confirmed and update the account balance.",
+  "Setujui transaksi": "Approve transaction",
+  "Transaksi belum berhasil disetujui.": "Transaction could not be approved.",
+  "Transaksi belum berhasil disetujui. Coba lagi.": "Transaction could not be approved. Try again.",
+  "Struk belum dapat dibuka. Coba lagi.": "Receipt could not be opened. Try again.",
+  "Transaksi masih perlu ditinjau.": "This transaction still needs review.",
+  "Simpan perubahan tidak mengubah saldo. Gunakan Setujui setelah detail benar.":
+    "Saving changes does not update the balance. Use Approve after details are correct.",
+  "Bukti struk tersedia.": "Receipt evidence is available.",
+  "Keyakinan ekstraksi AI: {confidence}%": "AI extraction confidence: {confidence}%",
+  "Lihat teks hasil ekstraksi": "View extracted text",
+  "{count} transaksi perlu ditinjau": "{count} transactions need review",
+  "semua waktu, belum masuk total terkonfirmasi": "all time, excluded from confirmed totals",
+  "Ada lebih dari satu mata uang. Arus kas tidak dijumlahkan tanpa kurs.":
+    "More than one currency exists. Cash flow is not combined without an exchange rate.",
+  "Arus kas lintas mata uang tidak tersedia": "Cross-currency cash flow is unavailable",
+  "Pilih satu mata uang atau tambahkan kurs sebelum membandingkan nilai.":
+    "Choose one currency or add exchange rates before comparing values.",
+  "Tidak dijumlahkan lintas mata uang": "Not combined across currencies",
+  "Pilih mata uang portfolio": "Choose portfolio currency",
+  "Pilih mata uang trading": "Choose trading currency",
 
   // Investments & Portfolio
   "Tambahkan akun berjenis Investasi terlebih dahulu melalui ":
@@ -445,6 +473,23 @@ const englishTranslations: Record<string, string> = {
   "Portfolio belum berhasil dimuat.": "Portfolio could not be loaded.",
   "Portfolio belum berhasil dimuat. Coba lagi beberapa saat lagi.":
     "Portfolio could not be loaded. Please try again in a moment.",
+  "Edit eksekusi": "Edit execution",
+  "Edit snapshot": "Edit snapshot",
+  "Hapus eksekusi?": "Delete execution?",
+  "Hapus snapshot?": "Delete snapshot?",
+  "Hapus eksekusi": "Delete execution",
+  "Hapus snapshot": "Delete snapshot",
+  "Eksekusi ini akan dihapus permanen dan posisi serta P/L akan dihitung ulang.":
+    "This execution will be permanently deleted and positions and P/L recalculated.",
+  "Snapshot ini akan dihapus permanen dari riwayat equity.":
+    "This snapshot will be permanently deleted from equity history.",
+  "Riwayat equity": "Equity history",
+  "Koreksi snapshot bila nilai atau waktu tercatat keliru.":
+    "Correct snapshots when value or timestamp is wrong.",
+  "Belum ada snapshot": "No snapshots yet",
+  "Catat equity pertama untuk menyimpan riwayat nilai portfolio.":
+    "Record first equity to preserve portfolio value history.",
+  "Catatan belum berhasil dihapus. Coba lagi.": "Record could not be deleted. Try again.",
 
   // Trading
   "Jurnal trading belum berhasil dimuat.": "Trading journal could not be loaded.",
@@ -544,6 +589,19 @@ const englishTranslations: Record<string, string> = {
   "Review belum dapat diminta.": "Review could not be requested.",
   "Review belum dapat diminta. Coba lagi saat koneksi tersedia.":
     "Review could not be requested. Try again when connection is available.",
+  "Edit trade": "Edit trade",
+  "Tutup trade": "Close trade",
+  "Batalkan": "Cancel",
+  "Batalkan trade?": "Cancel trade?",
+  "Batalkan trade": "Cancel trade",
+  "Hapus trade?": "Delete trade?",
+  "Hapus trade": "Delete trade",
+  "Trade akan ditandai dibatalkan dan hasil penutupan dihapus.":
+    "Trade will be marked cancelled and closing results cleared.",
+  "Trade ini akan dihapus permanen dari jurnal.": "This trade will be permanently deleted from journal.",
+  "Catat equity pertama untuk menyimpan riwayat trading.":
+    "Record first equity to preserve trading history.",
+  "Catatan belum berhasil diperbarui. Coba lagi.": "Record could not be updated. Try again.",
 
   // Accounts page
   "Tambahkan satu akun aktif lagi untuk transfer.": "Add one more active account for transfers.",
@@ -556,8 +614,15 @@ const englishTranslations: Record<string, string> = {
     "Fill in IDR equivalent so net worth accurately reflects your wealth.",
   "Lengkapi {name}": "Complete {name}",
   "Portofolio akun": "Account portfolio",
-  "{total} akun terhubung · {active} aktif": "{total} accounts connected · {active} active",
+  "{count} akun terhubung · {active} aktif": "{count} accounts connected · {active} active",
   "Filter jenis akun": "Filter account type",
+  Jenis: "Type",
+  Saldo: "Balance",
+  "Perubahan memerlukan koneksi internet. Hubungkan kembali lalu coba lagi.":
+    "Changes require an internet connection. Reconnect and try again.",
+  "Akun belum berhasil disimpan. Coba lagi.": "Account could not be saved. Try again.",
+  "Transfer belum berhasil disimpan. Coba lagi.": "Transfer could not be saved. Try again.",
+  "Saldo belum berhasil diperbarui. Coba lagi.": "Balance could not be updated. Try again.",
   "Dana likuid": "Liquid funds",
   Kewajiban: "Liabilities",
   "Mulai dari akun pertamamu": "Start with your first account",
@@ -710,6 +775,38 @@ const englishTranslations: Record<string, string> = {
     "Budgets and recurring transactions require destination accounts to keep balances accurate.",
   "Memuat planning": "Loading planning",
   "Memuat planning...": "Loading planning...",
+  "Budget hanya menghitung pengeluaran terkonfirmasi berakun IDR. {count} pengeluaran mata uang lain tidak dijumlahkan.":
+    "Budgets only count confirmed expenses from IDR accounts. {count} expense(s) in other currencies are excluded.",
+  Jeda: "Pause",
+  Dijeda: "Paused",
+  "Aktifkan kembali": "Reactivate",
+  "Jadwal transaksi diperbarui.": "Recurring transaction schedule updated.",
+  "Jadwal diaktifkan kembali.": "Schedule reactivated.",
+  "Jadwal dijeda. Transaksi lama tetap utuh.": "Schedule paused. Earlier transactions remain intact.",
+  "Status jadwal belum diperbarui. Coba lagi.": "Schedule status could not be updated. Try again.",
+  "Budget dihapus. Transaksi tetap utuh.": "Budget deleted. Transactions remain intact.",
+  "Budget belum dihapus. Coba lagi.": "Budget could not be deleted. Try again.",
+  "Hapus budget {category}?": "Delete {category} budget?",
+  "Budget akan dihapus. Transaksi dan riwayat kategori tetap utuh.": "Budget will be deleted. Transactions and category history remain intact.",
+  "Hapus budget": "Delete budget",
+  "Riwayat rekonsiliasi": "Reconciliation history",
+  "Statement {statement}; ledger {ledger}; selisih {difference}": "Statement {statement}; ledger {ledger}; difference {difference}",
+  "Riwayat akun": "Account history",
+  "Transfer dan rekonsiliasi terakhir. Riwayat tidak dapat diubah dari sini.": "Latest transfers and reconciliations. History cannot be changed here.",
+  "Belum ada riwayat akun.": "No account history yet.",
+  "Edit akun": "Edit account",
+  "Identitas akun": "Account identity",
+  "Nama dan institusi dapat diperbarui. Saldo memakai form pembaruan saldo terpisah.": "Name and institution can be updated. Use separate balance update form for balances.",
+  "Jenis akun, mata uang, dan saldo terkunci agar riwayat tetap konsisten.": "Account type, currency, and balance are locked to keep history consistent.",
+  "Arsipkan {name}?": "Archive {name}?",
+  "Aktifkan kembali {name}?": "Reactivate {name}?",
+  "Akun akan disembunyikan dari transaksi, transfer, dan entri baru. Riwayat tetap utuh.": "Account will be hidden from transactions, transfers, and new entries. History remains intact.",
+  "Akun akan tersedia lagi untuk transaksi, transfer, dan entri baru.": "Account will be available again for transactions, transfers, and new entries.",
+  "Arsipkan akun": "Archive account",
+  "Aktifkan akun": "Reactivate account",
+  "Status akun belum berhasil diperbarui. Coba lagi.": "Account status could not be updated. Try again.",
+  Arsipkan: "Archive",
+  Aktifkan: "Reactivate",
 
   // Smart Insights page
   "Review keuangan": "Financial review",

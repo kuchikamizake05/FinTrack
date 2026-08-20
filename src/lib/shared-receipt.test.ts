@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildSharedReceiptDraft, validateSharedReceiptFile } from "./shared-receipt";
+import {
+  buildSharedReceiptDraft,
+  getPrivateReceiptObjectPath,
+  validateSharedReceiptFile,
+} from "./shared-receipt";
 
 describe("shared receipt helpers", () => {
   it("builds a review-only transaction draft from shared text", () => {
@@ -14,5 +18,12 @@ describe("shared receipt helpers", () => {
     expect(validateSharedReceiptFile({ type: "image/jpeg", size: 2_000_000, name: "receipt.jpg" })).toBeNull();
     expect(validateSharedReceiptFile({ type: "application/pdf", size: 2_000_000, name: "receipt.pdf" })).toBeNull();
     expect(validateSharedReceiptFile({ type: "video/mp4", size: 2_000_000, name: "video.mp4" })).toContain("gambar");
+  });
+
+  it("accepts only owned object paths from receipts bucket", () => {
+    expect(getPrivateReceiptObjectPath("receipts/user-1/receipt.png", "user-1")).toBe("user-1/receipt.png");
+    expect(getPrivateReceiptObjectPath("receipts/user-2/receipt.png", "user-1")).toBeNull();
+    expect(getPrivateReceiptObjectPath("other/user-1/receipt.png", "user-1")).toBeNull();
+    expect(getPrivateReceiptObjectPath("receipts/user-1/../receipt.png", "user-1")).toBeNull();
   });
 });

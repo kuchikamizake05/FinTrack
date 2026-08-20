@@ -25,6 +25,7 @@ import {
   Eye,
   FileSpreadsheet,
   Loader2,
+  CheckCircle2,
   Plus,
   ReceiptText,
   RotateCcw,
@@ -53,8 +54,11 @@ import {
   type CategoryType,
 } from "@/lib/categories";
 import { filterTransactions, type TransactionFilters } from "@/lib/finance";
+import { getPrivateReceiptObjectPath } from "@/lib/shared-receipt";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import {
+  canApproveTransaction,
+  getTransactionSaveStatus,
   getTransactionSourceLabel,
   getTransactionStatusLabel,
   hasActiveTransactionFilters,
@@ -75,6 +79,7 @@ type Transaction = {
   note: string | null;
   source: string;
   receipt_url: string | null;
+  raw_text: string | null;
   ai_confidence: number | null;
   status: "confirmed" | "pending_approval" | "needs_review" | "deleted";
   created_at: string;
@@ -128,6 +133,9 @@ export default function TransactionsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [approveTarget, setApproveTarget] = useState<Transaction | null>(null);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -219,11 +227,27 @@ export default function TransactionsPage() {
   }, [categories]);
 
   useEffect(() => {
-    if (!loading && searchParams.get("new") === "1" && !autoOpenedRef.current) {
+    if (loading || autoOpenedRef.current) return;
+
+    const action = searchParams.get("new") === "1"
+      ? "new"
+      : searchParams.get("status") === "review"
+        ? "review"
+        : null;
+    if (!action) return;
+
+    const timer = window.setTimeout(() => {
+      if (autoOpenedRef.current) return;
       autoOpenedRef.current = true;
-      openAdd();
-      router.replace("/transactions", { scroll: false });
-    }
+      if (action === "new") {
+        openAdd();
+        router.replace("/transactions", { scroll: false });
+        return;
+      }
+      setFilters((current) => ({ ...current, status: "review" }));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loading, openAdd, router, searchParams]);
 
   const openEdit = (transaction: Transaction) => {
@@ -273,7 +297,7 @@ export default function TransactionsPage() {
         amount: Number(form.amount),
         note: form.note.trim() || null,
         source: selectedTx?.source ?? "manual",
-        status: "confirmed",
+        status: getTransactionSaveStatus(selectedTx?.status),
         account_id: form.accountId,
       };
 
@@ -289,6 +313,33 @@ export default function TransactionsPage() {
       setFormError("Transaksi belum berhasil disimpan. Coba lagi.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const requestApproval = (transaction: Transaction) => {
+    setApproveTarget(transaction);
+    setApproveError(null);
+  };
+
+  const handleApprove = async () => {
+    if (!approveTarget || approvingId || !canApproveTransaction(approveTarget.status)) return;
+    if (!canWriteOnline()) {
+      setApproveError(offlineWriteMessage);
+      return;
+    }
+
+    setApprovingId(approveTarget.id);
+    setApproveError(null);
+    try {
+      const { error } = await supabase.from("transactions").update({ status: "confirmed" }).eq("id", approveTarget.id);
+      if (error) throw error;
+      setApproveTarget(null);
+      await fetchTransactions();
+    } catch (error) {
+      reportHandledError("Transaction approval failed", error, "Transaksi belum berhasil disetujui.");
+      setApproveError("Transaksi belum berhasil disetujui. Coba lagi.");
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -433,6 +484,7 @@ export default function TransactionsPage() {
               className={fieldControlStyles}
             >
               <option value="active">{t("Transaksi aktif")}</option>
+              <option value="review">{t("Perlu ditinjau & persetujuan")}</option>
               <option value="confirmed">{t("Terkonfirmasi")}</option>
               <option value="pending_approval">{t("Perlu persetujuan")}</option>
               <option value="needs_review">{t("Perlu ditinjau")}</option>
@@ -493,11 +545,32 @@ export default function TransactionsPage() {
             onEdit={openEdit}
             onDelete={requestDelete}
             onRestore={handleRestore}
+            onApprove={requestApproval}
             deletingId={deletingId}
             restoringId={restoringId}
+            approvingId={approvingId}
           />
         )}
       </main>
+
+      {approveTarget && (
+        <ConfirmDialog
+          titleId="approve-transaction-title"
+          descriptionId="approve-transaction-description"
+          title={t("Setujui “{name}”?", { name: approveTarget.merchant || approveTarget.category })}
+          description={t("Transaksi ini akan menjadi terkonfirmasi dan mengubah saldo akun.")}
+          confirmLabel={t("Setujui transaksi")}
+          onClose={() => {
+            if (!approvingId) {
+              setApproveTarget(null);
+              setApproveError(null);
+            }
+          }}
+          onConfirm={() => void handleApprove()}
+          loading={Boolean(approvingId)}
+          error={approveError}
+        />
+      )}
 
       {deleteTarget && (
         <ConfirmDialog
@@ -525,6 +598,7 @@ export default function TransactionsPage() {
           accounts={financialAccounts}
           categories={categories}
           categoryOptions={transactionCategoryOptions}
+          transaction={selectedTx}
           isEditMode={isEditMode}
           saving={saving}
           error={formError}
@@ -555,15 +629,17 @@ function SummaryMetric({ icon: Icon, label, value, tone }: {
   );
 }
 
-function TransactionResults({ transactions, accountNames, dateLocale, onEdit, onDelete, onRestore, deletingId, restoringId }: {
+function TransactionResults({ transactions, accountNames, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId }: {
   transactions: Transaction[];
   accountNames: ReadonlyMap<string, string>;
   dateLocale: typeof idLocale;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onRestore: (transactionId: string) => Promise<void>;
+  onApprove: (transaction: Transaction) => void;
   deletingId: string | null;
   restoringId: string | null;
+  approvingId: string | null;
 }) {
   const { t } = useLanguage();
   return (
@@ -611,7 +687,7 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
                     <p className="mt-1.5 text-[11px] font-medium text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</p>
                   </td>
                   <td className="px-5 py-4">
-                    <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
+                    <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} onApprove={onApprove} deletingId={deletingId} restoringId={restoringId} approvingId={approvingId} />
                   </td>
                 </tr>
               ))}
@@ -644,7 +720,7 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
                   <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
                 </div>
               </div>
-              <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
+              <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} onApprove={onApprove} deletingId={deletingId} restoringId={restoringId} approvingId={approvingId} />
             </div>
             {transaction.note && <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">{transaction.note}</p>}
           </Surface>
@@ -654,27 +730,46 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
   );
 }
 
-function TransactionActions({ transaction, onEdit, onDelete, onRestore, deletingId, restoringId }: {
+function TransactionActions({ transaction, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId }: {
   transaction: Transaction;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onRestore: (transactionId: string) => Promise<void>;
+  onApprove: (transaction: Transaction) => void;
   deletingId: string | null;
   restoringId: string | null;
+  approvingId: string | null;
 }) {
   const { t } = useLanguage();
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [openingReceipt, setOpeningReceipt] = useState(false);
+
+  const openReceipt = async () => {
+    if (openingReceipt || !transaction.receipt_url) return;
+    setOpeningReceipt(true);
+    setReceiptError(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw authError ?? new Error("Missing authenticated user");
+      const objectPath = getPrivateReceiptObjectPath(transaction.receipt_url, user.id);
+      if (!objectPath) throw new Error("Invalid receipt path");
+      const { data, error } = await supabase.storage.from("receipts").createSignedUrl(objectPath, 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("Receipt URL unavailable");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      reportHandledError("Receipt signed URL failed", error, "Struk belum dapat dibuka.");
+      setReceiptError(t("Struk belum dapat dibuka. Coba lagi."));
+    } finally {
+      setOpeningReceipt(false);
+    }
+  };
+
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-1">
       {transaction.receipt_url && (
-        <a
-          href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/private/${transaction.receipt_url}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("Lihat struk {name}", { name: transaction.merchant || transaction.category })}
-          className={buttonStyles({ variant: "ghost", size: "icon", className: "h-9 min-h-9 w-9 rounded-lg" })}
-        >
+        <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => void openReceipt()} loading={openingReceipt} aria-label={t("Lihat struk {name}", { name: transaction.merchant || transaction.category })}>
           <Eye className="h-4 w-4" />
-        </a>
+        </Button>
       )}
       {transaction.status === "deleted" ? (
         <Button variant="secondary" size="compact" onClick={() => void onRestore(transaction.id)} loading={restoringId === transaction.id}>
@@ -682,6 +777,11 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
         </Button>
       ) : (
         <>
+          {canApproveTransaction(transaction.status) && (
+            <Button variant="secondary" size="compact" onClick={() => onApprove(transaction)} loading={approvingId === transaction.id}>
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t("Setujui")}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => onEdit(transaction)} aria-label={t("Edit {name}", { name: transaction.merchant || transaction.category })}>
             <Edit3 className="h-4 w-4" />
           </Button>
@@ -690,6 +790,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
           </Button>
         </>
       )}
+      {receiptError && <p role="alert" className="basis-full text-right text-[11px] text-rose-700">{receiptError}</p>}
     </div>
   );
 }
@@ -705,12 +806,13 @@ function StatusBadge({ status }: { status: Transaction["status"] }) {
   return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold", tones[status])}>{t(getTransactionStatusLabel(status))}</span>;
 }
 
-function TransactionDialog({ form, setForm, accounts, categories, categoryOptions, isEditMode, saving, error, merchantInputRef, onClose, onSubmit }: {
+function TransactionDialog({ form, setForm, accounts, categories, categoryOptions, transaction, isEditMode, saving, error, merchantInputRef, onClose, onSubmit }: {
   form: TransactionFormState;
   setForm: Dispatch<SetStateAction<TransactionFormState>>;
   accounts: FinancialAccount[];
   categories: CategoryRecord[];
   categoryOptions: string[];
+  transaction: Transaction | null;
   isEditMode: boolean;
   saving: boolean;
   error: string | null;
@@ -844,6 +946,16 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
               className={cn(fieldControlStyles, "resize-none")}
             />
           </Field>
+
+          {transaction && canApproveTransaction(transaction.status) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              <p className="font-bold">{t("Transaksi masih perlu ditinjau.")}</p>
+              <p>{t("Simpan perubahan tidak mengubah saldo. Gunakan Setujui setelah detail benar.")}</p>
+              {transaction.receipt_url && <p className="mt-2">{t("Bukti struk tersedia.")}</p>}
+              {transaction.ai_confidence !== null && <p>{t("Keyakinan ekstraksi AI: {confidence}%", { confidence: Math.round(transaction.ai_confidence * 100) })}</p>}
+              {transaction.raw_text && <details className="mt-2"><summary className="cursor-pointer font-semibold">{t("Lihat teks hasil ekstraksi")}</summary><p className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white/70 p-2 text-xs text-slate-700">{transaction.raw_text}</p></details>}
+            </div>
+          )}
 
           <div aria-live="polite" aria-atomic="true">
             {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">{error}</p>}

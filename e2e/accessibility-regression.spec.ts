@@ -4,9 +4,13 @@ import { expect, mockAuthenticatedSession, mockSupabase, test, user } from "./fi
 const account = {
   id: "account-1",
   name: "BCA Utama",
+  institution: "BCA",
+  kind: "bank" as const,
   currency: "IDR",
   current_balance: 1_000_000,
+  reporting_balance_idr: null,
   is_active: true,
+  updated_at: "2026-08-12T00:00:00.000Z",
 };
 
 const transaction = {
@@ -78,6 +82,47 @@ async function mockTransactionsPage(page: Page) {
     await fulfillRows(route, []);
   });
   return () => deleteRequests;
+}
+
+async function mockAccountsPage(page: Page) {
+  await mockAuthenticatedSession(page);
+  await page.route("https://e2e-project.supabase.co/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/auth/v1/user") {
+      await route.fulfill({ status: 200, json: user });
+      return;
+    }
+    if (url.pathname === "/rest/v1/financial_accounts") {
+      await fulfillRows(route, [account]);
+      return;
+    }
+    if (url.pathname === "/rest/v1/account_transfers") {
+      await fulfillRows(route, [{
+        id: "transfer-1",
+        source_account_id: account.id,
+        destination_account_id: "account-2",
+        amount: 100_000,
+        destination_amount: 100_000,
+        currency: "IDR",
+        destination_currency: "IDR",
+        date: "2026-08-11",
+        note: "Dana darurat",
+      }]);
+      return;
+    }
+    if (url.pathname === "/rest/v1/account_reconciliations") {
+      await fulfillRows(route, [{
+        id: "reconciliation-1",
+        account_id: account.id,
+        statement_balance: 1_000_000,
+        ledger_balance: 990_000,
+        reconciled_at: "2026-08-12",
+        note: "Cek mutasi",
+      }]);
+      return;
+    }
+    await fulfillRows(route, []);
+  });
 }
 
 async function mockCategoriesPage(page: Page) {
@@ -172,6 +217,17 @@ test.describe("keyboard and confirmation regressions @critical", () => {
     await page.getByRole("alertdialog").getByRole("button", { name: "Hapus kategori" }).click();
     await expect(page.getByRole("alertdialog")).toBeHidden();
     expect(getDeleteRequests()).toBe(1);
+  });
+
+  test("account history keeps transfer and reconciliation records read-only", async ({ page }) => {
+    await mockAccountsPage(page);
+    await page.goto("/accounts");
+
+    const history = page.getByRole("heading", { name: "Riwayat akun" }).locator("../..");
+    await expect(history).toContainText("Transfer · BCA Utama → Akun tidak tersedia");
+    await expect(history).toContainText("Rekonsiliasi akun · BCA Utama");
+    await expect(history).toContainText("Statement Rp 1.000.000; ledger Rp 990.000; selisih Rp 10.000");
+    await expect(history.getByRole("button")).toHaveCount(0);
   });
 
   test("skip link and profile menu support keyboard recovery", async ({ page }) => {

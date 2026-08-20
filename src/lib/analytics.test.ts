@@ -17,13 +17,20 @@ describe("buildWeeklyEquitySeries", () => {
 describe("buildPortfolioWeeklyEquitySeries", () => {
   it("carries the latest value of each account to form one portfolio curve", () => {
     expect(buildPortfolioWeeklyEquitySeries([
-      { accountId: "stockbit", recordedAt: "2026-07-01T08:00:00.000Z", equity: 1_000 },
-      { accountId: "bibit", recordedAt: "2026-07-02T08:00:00.000Z", equity: 500 },
-      { accountId: "stockbit", recordedAt: "2026-07-09T08:00:00.000Z", equity: 1_200 },
-    ])).toEqual([
+      { accountId: "stockbit", recordedAt: "2026-07-01T08:00:00.000Z", equity: 1_000, currency: "IDR" },
+      { accountId: "bibit", recordedAt: "2026-07-02T08:00:00.000Z", equity: 500, currency: "IDR" },
+      { accountId: "stockbit", recordedAt: "2026-07-09T08:00:00.000Z", equity: 1_200, currency: "IDR" },
+    ], "IDR")).toEqual([
       { week: "2026-W27", equity: 1_500 },
       { week: "2026-W28", equity: 1_700 },
     ]);
+  });
+
+  it("excludes snapshots from other currencies", () => {
+    expect(buildPortfolioWeeklyEquitySeries([
+      { accountId: "idr", recordedAt: "2026-07-01T08:00:00.000Z", equity: 1_000, currency: "IDR" },
+      { accountId: "usd", recordedAt: "2026-07-01T08:00:00.000Z", equity: 50, currency: "USD" },
+    ], "IDR")).toEqual([{ week: "2026-W27", equity: 1_000 }]);
   });
 });
 

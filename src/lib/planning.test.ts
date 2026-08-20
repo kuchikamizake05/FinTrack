@@ -17,6 +17,8 @@ describe("planning date helpers", () => {
       today: "2026-08-18",
       month: "2026-08-01",
       monthKey: "2026-08",
+      nextMonth: "2026-09-01",
     });
+    expect(getPlanningDateContext(new Date(2026, 11, 18)).nextMonth).toBe("2027-01-01");
   });
 });

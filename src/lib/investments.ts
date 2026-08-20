@@ -5,19 +5,31 @@ export type InvestmentExecution = StockExecution & {
   ticker: string;
   executed_at: string;
   account_id: string;
+  currency: string;
 };
 
-export function buildInvestmentPositions(executions: readonly InvestmentExecution[]) {
+export function buildInvestmentPositions(
+  executions: readonly InvestmentExecution[],
+  currency: string,
+) {
   const grouped = new Map<string, InvestmentExecution[]>();
   for (const execution of executions) {
-    grouped.set(execution.ticker, [...(grouped.get(execution.ticker) ?? []), execution]);
+    if (execution.currency !== currency) continue;
+    const key = `${execution.account_id}:${execution.ticker}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), execution]);
   }
-  return [...grouped.entries()]
-    .map(([ticker, tickerExecutions]) => ({
-      ticker,
-      summary: summarizeStockPosition([...tickerExecutions].sort((left, right) => left.executed_at.localeCompare(right.executed_at))),
+  return [...grouped.values()]
+    .map((accountExecutions) => ({
+      accountId: accountExecutions[0].account_id,
+      currency,
+      ticker: accountExecutions[0].ticker,
+      summary: summarizeStockPosition([...accountExecutions].sort((left, right) => left.executed_at.localeCompare(right.executed_at))),
     }))
-    .sort((left, right) => right.summary.costBasis - left.summary.costBasis || left.ticker.localeCompare(right.ticker));
+    .sort((left, right) =>
+      right.summary.costBasis - left.summary.costBasis
+      || left.ticker.localeCompare(right.ticker)
+      || left.accountId.localeCompare(right.accountId),
+    );
 }
 
 export function filterStockExecutions<T extends InvestmentExecution>(

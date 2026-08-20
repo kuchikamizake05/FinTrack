@@ -10,6 +10,7 @@ import Navbar from "@/components/Navbar";
 import { PortfolioTabs } from "@/components/PortfolioTabs";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
@@ -23,7 +24,7 @@ import { formatLocalDateTime } from "@/lib/planning";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
 
-type Account = { id: string; name: string; currency: string };
+type Account = { id: string; name: string; currency: string; is_active: boolean };
 type Execution = InvestmentExecution & { currency: string; note: string | null };
 type Snapshot = { id: string; account_id: string; recorded_at: string; equity: number; currency: string; note: string | null };
 type SideFilter = "all" | "buy" | "sell";
@@ -44,10 +45,14 @@ export default function InvestmentsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [executionOpen, setExecutionOpen] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [editingExecution, setEditingExecution] = useState<Execution | null>(null);
+  const [editingSnapshot, setEditingSnapshot] = useState<Snapshot | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<{ kind: "execution" | "snapshot"; id: string } | null>(null);
   const [executionForm, setExecutionForm] = useState(createExecutionForm);
   const [snapshotForm, setSnapshotForm] = useState(createSnapshotForm);
   const [sideFilter, setSideFilter] = useState<SideFilter>("all");
   const [search, setSearch] = useState("");
+  const [selectedCurrency, setSelectedCurrency] = useState("");
   const tickerRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
@@ -57,7 +62,7 @@ export default function InvestmentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [accountsResult, executionsResult, snapshotsResult] = await Promise.all([
-        supabase.from("financial_accounts").select("id, name, currency").eq("user_id", user.id).eq("kind", "investment").eq("is_active", true).order("name"),
+        supabase.from("financial_accounts").select("id, name, currency, is_active").eq("user_id", user.id).eq("kind", "investment").order("is_active", { ascending: false }).order("name"),
         supabase.from("stock_executions").select("id, account_id, ticker, side, quantity, price, fee, executed_at, currency, note").eq("user_id", user.id).order("executed_at", { ascending: false }),
         supabase.from("account_equity_snapshots").select("id, account_id, recorded_at, equity, currency, note, financial_accounts!inner(kind)").eq("user_id", user.id).eq("financial_accounts.kind", "investment").order("recorded_at", { ascending: true }),
       ]);
@@ -76,17 +81,37 @@ export default function InvestmentsPage() {
   }, [t]);
 
   useEffect(() => { const timer = window.setTimeout(() => void loadData(), 0); return () => window.clearTimeout(timer); }, [loadData]);
+  const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
   const accountNames = useMemo(() => new Map(accounts.map((account) => [account.id, account.name])), [accounts]);
-  const positions = useMemo(() => buildInvestmentPositions(executions), [executions]);
+  const currencies = useMemo(() => [...new Set([
+    ...accounts.map((account) => account.currency),
+    ...executions.map((execution) => execution.currency),
+    ...snapshots.map((snapshot) => snapshot.currency),
+  ])].sort(), [accounts, executions, snapshots]);
+  const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? "IDR";
+  const positions = useMemo(() => buildInvestmentPositions(executions, currency), [currency, executions]);
   const filteredExecutions = useMemo(() => filterStockExecutions(executions, { side: sideFilter, search }, accountNames), [accountNames, executions, search, sideFilter]);
-  const equitySeries = useMemo(() => buildPortfolioWeeklyEquitySeries(snapshots.map((item) => ({ accountId: item.account_id, recordedAt: item.recorded_at, equity: Number(item.equity) }))), [snapshots]);
+  const equitySeries = useMemo(() => buildPortfolioWeeklyEquitySeries(
+    snapshots.map((item) => ({ accountId: item.account_id, recordedAt: item.recorded_at, equity: Number(item.equity), currency: item.currency })),
+    currency,
+  ), [currency, snapshots]);
   const openPositions = positions.filter((position) => position.summary.quantity > 0);
   const totalCostBasis = openPositions.reduce((total, position) => total + position.summary.costBasis, 0);
   const totalRealizedPnl = positions.reduce((total, position) => total + position.summary.realizedPnl, 0);
   const latestEquity = equitySeries.at(-1)?.equity ?? null;
 
-  function openExecution() { const accountId = accounts[0]?.id ?? ""; setExecutionForm(createExecutionForm(accountId)); setFormError(null); setExecutionOpen(true); }
-  function openSnapshot() { const accountId = accounts[0]?.id ?? ""; setSnapshotForm(createSnapshotForm(accountId)); setFormError(null); setSnapshotOpen(true); }
+  function openExecution() { const accountId = activeAccounts[0]?.id ?? ""; setEditingExecution(null); setExecutionForm(createExecutionForm(accountId)); setFormError(null); setExecutionOpen(true); }
+  function openSnapshot() { const accountId = activeAccounts[0]?.id ?? ""; setEditingSnapshot(null); setSnapshotForm(createSnapshotForm(accountId)); setFormError(null); setSnapshotOpen(true); }
+  function editExecution(execution: Execution) {
+    setEditingExecution(execution);
+    setExecutionForm({ accountId: execution.account_id, ticker: execution.ticker, side: execution.side, quantity: String(execution.quantity), price: String(execution.price), fee: String(execution.fee), executedAt: formatLocalDateTime(new Date(execution.executed_at)), note: execution.note ?? "" });
+    setFormError(null); setExecutionOpen(true);
+  }
+  function editSnapshot(snapshot: Snapshot) {
+    setEditingSnapshot(snapshot);
+    setSnapshotForm({ accountId: snapshot.account_id, equity: String(snapshot.equity), recordedAt: formatLocalDateTime(new Date(snapshot.recorded_at)), note: snapshot.note ?? "" });
+    setFormError(null); setSnapshotOpen(true);
+  }
 
   async function saveExecution(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,9 +126,12 @@ export default function InvestmentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Missing session");
       const account = accounts.find((item) => item.id === executionForm.accountId);
-      const { error } = await supabase.from("stock_executions").insert({ user_id: user.id, account_id: executionForm.accountId, ticker: executionForm.ticker.trim().toUpperCase(), side: executionForm.side, quantity: Number(executionForm.quantity), price: Number(executionForm.price), fee: Number(executionForm.fee), currency: account?.currency ?? "IDR", executed_at: new Date(executionForm.executedAt).toISOString(), note: executionForm.note.trim() || null });
+      const record = { account_id: executionForm.accountId, ticker: executionForm.ticker.trim().toUpperCase(), side: executionForm.side, quantity: Number(executionForm.quantity), price: Number(executionForm.price), fee: Number(executionForm.fee), currency: account?.currency ?? "IDR", executed_at: new Date(executionForm.executedAt).toISOString(), note: executionForm.note.trim() || null };
+      const { error } = editingExecution
+        ? await supabase.from("stock_executions").update(record).eq("id", editingExecution.id).eq("user_id", user.id)
+        : await supabase.from("stock_executions").insert({ user_id: user.id, ...record });
       if (error) throw error;
-      setExecutionOpen(false); await loadData();
+      setExecutionOpen(false); setEditingExecution(null); await loadData();
     } catch (error) { reportHandledError("Execution save failed", error, "Eksekusi belum berhasil disimpan."); setFormError(t("Eksekusi belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
   }
@@ -121,11 +149,31 @@ export default function InvestmentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Missing session");
       const account = accounts.find((item) => item.id === snapshotForm.accountId);
-      const { error } = await supabase.from("account_equity_snapshots").insert({ user_id: user.id, account_id: snapshotForm.accountId, equity: Number(snapshotForm.equity), currency: account?.currency ?? "IDR", recorded_at: new Date(snapshotForm.recordedAt).toISOString(), note: snapshotForm.note.trim() || null });
+      const record = { account_id: snapshotForm.accountId, equity: Number(snapshotForm.equity), currency: account?.currency ?? "IDR", recorded_at: new Date(snapshotForm.recordedAt).toISOString(), note: snapshotForm.note.trim() || null };
+      const { error } = editingSnapshot
+        ? await supabase.from("account_equity_snapshots").update(record).eq("id", editingSnapshot.id).eq("user_id", user.id)
+        : await supabase.from("account_equity_snapshots").insert({ user_id: user.id, ...record });
       if (error) throw error;
-      setSnapshotOpen(false); await loadData();
+      setSnapshotOpen(false); setEditingSnapshot(null); await loadData();
     } catch (error) { reportHandledError("Investment snapshot save failed", error, "Snapshot belum berhasil disimpan."); setFormError(t("Snapshot belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
+  }
+
+  async function deleteRecord() {
+    if (!recordToDelete) return;
+    if (!canWriteOnline()) { setFormError(t(offlineWriteMessage)); return; }
+    setSaving(true); setFormError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Missing session");
+      const table = recordToDelete.kind === "execution" ? "stock_executions" : "account_equity_snapshots";
+      const { error } = await supabase.from(table).delete().eq("id", recordToDelete.id).eq("user_id", user.id);
+      if (error) throw error;
+      setRecordToDelete(null); await loadData();
+    } catch (error) {
+      reportHandledError("Investment journal delete failed", error, "Catatan belum berhasil dihapus.");
+      setFormError(t("Catatan belum berhasil dihapus. Coba lagi."));
+    } finally { setSaving(false); }
   }
 
   return (
@@ -142,72 +190,89 @@ export default function InvestmentsPage() {
           <PortfolioTabs />
 
           <div role="group" aria-label={t("Aksi investasi")} className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
-            <Button variant="secondary" onClick={openSnapshot} disabled={!accounts.length} className="w-full sm:w-auto">
+            <Button variant="secondary" onClick={openSnapshot} disabled={!activeAccounts.length} className="w-full sm:w-auto">
               <Camera className="h-4 w-4" /> {t("Update equity")}
             </Button>
-            <Button onClick={openExecution} disabled={!accounts.length} className="w-full sm:w-auto">
+            <Button onClick={openExecution} disabled={!activeAccounts.length} className="w-full sm:w-auto">
               <Plus className="h-4 w-4" /> {t("Catat eksekusi")}
             </Button>
           </div>
         </div>
 
         {pageError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{pageError}</span><Button variant="secondary" size="compact" onClick={() => void loadData()}>{t("Coba lagi")}</Button></div>}
-        {!loading && accounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">{t("Tambahkan akun berjenis Investasi terlebih dahulu melalui ")}<Link href="/accounts" className="font-bold underline underline-offset-2">{t("Akun & saldo")}</Link>.</div>}
+        {!loading && activeAccounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">{t("Tambahkan akun berjenis Investasi terlebih dahulu melalui ")}<Link href="/accounts" className="font-bold underline underline-offset-2">{t("Akun & saldo")}</Link>.</div>}
+
+        {currencies.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("Pilih mata uang portfolio")}>
+            <span className="text-xs font-bold text-slate-500">{t("Mata uang")}</span>
+            {currencies.map((item) => (
+              <Button key={item} variant={currency === item ? "secondary" : "ghost"} size="compact" onClick={() => setSelectedCurrency(item)} aria-pressed={currency === item}>
+                {item}
+              </Button>
+            ))}
+          </div>
+        )}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("Ringkasan portfolio")}>
           <Metric label={t("Posisi terbuka")} value={String(openPositions.length)} hint={t("Ticker yang masih dimiliki")} icon={BarChart3} />
-          <Metric label={t("Modal tersisa")} value={formatIdr(totalCostBasis)} hint={t("Cost basis rata-rata tertimbang")} icon={WalletCards} />
-          <Metric label={t("Equity terakhir")} value={latestEquity === null ? t("Belum ada") : formatIdr(latestEquity)} hint={latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")} icon={LineChartIcon} />
-          <Metric label={t("P/L terealisasi")} value={formatSignedIdr(totalRealizedPnl)} hint={t("Setelah biaya jual")} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} tone={totalRealizedPnl >= 0 ? "text-emerald-700" : "text-rose-700"} />
+          <Metric label={t("Modal tersisa")} value={formatMoney(totalCostBasis, currency)} hint={t("Cost basis rata-rata tertimbang")} icon={WalletCards} />
+          <Metric label={t("Equity terakhir")} value={latestEquity === null ? t("Belum ada") : formatMoney(latestEquity, currency)} hint={latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")} icon={LineChartIcon} />
+          <Metric label={t("P/L terealisasi")} value={formatSignedMoney(totalRealizedPnl, currency)} hint={t("Setelah biaya jual")} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} tone={totalRealizedPnl >= 0 ? "text-emerald-700" : "text-rose-700"} />
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Surface className="p-4 sm:p-5">
             <div><h2 className="flex items-center gap-2 text-base font-bold"><LineChartIcon className="h-4 w-4 text-emerald-700" aria-hidden="true" /> {t("Equity mingguan")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Nilai terakhir tiap akun pada setiap minggu.")}</p></div>
-            {equitySeries.length > 1 ? <><figure aria-labelledby="portfolio-equity-caption" className="mt-4"><figcaption id="portfolio-equity-caption" className="sr-only">{t("Perubahan total equity portofolio per minggu.")}</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><LineChart data={equitySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tickFormatter={(value) => `Rp${Number(value / 1_000_000).toFixed(1)}jt`} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={60} /><Tooltip formatter={(value) => formatIdr(Number(value))} contentStyle={{ borderRadius: 12, borderColor: "#d1fae5" }} /><Line type="monotone" dataKey="equity" name={t("Equity portofolio")} stroke="#15803d" strokeWidth={3} dot={{ r: 3, fill: "#15803d" }} activeDot={{ r: 5, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div></figure><details className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5"><summary className="cursor-pointer text-xs font-semibold text-emerald-700">{t("Lihat data tabel equity")}</summary><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[240px] text-left text-xs"><caption className="sr-only">{t("Total equity portofolio per minggu.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Minggu")}</th><th scope="col" className="pb-2 text-right">{t("Equity")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{equitySeries.map((point) => <tr key={point.week}><th scope="row" className="py-2 pr-4 font-semibold">{point.week}</th><td className="py-2 text-right font-medium">{formatIdr(point.equity)}</td></tr>)}</tbody></table></div></details></> : <div className="mt-4 rounded-xl bg-emerald-50/70 px-5 py-8 text-center"><LineChartIcon className="mx-auto h-6 w-6 text-emerald-700" aria-hidden="true" /><p className="mt-3 text-sm font-bold">{t("Butuh dua snapshot untuk grafik")}</p><p className="mt-1 text-xs leading-5 text-slate-500">{t("Catat nilai portfolio secara rutin agar arahnya terbaca.")}</p></div>}
+            {equitySeries.length > 1 ? <><figure aria-labelledby="portfolio-equity-caption" className="mt-4"><figcaption id="portfolio-equity-caption" className="sr-only">{t("Perubahan total equity portofolio per minggu.")}</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><LineChart data={equitySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tickFormatter={(value) => new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={60} /><Tooltip formatter={(value) => formatMoney(Number(value), currency)} contentStyle={{ borderRadius: 12, borderColor: "#d1fae5" }} /><Line type="monotone" dataKey="equity" name={t("Equity portofolio")} stroke="#15803d" strokeWidth={3} dot={{ r: 3, fill: "#15803d" }} activeDot={{ r: 5, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div></figure><details className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5"><summary className="cursor-pointer text-xs font-semibold text-emerald-700">{t("Lihat data tabel equity")}</summary><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[240px] text-left text-xs"><caption className="sr-only">{t("Total equity portofolio per minggu.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Minggu")}</th><th scope="col" className="pb-2 text-right">{t("Equity")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{equitySeries.map((point) => <tr key={point.week}><th scope="row" className="py-2 pr-4 font-semibold">{point.week}</th><td className="py-2 text-right font-medium">{formatMoney(point.equity, currency)}</td></tr>)}</tbody></table></div></details></> : <div className="mt-4 rounded-xl bg-emerald-50/70 px-5 py-8 text-center"><LineChartIcon className="mx-auto h-6 w-6 text-emerald-700" aria-hidden="true" /><p className="mt-3 text-sm font-bold">{t("Butuh dua snapshot untuk grafik")}</p><p className="mt-1 text-xs leading-5 text-slate-500">{t("Catat nilai portfolio secara rutin agar arahnya terbaca.")}</p></div>}
           </Surface>
 
           <Surface className="overflow-hidden">
             <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><h2 className="text-base font-bold">{t("Posisi saat ini")}</h2><p className="mt-1 text-xs text-slate-500">{t("Cost basis dari seluruh eksekusi tercatat.")}</p></div>
-            {loading ? <InvestmentSkeleton /> : openPositions.length === 0 ? <EmptyState icon={BarChart3} title={t("Belum ada posisi")} description={t("Catat pembelian pertama untuk mulai menghitung jumlah, rata-rata, dan cost basis.")} action={accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat pembelian")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{openPositions.map((position) => <PositionRow key={position.ticker} ticker={position.ticker} summary={position.summary} />)}</div>}
+            {loading ? <InvestmentSkeleton /> : openPositions.length === 0 ? <EmptyState icon={BarChart3} title={t("Belum ada posisi")} description={t("Catat pembelian pertama untuk mulai menghitung jumlah, rata-rata, dan cost basis.")} action={activeAccounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat pembelian")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{openPositions.map((position) => <PositionRow key={`${position.accountId}:${position.ticker}`} ticker={position.ticker} accountName={accountNames.get(position.accountId)} currency={position.currency} summary={position.summary} />)}</div>}
           </Surface>
         </div>
 
         <Surface className="overflow-hidden">
           <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="text-base font-bold">{t("Execution journal")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Jejak beli dan jual yang menjadi dasar perhitungan posisi.")}</p></div><div className="flex flex-col gap-2 sm:flex-row"><div role="group" aria-label={t("Filter arah eksekusi")} className="flex rounded-xl bg-slate-100 p-1">{(["all", "buy", "sell"] as const).map((side) => <button key={side} type="button" aria-pressed={sideFilter === side} onClick={() => setSideFilter(side)} className={cn("min-h-10 rounded-lg px-3 text-xs font-bold transition", sideFilter === side ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{side === "all" ? t("Semua") : side === "buy" ? t("Beli") : t("Jual")}</button>)}</div><label className="relative" htmlFor="execution-search"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">{t("Cari ticker atau broker")}</span><input id="execution-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("Cari ticker atau broker")} className={cn(fieldControlStyles, "pl-10 sm:w-64")} /></label></div></div></div>
-          {loading ? <InvestmentSkeleton /> : filteredExecutions.length === 0 ? <EmptyState icon={Search} title={executions.length ? t("Eksekusi tidak ditemukan") : t("Journal masih kosong")} description={executions.length ? t("Coba kata kunci atau tipe eksekusi lain.") : t("Setiap pembelian dan penjualan akan tampil kronologis di sini.")} action={!executions.length && accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat eksekusi")}</Button> : undefined} /> : <ExecutionJournal executions={filteredExecutions} accountNames={accountNames} dateLocale={dateLocale} />}
+          {loading ? <InvestmentSkeleton /> : filteredExecutions.length === 0 ? <EmptyState icon={Search} title={executions.length ? t("Eksekusi tidak ditemukan") : t("Journal masih kosong")} description={executions.length ? t("Coba kata kunci atau tipe eksekusi lain.") : t("Setiap pembelian dan penjualan akan tampil kronologis di sini.")} action={!executions.length && activeAccounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat eksekusi")}</Button> : undefined} /> : <ExecutionJournal executions={filteredExecutions} accountNames={accountNames} dateLocale={dateLocale} onEdit={editExecution} onDelete={(id) => { setFormError(null); setRecordToDelete({ kind: "execution", id }); }} />}
+        </Surface>
+
+        <Surface className="overflow-hidden">
+          <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><h2 className="text-base font-bold">{t("Riwayat equity")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Koreksi snapshot bila nilai atau waktu tercatat keliru.")}</p></div>
+          {loading ? <InvestmentSkeleton /> : snapshots.length === 0 ? <EmptyState icon={Camera} title={t("Belum ada snapshot")} description={t("Catat equity pertama untuk menyimpan riwayat nilai portfolio.")} action={activeAccounts.length ? <Button variant="secondary" onClick={openSnapshot}><Camera className="h-4 w-4" /> {t("Update equity")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{[...snapshots].reverse().map((snapshot) => <article key={snapshot.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="text-sm font-bold">{formatMoney(snapshot.equity, snapshot.currency)}</p><p className="mt-1 text-xs text-slate-500">{format(parseISO(snapshot.recorded_at), "dd MMM yyyy, HH:mm", { locale: dateLocale })} · {accountNames.get(snapshot.account_id) ?? t("Akun investasi")}</p>{snapshot.note && <p className="mt-1 text-xs leading-5 text-slate-600">{snapshot.note}</p>}</div><div className="flex gap-2"><Button variant="secondary" size="compact" onClick={() => editSnapshot(snapshot)}>{t("Edit")}</Button><Button variant="destructive" size="compact" onClick={() => { setFormError(null); setRecordToDelete({ kind: "snapshot", id: snapshot.id }); }}>{t("Hapus")}</Button></div></article>)}</div>}
         </Surface>
       </main>
 
-      {executionOpen && <ExecutionDialog accounts={accounts} form={executionForm} setForm={setExecutionForm} saving={saving} error={formError} tickerRef={tickerRef} onClose={() => !saving && setExecutionOpen(false)} onSubmit={saveExecution} />}
-      {snapshotOpen && <SnapshotDialog accounts={accounts} form={snapshotForm} setForm={setSnapshotForm} saving={saving} error={formError} onClose={() => !saving && setSnapshotOpen(false)} onSubmit={saveSnapshot} />}
+      {executionOpen && <ExecutionDialog accounts={editingExecution ? accounts : activeAccounts} form={executionForm} setForm={setExecutionForm} saving={saving} error={formError} tickerRef={tickerRef} editing={Boolean(editingExecution)} onClose={() => !saving && setExecutionOpen(false)} onSubmit={saveExecution} />}
+      {snapshotOpen && <SnapshotDialog accounts={editingSnapshot ? accounts : activeAccounts} form={snapshotForm} setForm={setSnapshotForm} saving={saving} error={formError} editing={Boolean(editingSnapshot)} onClose={() => !saving && setSnapshotOpen(false)} onSubmit={saveSnapshot} />}
+      {recordToDelete && <ConfirmDialog titleId="investment-delete-title" descriptionId="investment-delete-description" title={t(recordToDelete.kind === "execution" ? "Hapus eksekusi?" : "Hapus snapshot?")} description={t(recordToDelete.kind === "execution" ? "Eksekusi ini akan dihapus permanen dan posisi serta P/L akan dihitung ulang." : "Snapshot ini akan dihapus permanen dari riwayat equity.")} confirmLabel={t(recordToDelete.kind === "execution" ? "Hapus eksekusi" : "Hapus snapshot")} cancelLabel={t("Batal")} onClose={() => !saving && setRecordToDelete(null)} onConfirm={() => void deleteRecord()} loading={saving} error={formError} />}
     </div>
   );
 }
 
 function Metric({ label, value, hint, icon: Icon, tone = "text-slate-900" }: { label: string; value: string; hint: string; icon: typeof BarChart3; tone?: string }) { return <Surface className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{label}</p><p className={cn("mt-2 text-xl font-bold tracking-tight", tone)}>{value}</p><p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p></div><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Icon className="h-5 w-5" /></span></div></Surface>; }
 
-function PositionRow({ ticker, summary }: { ticker: string; summary: ReturnType<typeof buildInvestmentPositions>[number]["summary"] }) {
+function PositionRow({ ticker, accountName, currency, summary }: { ticker: string; accountName?: string; currency: string; summary: ReturnType<typeof buildInvestmentPositions>[number]["summary"] }) {
   const { t } = useLanguage();
   return (
     <article className="p-4 sm:px-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="font-mono text-lg font-bold">{ticker}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{t("{count} lembar", { count: summary.quantity.toLocaleString("id-ID") })}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{accountName ?? t("Akun investasi")} · {t("{count} lembar", { count: summary.quantity.toLocaleString("id-ID") })}</p>
         </div>
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", summary.realizedPnl >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>
-          {formatSignedIdr(summary.realizedPnl)} {t("realized")}
+          {formatSignedMoney(summary.realizedPnl, currency)} {t("realized")}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
         <div>
           <p className="text-slate-400">{t("Rata-rata")}</p>
-          <p className="mt-1 font-bold">{formatIdr(summary.averageCost)}</p>
+          <p className="mt-1 font-bold">{formatMoney(summary.averageCost, currency)}</p>
         </div>
         <div>
           <p className="text-slate-400">{t("Cost basis")}</p>
-          <p className="mt-1 font-bold">{formatIdr(summary.costBasis)}</p>
+          <p className="mt-1 font-bold">{formatMoney(summary.costBasis, currency)}</p>
         </div>
       </div>
       {summary.oversoldQuantity > 0 && (
@@ -219,7 +284,7 @@ function PositionRow({ ticker, summary }: { ticker: string; summary: ReturnType<
   );
 }
 
-function ExecutionJournal({ executions, accountNames, dateLocale }: { executions: Execution[]; accountNames: ReadonlyMap<string, string>; dateLocale: typeof idLocale }) {
+function ExecutionJournal({ executions, accountNames, dateLocale, onEdit, onDelete }: { executions: Execution[]; accountNames: ReadonlyMap<string, string>; dateLocale: typeof idLocale; onEdit: (execution: Execution) => void; onDelete: (id: string) => void }) {
   const { t } = useLanguage();
   return (
     <div>
@@ -233,6 +298,7 @@ function ExecutionJournal({ executions, accountNames, dateLocale }: { executions
               <th className="px-4 py-3">{t("Jumlah")}</th>
               <th className="px-4 py-3">{t("Harga")}</th>
               <th className="px-5 py-3 text-right">{t("Nilai + biaya")}</th>
+              <th className="px-5 py-3 text-right"><span className="sr-only">{t("Aksi")}</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -250,6 +316,7 @@ function ExecutionJournal({ executions, accountNames, dateLocale }: { executions
                   <p className="text-sm font-bold">{formatMoney(Number(item.quantity) * Number(item.price), item.currency)}</p>
                   <p className="mt-0.5 text-xs text-slate-400">{t("Biaya")} {formatMoney(item.fee, item.currency)}</p>
                 </td>
+                <td className="px-5 py-4"><div className="flex justify-end gap-2"><Button variant="secondary" size="compact" onClick={() => onEdit(item)}>{t("Edit")}</Button><Button variant="destructive" size="compact" onClick={() => onDelete(item.id)}>{t("Hapus")}</Button></div></td>
               </tr>
             ))}
           </tbody>
@@ -276,6 +343,7 @@ function ExecutionJournal({ executions, accountNames, dateLocale }: { executions
               </div>
             </div>
             <p className="text-xs text-slate-500">{item.account_id ? accountNames.get(item.account_id) ?? t("Akun investasi") : t("Akun investasi")} · {t("Biaya")} {formatMoney(item.fee, item.currency)}</p>
+            <div className="flex gap-2"><Button variant="secondary" size="compact" onClick={() => onEdit(item)}>{t("Edit")}</Button><Button variant="destructive" size="compact" onClick={() => onDelete(item.id)}>{t("Hapus")}</Button></div>
           </article>
         ))}
       </div>
@@ -288,15 +356,15 @@ function SideBadge({ side }: { side: "buy" | "sell" }) {
   return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-bold", side === "buy" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{side === "buy" ? t("Beli") : t("Jual")}</span>;
 }
 
-function ExecutionDialog({ accounts, form, setForm, saving, error, tickerRef, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createExecutionForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createExecutionForm>>>; saving: boolean; error: string | null; tickerRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function ExecutionDialog({ accounts, form, setForm, saving, error, tickerRef, editing, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createExecutionForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createExecutionForm>>>; saving: boolean; error: string | null; tickerRef: React.RefObject<HTMLInputElement | null>; editing: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useLanguage();
   return (
-    <Dialog title={t("Catat eksekusi")} eyebrow={t("Execution journal")} description={t("Simpan detail sesuai trade confirmation broker.")} saving={saving} initialFocusRef={tickerRef} onClose={onClose}>
+    <Dialog title={t(editing ? "Edit eksekusi" : "Catat eksekusi")} eyebrow={t("Execution journal")} description={t("Simpan detail sesuai trade confirmation broker.")} saving={saving} initialFocusRef={tickerRef} onClose={onClose}>
       <form onSubmit={onSubmit}>
         <div className="space-y-4 px-5 py-5 sm:px-6">
           <Field label={t("Akun investasi")} htmlFor="execution-account">
             <select id="execution-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
+              {accounts.filter((account) => account.is_active || account.id === form.accountId).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
             </select>
           </Field>
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
@@ -330,21 +398,21 @@ function ExecutionDialog({ accounts, form, setForm, saving, error, tickerRef, on
           </Field>
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
         </div>
-        <DialogActions saving={saving} onClose={onClose} label={t("Simpan eksekusi")} />
+        <DialogActions saving={saving} onClose={onClose} label={t(editing ? "Simpan perubahan" : "Simpan eksekusi")} />
       </form>
     </Dialog>
   );
 }
 
-function SnapshotDialog({ accounts, form, setForm, saving, error, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createSnapshotForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createSnapshotForm>>>; saving: boolean; error: string | null; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function SnapshotDialog({ accounts, form, setForm, saving, error, editing, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createSnapshotForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createSnapshotForm>>>; saving: boolean; error: string | null; editing: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useLanguage();
   return (
-    <Dialog title={t("Update equity")} eyebrow={t("Portfolio snapshot")} description={t("Catat total nilai akun, termasuk kas broker dan nilai saham.")} saving={saving} onClose={onClose}>
+    <Dialog title={t(editing ? "Edit snapshot" : "Update equity")} eyebrow={t("Portfolio snapshot")} description={t("Catat total nilai akun, termasuk kas broker dan nilai saham.")} saving={saving} onClose={onClose}>
       <form onSubmit={onSubmit}>
         <div className="space-y-4 px-5 py-5 sm:px-6">
           <Field label={t("Akun investasi")} htmlFor="snapshot-account">
             <select id="snapshot-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
+              {accounts.filter((account) => account.is_active || account.id === form.accountId).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
             </select>
           </Field>
           <Field label={t("Total equity")} htmlFor="snapshot-equity" hint={t("Gunakan mata uang akun yang dipilih.")}>
@@ -358,7 +426,7 @@ function SnapshotDialog({ accounts, form, setForm, saving, error, onClose, onSub
           </Field>
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
         </div>
-        <DialogActions saving={saving} onClose={onClose} label={t("Simpan snapshot")} />
+        <DialogActions saving={saving} onClose={onClose} label={t(editing ? "Simpan perubahan" : "Simpan snapshot")} />
       </form>
     </Dialog>
   );
@@ -394,6 +462,11 @@ function DialogActions({ saving, onClose, label }: { saving: boolean; onClose: (
   );
 }
 function InvestmentSkeleton() { return <div className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-20 bg-slate-50/60" />)}</div>; }
-function formatIdr(value: number) { return `Rp${Math.abs(Number(value)).toLocaleString("id-ID")}`; }
-function formatSignedIdr(value: number) { return `${value >= 0 ? "+" : "−"}${formatIdr(value)}`; }
-function formatMoney(value: number, currency: string) { return currency === "IDR" ? formatIdr(Number(value)) : `${currency} ${Number(value).toLocaleString("id-ID", { maximumFractionDigits: 4 })}`; }
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "IDR" ? 0 : 4,
+  }).format(Math.abs(Number(value)));
+}
+function formatSignedMoney(value: number, currency: string) { return `${value >= 0 ? "+" : "−"}${formatMoney(value, currency)}`; }

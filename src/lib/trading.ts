@@ -109,6 +109,13 @@ export function calculateTradingJournalMetrics(trades: readonly ForexJournalTrad
   };
 }
 
+export function filterForexTradesByCurrency<T extends { currency: string }>(
+  trades: readonly T[],
+  currency: string,
+) {
+  return trades.filter((trade) => trade.currency === currency);
+}
+
 export function filterForexTrades<T extends ForexJournalTrade>(
   trades: readonly T[],
   filters: { status: "all" | ForexJournalTrade["status"]; search: string },

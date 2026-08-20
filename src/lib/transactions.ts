@@ -32,6 +32,14 @@ export function validateTransactionForm(form: { accountId: string; amount: strin
   return null;
 }
 
+export function getTransactionSaveStatus(existingStatus?: TransactionStatus) {
+  return existingStatus ?? "confirmed";
+}
+
+export function canApproveTransaction(status: TransactionStatus) {
+  return status === "pending_approval" || status === "needs_review";
+}
+
 export function getTransactionSourceLabel(source: string) {
   if (source === "telegram_text") return "Bot Telegram";
   if (source === "telegram_receipt") return "Scan struk";

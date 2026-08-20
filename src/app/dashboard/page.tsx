@@ -38,6 +38,7 @@ import Navbar from "@/components/Navbar";
 import { useOnboarding } from "@/components/OnboardingBoundary";
 import { Button } from "@/components/ui/Button";
 import { calculatePercentageChange } from "@/lib/analytics";
+import { groupTransactionAmountsByCurrency } from "@/lib/finance";
 import {
   buildCumulativeCashFlowSeries,
   calculateGoalProgress,
@@ -113,7 +114,7 @@ export default function DashboardPage() {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [firstName, setFirstName] = useState("Kamu");
   const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [previousMonthExpense, setPreviousMonthExpense] = useState(0);
+  const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Array<Pick<Transaction, "amount" | "account_id">>>([]);
   const [showBalances, setShowBalances] = useState(true);
   const [setupCardDismissed, setSetupCardDismissed] = useState(false);
 
@@ -164,7 +165,7 @@ export default function DashboardPage() {
             .order("date", { ascending: false }),
           supabase
             .from("transactions")
-            .select("type, amount")
+            .select("amount, account_id")
             .eq("user_id", user.id)
             .eq("type", "expense")
             .neq("status", "deleted")
@@ -199,10 +200,7 @@ export default function DashboardPage() {
         if (accountResult.error) throw accountResult.error;
 
         setTransactions((txResult.data || []) as Transaction[]);
-        setPreviousMonthExpense((previousResult.data || []).reduce(
-          (sum, transaction) => sum + Number(transaction.amount),
-          0,
-        ));
+        setPreviousMonthExpenses((previousResult.data || []) as Array<Pick<Transaction, "amount" | "account_id">>);
         setPendingTx((pendingResult.data || []) as Transaction[]);
         setAccounts((accountResult.data || []) as FinancialAccount[]);
 
@@ -240,22 +238,40 @@ export default function DashboardPage() {
     });
   };
 
-  const totalIncome = transactions
+  const accountCurrencies = new Map(accounts.map((account) => [account.id, account.currency]));
+  const transactionCurrencies = new Set(transactions.map((transaction) => transaction.account_id ? accountCurrencies.get(transaction.account_id) ?? "Tidak diketahui" : "Tidak diketahui"));
+  const cashFlowCurrency = transactionCurrencies.size === 1 && !transactionCurrencies.has("Tidak diketahui") ? [...transactionCurrencies][0] : null;
+  const cashFlowTransactions = cashFlowCurrency
+    ? transactions.filter((transaction) => transaction.account_id && accountCurrencies.get(transaction.account_id) === cashFlowCurrency)
+    : [];
+  const totalIncome = cashFlowTransactions
     .filter((transaction) => transaction.type === "income")
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
-  const totalExpense = transactions
+  const totalExpense = cashFlowTransactions
     .filter((transaction) => transaction.type === "expense")
     .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
   const balance = totalIncome - totalExpense;
-  const expenseChange = calculatePercentageChange(totalExpense, previousMonthExpense);
+  const previousMonthExpense = cashFlowCurrency
+    ? previousMonthExpenses
+      .filter((transaction) => transaction.account_id && accountCurrencies.get(transaction.account_id) === cashFlowCurrency)
+      .reduce((sum, transaction) => sum + Number(transaction.amount), 0)
+    : 0;
+  const expenseChange = cashFlowCurrency ? calculatePercentageChange(totalExpense, previousMonthExpense) : null;
   const daysInMonth = getDaysInMonth(selectedMonth);
   const sampleDays = [...new Set([1, 7, 13, 19, 25, daysInMonth])].filter((day) => day <= daysInMonth);
   const cashFlowData = buildCumulativeCashFlowSeries(
-    transactions.map(({ date, type, amount }) => ({ date, type, amount: Number(amount) })),
+    cashFlowTransactions.map(({ date, type, amount }) => ({ date, type, amount: Number(amount) })),
     sampleDays,
     format(selectedMonth, "MMM", { locale: id }),
   );
-  const displayIdr = (amount: number) => maskAmount(formatIdr(amount), showBalances);
+  const formatCurrency = (amount: number, currency?: string | null) => {
+    const code = currency ?? "IDR";
+    return new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { style: "currency", currency: code, maximumFractionDigits: code === "IDR" ? 0 : 2 }).format(Math.abs(amount));
+  };
+  const displayCurrency = (amount: number, currency?: string | null) => maskAmount(formatCurrency(amount, currency), showBalances);
+  const pendingByCurrency = groupTransactionAmountsByCurrency(pendingTx, accountCurrencies, ["pending_approval", "needs_review"]);
+  const pendingTotals = Object.entries(pendingByCurrency);
+  const cashFlowUnavailable = transactions.length > 0 && !cashFlowCurrency;
   const primaryGoal = goals[0];
   const goalProgress = primaryGoal
     ? calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount))
@@ -330,28 +346,44 @@ export default function DashboardPage() {
           <MobileDashboardSkeleton />
         ) : (
           <>
-            <section aria-labelledby="mobile-cash-flow-title" className={`relative mt-4 overflow-hidden rounded-[24px] px-5 py-5 text-white shadow-[0_18px_36px_rgba(23,60,50,0.20)] ${balance >= 0 ? "bg-[#173c32]" : "bg-[#542a32]"}`}>
+            <section aria-labelledby="mobile-cash-flow-title" className={`relative mt-4 overflow-hidden rounded-[24px] px-5 py-5 text-white shadow-[0_18px_36px_rgba(23,60,50,0.20)] ${cashFlowUnavailable || balance >= 0 ? "bg-[#173c32]" : "bg-[#542a32]"}`}>
               <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full border-[28px] border-white/[0.07]" />
               <div className="pointer-events-none absolute -bottom-20 right-6 h-36 w-36 rounded-full bg-white/[0.06] blur-2xl" />
               <div className="relative">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+                {cashFlowUnavailable ? (
+                  <>
                     <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">{t("Arus kas bulan ini")}</p>
-                    <p className="mt-2 text-[29px] font-extrabold tracking-[-0.05em] text-[#ffffff]">{balance < 0 ? "-" : "+"}{displayIdr(balance)}</p>
-                  </div>
-                  <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-emerald-50">
-                    {t(balance >= 0 ? "Arus kas aman" : "Butuh perhatian")}
-                  </span>
-                </div>
-                <p className="mt-1.5 max-w-[285px] text-xs leading-5 text-emerald-50/65">
-                  {t(balance >= 0 ? "Pendapatan masih lebih besar dari pengeluaran. Pertahankan ritmemu." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
-                </p>
-                <div className="mt-5 grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 pt-4">
-                  <MobileMetric icon={ArrowDownRight} label={language === "en" ? "Income" : "Masuk"} value={displayIdr(totalIncome)} />
-                  <MobileMetric icon={ArrowUpRight} label={language === "en" ? "Expenses" : "Keluar"} value={displayIdr(totalExpense)} right />
-                </div>
+                    <p className="mt-2 text-sm font-bold leading-6 text-emerald-50">{t("Ada lebih dari satu mata uang. Arus kas tidak dijumlahkan tanpa kurs.")}</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">{t("Arus kas bulan ini")} · {cashFlowCurrency}</p>
+                        <p className="mt-2 text-[29px] font-extrabold tracking-[-0.05em] text-[#ffffff]">{balance < 0 ? "-" : "+"}{displayCurrency(balance, cashFlowCurrency)}</p>
+                      </div>
+                      <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-emerald-50">
+                        {t(balance >= 0 ? "Arus kas aman" : "Butuh perhatian")}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 max-w-[285px] text-xs leading-5 text-emerald-50/65">
+                      {t(balance >= 0 ? "Pendapatan masih lebih besar dari pengeluaran. Pertahankan ritmemu." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
+                    </p>
+                    <div className="mt-5 grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 pt-4">
+                      <MobileMetric icon={ArrowDownRight} label={language === "en" ? "Income" : "Masuk"} value={displayCurrency(totalIncome, cashFlowCurrency)} />
+                      <MobileMetric icon={ArrowUpRight} label={language === "en" ? "Expenses" : "Keluar"} value={displayCurrency(totalExpense, cashFlowCurrency)} right />
+                    </div>
+                  </>
+                )}
               </div>
             </section>
+
+            {pendingTotals.length > 0 && (
+              <Link href="/transactions?status=review" className="mt-3 block rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900">
+                <strong>{t("{count} transaksi perlu ditinjau", { count: pendingTx.length })}</strong>
+                <span className="mt-1 block">{pendingTotals.map(([currency, amount]) => displayCurrency(amount, currency)).join(" · ")} · {t("semua waktu, belum masuk total terkonfirmasi")}</span>
+              </Link>
+            )}
 
             {showSetupCard && (
               <section className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-[#effaf4] px-3.5 py-3" aria-label="Progres penyiapan">
@@ -397,7 +429,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="divide-y divide-slate-100 border-t border-slate-100">
                   {recentTransactions.slice(0, 2).map((transaction) => (
-                    <MobileActivity key={transaction.id} transaction={transaction} amount={displayIdr(Number(transaction.amount))} />
+                    <MobileActivity key={transaction.id} transaction={transaction} amount={displayCurrency(Number(transaction.amount), transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined)} />
                   ))}
                 </div>
               )}
@@ -472,12 +504,18 @@ export default function DashboardPage() {
                       <h2 className={`text-lg font-bold tracking-tight ${balance >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
                         {t(balance >= 0 ? "Arus kas aman" : "Arus kas perlu perhatian")}
                       </h2>
-                      <p className={`mt-3 text-3xl font-bold tracking-[-0.045em] sm:text-[2.5rem] ${balance >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                        {balance < 0 ? "-" : "+"}{displayIdr(balance)}
-                      </p>
-                      <p className="mt-4 text-sm leading-6 text-slate-500">
-                        {t(balance >= 0 ? "Pendapatan lebih besar dari pengeluaran. Pertahankan ritme keuangan yang sehat." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
-                      </p>
+                      {cashFlowUnavailable ? (
+                        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">{t("Ada lebih dari satu mata uang. Arus kas tidak dijumlahkan tanpa kurs.")}</p>
+                      ) : (
+                        <>
+                          <p className={`mt-3 text-3xl font-bold tracking-[-0.045em] sm:text-[2.5rem] ${balance >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                            {balance < 0 ? "-" : "+"}{displayCurrency(balance, cashFlowCurrency)}
+                          </p>
+                          <p className="mt-4 text-sm leading-6 text-slate-500">
+                            {t(balance >= 0 ? "Pendapatan lebih besar dari pengeluaran. Pertahankan ritme keuangan yang sehat." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
+                          </p>
+                        </>
+                      )}
                     </div>
                     <Link href="/insights" className="mt-5 inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
                       <CircleDollarSign className="h-4 w-4" /> {t("Lihat ringkasan")}
@@ -489,11 +527,11 @@ export default function DashboardPage() {
                       <li className="flex items-center gap-2"><span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-emerald-600" />Pendapatan</li>
                       <li className="flex items-center gap-2"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-rose-500" />Pengeluaran</li>
                     </ul>
-                    {transactions.length === 0 ? (
+                    {transactions.length === 0 || cashFlowUnavailable ? (
                       <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-emerald-50/55 px-6 text-center">
                         <CircleDollarSign className="mb-2 h-7 w-7 text-emerald-600" aria-hidden="true" />
-                        <p className="font-semibold text-slate-800">Belum ada arus kas bulan ini</p>
-                        <p className="mt-1 text-xs text-slate-500">Catat transaksi pertama agar polanya mulai terlihat.</p>
+                        <p className="font-semibold text-slate-800">{cashFlowUnavailable ? t("Arus kas lintas mata uang tidak tersedia") : t("Belum ada arus kas bulan ini")}</p>
+                        <p className="mt-1 text-xs text-slate-500">{cashFlowUnavailable ? t("Pilih satu mata uang atau tambahkan kurs sebelum membandingkan nilai.") : t("Catat transaksi pertama agar polanya mulai terlihat.")}</p>
                       </div>
                     ) : (
                       <>
@@ -503,11 +541,11 @@ export default function DashboardPage() {
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart data={cashFlowData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
                                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
-                                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => `${Math.round(Number(value) / 1_000_000)}jt`} />
+                                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} />
                                 <Tooltip
                                   cursor={{ stroke: "#d1fae5", strokeWidth: 1 }}
                                   contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }}
-                                  formatter={(value) => formatIdr(Number(value || 0))}
+                                  formatter={(value) => formatCurrency(Number(value || 0), cashFlowCurrency)}
                                 />
                                 <Line type="monotone" dataKey="income" name="Pemasukan" stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
                                 <Line type="monotone" dataKey="expense" name="Pengeluaran" stroke="#fb7185" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
@@ -527,8 +565,8 @@ export default function DashboardPage() {
                                 {cashFlowData.map((point) => (
                                   <tr key={point.day}>
                                     <th scope="row" className="py-2 pr-4 font-semibold">{point.label}</th>
-                                    <td className="py-2 pr-4 text-right font-medium">{displayIdr(point.income)}</td>
-                                    <td className="py-2 text-right font-medium">{displayIdr(point.expense)}</td>
+                                    <td className="py-2 pr-4 text-right font-medium">{displayCurrency(point.income, cashFlowCurrency)}</td>
+                                    <td className="py-2 text-right font-medium">{displayCurrency(point.expense, cashFlowCurrency)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -538,8 +576,8 @@ export default function DashboardPage() {
                       </>
                     )}
                     <div className="mt-5 grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 pt-4">
-                      <CompactMetric icon={ArrowUpRight} label="Pendapatan" value={displayIdr(totalIncome)} detail={`${transactions.filter((item) => item.type === "income").length} transaksi masuk`} tone="emerald" />
-                      <CompactMetric icon={ArrowDownRight} label="Pengeluaran" value={displayIdr(totalExpense)} detail={expenseChange === null ? "Belum ada pembanding" : `${expenseChange > 0 ? "+" : ""}${expenseChange}% vs bulan lalu`} tone="rose" />
+                      <CompactMetric icon={ArrowUpRight} label="Pendapatan" value={cashFlowUnavailable ? "—" : displayCurrency(totalIncome, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : `${cashFlowTransactions.filter((item) => item.type === "income").length} transaksi masuk`} tone="emerald" />
+                      <CompactMetric icon={ArrowDownRight} label="Pengeluaran" value={cashFlowUnavailable ? "—" : displayCurrency(totalExpense, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : expenseChange === null ? t("Belum ada pembanding") : `${expenseChange > 0 ? "+" : ""}${expenseChange}% vs bulan lalu`} tone="rose" />
                     </div>
                   </div>
                 </div>
@@ -576,7 +614,7 @@ export default function DashboardPage() {
                           </div>
                           <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{transaction.category}</span>
                           <span className={`text-sm font-bold sm:text-right ${transaction.type === "income" ? "text-emerald-700" : "text-slate-800"}`}>
-                            {transaction.type === "income" ? "+" : "-"}{displayIdr(Number(transaction.amount))}
+                            {transaction.type === "income" ? "+" : "-"}{displayCurrency(Number(transaction.amount), transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined)}
                           </span>
                         </div>
                       ))}
@@ -598,8 +636,8 @@ export default function DashboardPage() {
                 <AttentionRow
                   icon={pendingTx.length > 0 ? ReceiptText : CheckCircle2}
                   title={pendingTx.length > 0 ? `${pendingTx.length} transaksi perlu ditinjau` : "Semua transaksi sudah ditinjau"}
-                  detail={pendingTx.length > 0 ? "Pastikan kategori dan nominalnya benar." : "Tidak ada approval yang tertunda."}
-                  href="/transactions"
+                  detail={pendingTx.length > 0 ? `${Object.entries(pendingByCurrency).map(([currency, amount]) => formatCurrency(amount, currency)).join(" · ")} · ${t("semua waktu, belum masuk total terkonfirmasi")}` : "Tidak ada approval yang tertunda."}
+                  href="/transactions?status=review"
                   tone={pendingTx.length > 0 ? "amber" : "emerald"}
                 />
                 <AttentionRow

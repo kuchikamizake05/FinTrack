@@ -24,10 +24,15 @@ export function buildWeeklyEquitySeries(snapshots: readonly EquitySnapshotInput[
     .map(([week, snapshot]) => ({ week, equity: snapshot.equity }));
 }
 
-export function buildPortfolioWeeklyEquitySeries(snapshots: readonly Required<EquitySnapshotInput>[]) {
-  const latestByAccountWeek = new Map<string, Required<EquitySnapshotInput>>();
+export type PortfolioEquitySnapshotInput = Required<EquitySnapshotInput> & { currency: string };
+
+export function buildPortfolioWeeklyEquitySeries(
+  snapshots: readonly PortfolioEquitySnapshotInput[],
+  currency: string,
+) {
+  const latestByAccountWeek = new Map<string, PortfolioEquitySnapshotInput>();
   for (const snapshot of snapshots) {
-    if (!Number.isFinite(Number(snapshot.equity)) || Number.isNaN(new Date(snapshot.recordedAt).getTime())) continue;
+    if (snapshot.currency !== currency || !Number.isFinite(Number(snapshot.equity)) || Number.isNaN(new Date(snapshot.recordedAt).getTime())) continue;
     const key = `${getIsoWeekKey(snapshot.recordedAt)}:${snapshot.accountId}`;
     const current = latestByAccountWeek.get(key);
     if (!current || new Date(snapshot.recordedAt) > new Date(current.recordedAt)) latestByAccountWeek.set(key, { ...snapshot, equity: Number(snapshot.equity) });

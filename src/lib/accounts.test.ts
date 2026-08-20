@@ -141,6 +141,15 @@ describe("account form validation", () => {
     });
   });
 
+  it("accepts any uppercase ISO-style three-letter currency", () => {
+    expect(validateAccountForm({
+      name: "Euro wallet",
+      currency: "EUR",
+      currentBalance: "20",
+      reportingBalanceIdr: "350000",
+    })).toEqual({ valid: true, errors: {} });
+  });
+
   it("requires valid source, destination, amount, currencies, and date for transfers", () => {
     expect(validateTransferForm({
       sourceAccountId: "jago",

@@ -3,6 +3,7 @@ import {
   buildBudgetProgress,
   buildFinancialAlerts,
   buildReconciliation,
+  getIdrBudgetScope,
   buildRecurringTransactionDraft,
   parseTransactionCsv,
   serializeTransactionsCsv,
@@ -20,6 +21,16 @@ describe("financial control helpers", () => {
 
   it("creates the next recurring transaction without changing its schedule", () => {
     expect(buildRecurringTransactionDraft({ merchant: "Netflix", category: "Tagihan", amount: 65_000, type: "expense", accountId: "a1", nextRunDate: "2026-08-20", interval: "monthly" })).toEqual({ date: "2026-08-20", merchant: "Netflix", category: "Tagihan", amount: 65_000, type: "expense", accountId: "a1", source: "recurring" });
+  });
+
+  it("keeps budgets IDR-only and discloses excluded spending", () => {
+    const scope = getIdrBudgetScope([
+      { ...transactions[0], account_id: "idr" },
+      { ...transactions[1], account_id: "usd", status: "confirmed" as const },
+    ], new Map([["idr", "IDR"], ["usd", "USD"]]));
+
+    expect(scope.idrTransactions).toHaveLength(1);
+    expect(scope.excludedExpenseCount).toBe(1);
   });
 
   it("exports data safely and imports a valid user-editable CSV", () => {

@@ -14,9 +14,11 @@ export function formatLocalDateTime(date: Date) {
 export function getPlanningDateContext(date: Date) {
   const today = formatLocalDate(date);
   const monthKey = today.slice(0, 7);
+  const nextMonth = formatLocalDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
   return {
     today,
     month: `${monthKey}-01`,
     monthKey,
+    nextMonth,
   };
 }

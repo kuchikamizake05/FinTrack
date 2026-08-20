@@ -15,3 +15,15 @@ export function validateSharedReceiptFile(file: Pick<File, "type" | "size" | "na
   if (file.size > maxFileSize) return "Ukuran bukti maksimal 10 MB.";
   return null;
 }
+
+export function getPrivateReceiptObjectPath(receiptUrl: string | null | undefined, userId: string) {
+  const prefix = `receipts/${userId}/`;
+  if (!receiptUrl?.startsWith(prefix)) return null;
+
+  const objectPath = receiptUrl.slice("receipts/".length);
+  if (!objectPath || objectPath.split("/").some((segment) => !segment || segment === "." || segment === "..")) {
+    return null;
+  }
+
+  return objectPath;
+}

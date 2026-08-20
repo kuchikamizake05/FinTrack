@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canApproveTransaction,
+  getTransactionSaveStatus,
   getTransactionSourceLabel,
   getTransactionStatusLabel,
   hasActiveTransactionFilters,
@@ -89,6 +91,16 @@ describe("transaction presentation helpers", () => {
     expect(getTransactionSourceLabel("recurring")).toBe("Jadwal berulang");
     expect(getTransactionStatusLabel("pending_approval")).toBe("Perlu persetujuan");
     expect(getTransactionStatusLabel("needs_review")).toBe("Perlu ditinjau");
+  });
+
+  it("preserves review status until explicit approval", () => {
+    expect(getTransactionSaveStatus("needs_review")).toBe("needs_review");
+    expect(getTransactionSaveStatus("pending_approval")).toBe("pending_approval");
+    expect(getTransactionSaveStatus()).toBe("confirmed");
+    expect(canApproveTransaction("needs_review")).toBe(true);
+    expect(canApproveTransaction("pending_approval")).toBe(true);
+    expect(canApproveTransaction("confirmed")).toBe(false);
+    expect(canApproveTransaction("deleted")).toBe(false);
   });
 
 });

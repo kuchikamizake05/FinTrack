@@ -16,7 +16,7 @@ export type TransactionFilters = {
   search: string;
   category: string;
   type: "all" | TransactionType;
-  status: "all" | "active" | TransactionStatus;
+  status: "all" | "active" | "review" | TransactionStatus;
   startDate: string;
   endDate: string;
 };
@@ -49,6 +49,22 @@ export function buildCategoryTotals(transactions: readonly FinanceTransaction[])
   }, {});
 }
 
+export function groupTransactionAmountsByCurrency<T extends Pick<FinanceTransaction, "amount" | "status"> & { account_id: string | null }>(
+  transactions: readonly T[],
+  accountCurrencies: ReadonlyMap<string, string>,
+  statuses: readonly TransactionStatus[],
+) {
+  const includedStatuses = new Set(statuses);
+  return transactions.reduce<Record<string, number>>((totals, transaction) => {
+    if (!includedStatuses.has(transaction.status)) return totals;
+    const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined;
+    const key = currency ?? "Tidak diketahui";
+    const amount = Number(transaction.amount);
+    if (Number.isFinite(amount)) totals[key] = (totals[key] ?? 0) + amount;
+    return totals;
+  }, {});
+}
+
 export function filterTransactions<T extends FinanceTransaction>(
   transactions: readonly T[],
   filters: TransactionFilters,
@@ -57,7 +73,8 @@ export function filterTransactions<T extends FinanceTransaction>(
 
   return transactions.filter((transaction) => {
     if (filters.status === "active" && transaction.status === "deleted") return false;
-    if (filters.status !== "all" && filters.status !== "active" && transaction.status !== filters.status) return false;
+    if (filters.status === "review" && transaction.status !== "pending_approval" && transaction.status !== "needs_review") return false;
+    if (filters.status !== "all" && filters.status !== "active" && filters.status !== "review" && transaction.status !== filters.status) return false;
     if (filters.type !== "all" && transaction.type !== filters.type) return false;
     if (filters.category !== "all" && transaction.category !== filters.category) return false;
     if (filters.startDate && transaction.date < filters.startDate) return false;

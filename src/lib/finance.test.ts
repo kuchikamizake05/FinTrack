@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildCategoryTotals, calculateSummary, filterTransactions } from "./finance";
+import {
+  buildCategoryTotals,
+  calculateSummary,
+  filterTransactions,
+  groupTransactionAmountsByCurrency,
+} from "./finance";
 
 const transactions = [
   { id: "1", date: "2026-07-01", type: "expense" as const, category: "Makanan & Minuman", amount: 25_000, status: "confirmed" as const, merchant: "Kopi" },
@@ -26,5 +31,21 @@ describe("finance helpers", () => {
       startDate: "2026-07-01",
       endDate: "2026-07-01",
     }).map((transaction) => transaction.id)).toEqual(["1"]);
+    expect(filterTransactions(transactions, {
+      search: "",
+      type: "all",
+      category: "all",
+      status: "review",
+      startDate: "",
+      endDate: "",
+    }).map((transaction) => transaction.id)).toEqual(["3"]);
+  });
+
+  it("groups review money by currency without conversion", () => {
+    const currencyByAccount = new Map([["account-idr", "IDR"], ["account-usd", "USD"]]);
+    expect(groupTransactionAmountsByCurrency([
+      { ...transactions[2], account_id: "account-idr" },
+      { ...transactions[2], id: "5", amount: 20, status: "needs_review" as const, account_id: "account-usd" },
+    ], currencyByAccount, ["pending_approval", "needs_review"])).toEqual({ IDR: 15_000, USD: 20 });
   });
 });

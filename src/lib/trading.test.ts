@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateForexRMultiple, calculateTradingJournalMetrics, filterForexTrades, summarizeStockPosition, validateForexTradeForm } from "./trading";
+import { calculateForexRMultiple, calculateTradingJournalMetrics, filterForexTrades, filterForexTradesByCurrency, summarizeStockPosition, validateForexTradeForm } from "./trading";
 
 describe("summarizeStockPosition", () => {
   it("tracks weighted-average cost basis and realized profit after a partial sale", () => {
@@ -53,9 +53,21 @@ describe("trading journal", () => {
     expect(filterForexTrades(trades, { status: "closed", search: "reversal" }).map((trade) => trade.symbol)).toEqual(["XAUUSD"]);
   });
 
+  it("keeps unlike-currency trades out of scoped metrics", () => {
+    const scoped = filterForexTradesByCurrency([
+      { ...trades[0], currency: "USD" },
+      { ...trades[1], currency: "IDR" },
+    ], "USD");
+    expect(calculateTradingJournalMetrics(scoped)).toMatchObject({ closed: 1, pnl: 200 });
+  });
+
   it("requires exit data for a closed trade", () => {
     const base = { accountId: "broker", symbol: "EURUSD", lotSize: "0.1", entryPrice: "1.1", commission: "0", swap: "0", grossPnl: "20", exitPrice: "", stopLoss: "1", takeProfit: "1.2", riskAmount: "10", openedAt: "2026-01-01T10:00", closedAt: "" };
     expect(validateForexTradeForm({ ...base, status: "closed" })).toBeTruthy();
     expect(validateForexTradeForm({ ...base, status: "closed", exitPrice: "1.2", closedAt: "2026-01-01T11:00" })).toBeNull();
+  });
+
+  it("allows correction form for an open trade without close data", () => {
+    expect(validateForexTradeForm({ accountId: "broker", symbol: "EURUSD", status: "open", lotSize: "0.1", entryPrice: "1.1", commission: "0", swap: "0", grossPnl: "0", exitPrice: "", stopLoss: "", takeProfit: "", riskAmount: "", openedAt: "2026-01-01T10:00", closedAt: "" })).toBeNull();
   });
 });

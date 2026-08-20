@@ -13,7 +13,7 @@ export default function TradingAnalytics({ trades, snapshots, currency = "USD" }
   const { t } = useLanguage();
   const closedTrades = trades.filter((trade) => trade.status === "closed");
   const performance = calculateTradingPerformance(closedTrades.map((trade) => ({ netPnl: Number(trade.net_pnl) })));
-  const equitySeries = buildPortfolioWeeklyEquitySeries(snapshots.map((snapshot) => ({ accountId: snapshot.account_id, recordedAt: snapshot.recorded_at, equity: Number(snapshot.equity) })));
+  const equitySeries = buildPortfolioWeeklyEquitySeries(snapshots.map((snapshot) => ({ accountId: snapshot.account_id, recordedAt: snapshot.recorded_at, equity: Number(snapshot.equity), currency })), currency);
   return (
     <section className="grid gap-4 xl:grid-cols-[1.45fr_0.9fr]">
       <Surface className="p-5">

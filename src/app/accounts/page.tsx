@@ -31,6 +31,7 @@ import {
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DialogFrame as AccessibleDialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
@@ -100,7 +101,27 @@ const createTransferForm = () => ({
 type AccountFormState = typeof emptyAccountForm;
 type TransferFormState = ReturnType<typeof createTransferForm>;
 type BalanceFormState = { currentBalance: string; reportingBalanceIdr: string };
+type TransferRecord = {
+  id: string;
+  source_account_id: string;
+  destination_account_id: string;
+  amount: number;
+  destination_amount: number;
+  currency: string;
+  destination_currency: string;
+  date: string;
+  note: string | null;
+};
+type ReconciliationRecord = {
+  id: string;
+  account_id: string;
+  statement_balance: number;
+  ledger_balance: number;
+  reconciled_at: string;
+  note: string | null;
+};
 type DialogKind = "account" | "transfer" | "balance" | null;
+type AccountDialogMode = "create" | "edit";
 
 const idrFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -120,6 +141,8 @@ export default function AccountsPage() {
   const { language, t } = useLanguage();
   const dateLocale = language === "en" ? enUS : idLocale;
   const [accounts, setAccounts] = useState<AccountOverviewRecord[]>([]);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [reconciliations, setReconciliations] = useState<ReconciliationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -128,6 +151,8 @@ export default function AccountsPage() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>(null);
   const [activeFilter, setActiveFilter] = useState<AccountFilter>("all");
   const [balanceAccount, setBalanceAccount] = useState<AccountOverviewRecord | null>(null);
+  const [editingAccount, setEditingAccount] = useState<AccountOverviewRecord | null>(null);
+  const [accountToToggle, setAccountToToggle] = useState<AccountOverviewRecord | null>(null);
   const [accountForm, setAccountForm] = useState<AccountFormState>(emptyAccountForm);
   const [transferForm, setTransferForm] = useState<TransferFormState>(createTransferForm);
   const [balanceForm, setBalanceForm] = useState<BalanceFormState>({ currentBalance: "", reportingBalanceIdr: "" });
@@ -142,14 +167,31 @@ export default function AccountsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error } = await supabase
-        .from("financial_accounts")
-        .select("id, name, institution, kind, currency, current_balance, reporting_balance_idr, is_active, updated_at")
-        .eq("user_id", user.id)
-        .order("is_active", { ascending: false })
-        .order("name", { ascending: true });
+      const [accountsResult, transfersResult, reconciliationsResult] = await Promise.all([
+        supabase
+          .from("financial_accounts")
+          .select("id, name, institution, kind, currency, current_balance, reporting_balance_idr, is_active, updated_at")
+          .eq("user_id", user.id)
+          .order("is_active", { ascending: false })
+          .order("name", { ascending: true }),
+        supabase
+          .from("account_transfers")
+          .select("id, source_account_id, destination_account_id, amount, destination_amount, currency, destination_currency, date, note")
+          .eq("user_id", user.id)
+          .order("date", { ascending: false })
+          .limit(5),
+        supabase
+          .from("account_reconciliations")
+          .select("id, account_id, statement_balance, ledger_balance, reconciled_at, note")
+          .eq("user_id", user.id)
+          .order("reconciled_at", { ascending: false })
+          .limit(5),
+      ]);
+      const error = accountsResult.error || transfersResult.error || reconciliationsResult.error;
       if (error) throw error;
-      setAccounts((data ?? []) as AccountOverviewRecord[]);
+      setAccounts((accountsResult.data ?? []) as AccountOverviewRecord[]);
+      setTransfers((transfersResult.data ?? []) as TransferRecord[]);
+      setReconciliations((reconciliationsResult.data ?? []) as ReconciliationRecord[]);
     } catch (error) {
       reportHandledError("Accounts unavailable", error, "Data akun belum berhasil dimuat.");
       setPageError(t("Data akun belum berhasil dimuat. Coba lagi beberapa saat lagi."));
@@ -166,6 +208,7 @@ export default function AccountsPage() {
   const closeDialog = useCallback(() => {
     if (saving) return;
     setActiveDialog(null);
+    setEditingAccount(null);
     setFormError(null);
     setFormErrors({});
     window.setTimeout(() => lastTriggerRef.current?.focus(), 0);
@@ -185,10 +228,33 @@ export default function AccountsPage() {
 
   function openAccountDialog() {
     rememberTrigger();
+    setEditingAccount(null);
     setAccountForm(emptyAccountForm);
     setFormError(null);
     setFormErrors({});
     setActiveDialog("account");
+  }
+
+  function openEditAccountDialog(account: AccountOverviewRecord) {
+    rememberTrigger();
+    setEditingAccount(account);
+    setAccountForm({
+      name: account.name,
+      institution: account.institution ?? "",
+      kind: account.kind,
+      currency: account.currency,
+      currentBalance: String(account.current_balance),
+      reportingBalanceIdr: account.reporting_balance_idr === null ? "" : String(account.reporting_balance_idr),
+    });
+    setFormError(null);
+    setFormErrors({});
+    setActiveDialog("account");
+  }
+
+  function openAccountToggleDialog(account: AccountOverviewRecord) {
+    rememberTrigger();
+    setFormError(null);
+    setAccountToToggle(account);
   }
 
   function openTransferDialog() {
@@ -228,23 +294,54 @@ export default function AccountsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sesi login tidak ditemukan.");
       const reportingBalanceIdr = accountForm.reportingBalanceIdr.trim() ? Number(accountForm.reportingBalanceIdr) : null;
-      const { error } = await supabase.from("financial_accounts").insert({
-        user_id: user.id,
-        name: accountForm.name.trim(),
-        institution: accountForm.institution.trim() || null,
-        kind: accountForm.kind,
-        currency: accountForm.currency,
-        current_balance: Number(accountForm.currentBalance),
-        reporting_balance_idr: accountForm.currency === "IDR" ? null : reportingBalanceIdr,
-      });
+      const identity = { name: accountForm.name.trim(), institution: accountForm.institution.trim() || null };
+      const { error } = editingAccount
+        ? await supabase.from("financial_accounts").update(identity).eq("id", editingAccount.id).eq("user_id", user.id)
+        : await supabase.from("financial_accounts").insert({
+          user_id: user.id,
+          ...identity,
+          kind: accountForm.kind,
+          currency: accountForm.currency.toUpperCase(),
+          current_balance: Number(accountForm.currentBalance),
+          reporting_balance_idr: accountForm.currency === "IDR" ? null : reportingBalanceIdr,
+        });
       if (error) throw error;
       setActiveDialog(null);
+      setEditingAccount(null);
       setAccountForm(emptyAccountForm);
       await loadAccounts();
       window.setTimeout(() => lastTriggerRef.current?.focus(), 0);
     } catch (error) {
       reportHandledError("Account save failed", error, "Akun belum berhasil disimpan.");
       setFormError(t("Akun belum berhasil disimpan. Coba lagi."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleAccountActive() {
+    if (!accountToToggle) return;
+    if (!canWriteOnline()) {
+      setFormError(t(offlineWriteMessage));
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesi login tidak ditemukan.");
+      const { error } = await supabase
+        .from("financial_accounts")
+        .update({ is_active: !accountToToggle.is_active })
+        .eq("id", accountToToggle.id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setAccountToToggle(null);
+      await loadAccounts();
+      window.setTimeout(() => lastTriggerRef.current?.focus(), 0);
+    } catch (error) {
+      reportHandledError("Account lifecycle update failed", error, "Status akun belum berhasil diperbarui.");
+      setFormError(t("Status akun belum berhasil diperbarui. Coba lagi."));
     } finally {
       setSaving(false);
     }
@@ -435,9 +532,16 @@ export default function AccountsPage() {
                   action={<Button variant="secondary" onClick={() => setActiveFilter("all")}>{t("Lihat semua akun")}</Button>}
                 />
               ) : (
-                <AccountLedger accounts={filteredAccounts} onUpdateBalance={openBalanceDialog} dateLocale={dateLocale} />
+                <AccountLedger accounts={filteredAccounts} onUpdateBalance={openBalanceDialog} onEdit={openEditAccountDialog} onToggleActive={openAccountToggleDialog} dateLocale={dateLocale} />
               )}
             </Surface>
+
+            <AccountHistory
+              accounts={accounts}
+              transfers={transfers}
+              reconciliations={reconciliations}
+              dateLocale={dateLocale}
+            />
           </>
         )}
       </main>
@@ -446,12 +550,27 @@ export default function AccountsPage() {
         <AccountDialog
           form={accountForm}
           setForm={setAccountForm}
+          mode={editingAccount ? "edit" : "create"}
           errors={formErrors}
           error={formError}
           saving={saving}
           nameInputRef={nameInputRef}
           onClose={closeDialog}
           onSubmit={saveAccount}
+        />
+      )}
+      {accountToToggle && (
+        <ConfirmDialog
+          titleId="account-lifecycle-title"
+          descriptionId="account-lifecycle-description"
+          title={t(accountToToggle.is_active ? "Arsipkan {name}?" : "Aktifkan kembali {name}?", { name: accountToToggle.name })}
+          description={t(accountToToggle.is_active ? "Akun akan disembunyikan dari transaksi, transfer, dan entri baru. Riwayat tetap utuh." : "Akun akan tersedia lagi untuk transaksi, transfer, dan entri baru.")}
+          confirmLabel={t(accountToToggle.is_active ? "Arsipkan akun" : "Aktifkan akun")}
+          cancelLabel={t("Batal")}
+          onClose={() => { if (!saving) setAccountToToggle(null); }}
+          onConfirm={() => void toggleAccountActive()}
+          loading={saving}
+          error={formError}
         />
       )}
       {activeDialog === "transfer" && (
@@ -526,18 +645,18 @@ function OverviewMetric({ icon, label, value, tone = "neutral" }: { icon: ReactN
   );
 }
 
-function AccountLedger({ accounts, onUpdateBalance, dateLocale }: { accounts: AccountOverviewRecord[]; onUpdateBalance: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountLedger({ accounts, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { accounts: AccountOverviewRecord[]; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <>
       <div className="hidden md:block">
         <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,1fr)_auto] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
-          <span>{t("Akun")}</span><span>{t("Jenis")}</span><span className="text-right">{t("Saldo")}</span><span className="w-32 text-right">{t("Aksi")}</span>
+          <span>{t("Akun")}</span><span>{t("Jenis")}</span><span className="text-right">{t("Saldo")}</span><span className="w-56 text-right">{t("Aksi")}</span>
         </div>
-        {accounts.map((account) => <AccountRow key={account.id} account={account} onUpdateBalance={onUpdateBalance} dateLocale={dateLocale} />)}
+        {accounts.map((account) => <AccountRow key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} dateLocale={dateLocale} />)}
       </div>
       <div className="divide-y divide-slate-100 md:hidden">
-        {accounts.map((account) => <AccountCard key={account.id} account={account} onUpdateBalance={onUpdateBalance} dateLocale={dateLocale} />)}
+        {accounts.map((account) => <AccountCard key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} dateLocale={dateLocale} />)}
       </div>
     </>
   );
@@ -576,19 +695,19 @@ function AccountBalance({ account, align = "right" }: { account: AccountOverview
   );
 }
 
-function AccountRow({ account, onUpdateBalance, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountRow({ account, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <article className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,1fr)_auto] items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-emerald-50/35">
       <AccountIdentity account={account} dateLocale={dateLocale} />
       <div><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))} · {account.currency}</span></div>
       <AccountBalance account={account} />
-      <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)} className="w-32">{t("Perbarui saldo")}</Button>
+      <div className="flex w-56 justify-end gap-1"><Button variant="ghost" size="compact" onClick={() => onEdit(account)}>{t("Edit")}</Button>{account.is_active && <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)}>{t("Perbarui saldo")}</Button>}<Button variant="ghost" size="compact" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button></div>
     </article>
   );
 }
 
-function AccountCard({ account, onUpdateBalance, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <article className="p-4">
@@ -597,8 +716,64 @@ function AccountCard({ account, onUpdateBalance, dateLocale }: { account: Accoun
         <AccountBalance account={account} align="left" />
         <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))}</span>
       </div>
-      <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="mt-3 w-full">{t("Perbarui saldo")}</Button>
+      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui saldo")}</Button>}</div>
     </article>
+  );
+}
+
+function AccountHistory({ accounts, transfers, reconciliations, dateLocale }: {
+  accounts: AccountOverviewRecord[];
+  transfers: TransferRecord[];
+  reconciliations: ReconciliationRecord[];
+  dateLocale: typeof idLocale;
+}) {
+  const { t } = useLanguage();
+  const accountNames = useMemo(() => new Map(accounts.map((account) => [account.id, account.name])), [accounts]);
+
+  return (
+    <Surface className="overflow-hidden">
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+        <h2 className="text-lg font-bold tracking-tight text-slate-900">{t("Riwayat akun")}</h2>
+        <p className="mt-1 text-xs text-slate-500">{t("Transfer dan rekonsiliasi terakhir. Riwayat tidak dapat diubah dari sini.")}</p>
+      </div>
+      {transfers.length === 0 && reconciliations.length === 0 ? (
+        <p className="px-4 py-5 text-sm text-slate-500 sm:px-5">{t("Belum ada riwayat akun.")}</p>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {transfers.map((transfer) => (
+            <div key={transfer.id} className="px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">{t("Transfer")} · {accountNames.get(transfer.source_account_id) ?? t("Akun tidak tersedia")} → {accountNames.get(transfer.destination_account_id) ?? t("Akun tidak tersedia")}</p>
+                  <p className="mt-1 text-xs text-slate-500">{format(parseISO(transfer.date), "dd MMM yyyy", { locale: dateLocale })}{transfer.note ? ` · ${transfer.note}` : ""}</p>
+                </div>
+                <p className="text-right font-mono text-sm font-bold text-slate-800">{formatMoney(Number(transfer.amount), transfer.currency)} → {formatMoney(Number(transfer.destination_amount), transfer.destination_currency)}</p>
+              </div>
+            </div>
+          ))}
+          {reconciliations.map((reconciliation) => {
+            const account = accounts.find((item) => item.id === reconciliation.account_id);
+            const currency = account?.currency ?? "IDR";
+            const difference = Number(reconciliation.statement_balance) - Number(reconciliation.ledger_balance);
+            return (
+              <div key={reconciliation.id} className="px-4 py-4 sm:px-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{t("Rekonsiliasi akun")} · {account?.name ?? t("Akun tidak tersedia")}</p>
+                    <p className="mt-1 text-xs text-slate-500">{format(parseISO(reconciliation.reconciled_at), "dd MMM yyyy", { locale: dateLocale })}{reconciliation.note ? ` · ${reconciliation.note}` : ""}</p>
+                  </div>
+                  <p className="text-right text-xs leading-5 text-slate-600">{t("Statement {statement}; ledger {ledger}; selisih {difference}", {
+                    statement: formatMoney(Number(reconciliation.statement_balance), currency),
+                    ledger: formatMoney(Number(reconciliation.ledger_balance), currency),
+                    difference: formatMoney(difference, currency),
+                  })}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Surface>
   );
 }
 
@@ -646,9 +821,10 @@ function AccountDialogFrame({ title, eyebrow, description, saving, error, initia
   );
 }
 
-function AccountDialog({ form, setForm, errors, error, saving, nameInputRef, onClose, onSubmit }: {
+function AccountDialog({ form, setForm, mode, errors, error, saving, nameInputRef, onClose, onSubmit }: {
   form: AccountFormState;
   setForm: Dispatch<SetStateAction<AccountFormState>>;
+  mode: AccountDialogMode;
   errors: Record<string, string>;
   error: string | null;
   saving: boolean;
@@ -658,8 +834,9 @@ function AccountDialog({ form, setForm, errors, error, saving, nameInputRef, onC
 }) {
   const { t } = useLanguage();
   const validation = validateAccountForm(form);
+  const editing = mode === "edit";
   return (
-    <AccountDialogFrame title={t("Tambah akun")} eyebrow={t("Akun baru")} description={t("Hubungkan satu sumber dana atau kewajiban ke overview FinTrack.")} saving={saving} error={error} initialFocusRef={nameInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t("Simpan akun")} submitDisabled={!validation.valid}>
+    <AccountDialogFrame title={t(editing ? "Edit akun" : "Tambah akun")} eyebrow={t(editing ? "Identitas akun" : "Akun baru")} description={t(editing ? "Nama dan institusi dapat diperbarui. Saldo memakai form pembaruan saldo terpisah." : "Hubungkan satu sumber dana atau kewajiban ke overview FinTrack.")} saving={saving} error={error} initialFocusRef={nameInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t(editing ? "Simpan perubahan" : "Simpan akun")} submitDisabled={!validation.valid}>
       <Field label={t("Nama akun")} htmlFor="account-name" error={errors.name ? t(errors.name) : undefined} hint={t("Contoh: Jago Utama atau Stockbit.")}>
         <input ref={nameInputRef} id="account-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder={t("Nama yang mudah dikenali")} className={fieldControlStyles} />
       </Field>
@@ -668,22 +845,23 @@ function AccountDialog({ form, setForm, errors, error, saving, nameInputRef, onC
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("Jenis akun")} htmlFor="account-kind">
-          <select id="account-kind" value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinancialAccountKind }))} className={fieldControlStyles}>
+          <select id="account-kind" disabled={editing} value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinancialAccountKind }))} className={fieldControlStyles}>
             {accountKinds.map((kind) => <option key={kind.value} value={kind.value}>{t(kind.label)}</option>)}
           </select>
         </Field>
         <Field label={t("Mata uang")} htmlFor="account-currency" error={errors.currency ? t(errors.currency) : undefined}>
-          <select id="account-currency" value={form.currency} onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value }))} className={fieldControlStyles}><option value="IDR">IDR</option><option value="USD">USD</option></select>
+          <input id="account-currency" disabled={editing} minLength={3} maxLength={3} value={form.currency} onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} className={fieldControlStyles} />
         </Field>
       </div>
-      <Field label={t("Saldo awal")} htmlFor="account-balance" error={errors.currentBalance ? t(errors.currentBalance) : undefined} hint={t("Masukkan angka tanpa pemisah ribuan.")}>
+      {!editing && <><Field label={t("Saldo awal")} htmlFor="account-balance" error={errors.currentBalance ? t(errors.currentBalance) : undefined} hint={t("Masukkan angka tanpa pemisah ribuan.")}>
         <input id="account-balance" type="number" step="any" inputMode="decimal" value={form.currentBalance} onChange={(event) => setForm((current) => ({ ...current, currentBalance: event.target.value }))} className={cn(fieldControlStyles, "font-mono text-base font-bold")} />
       </Field>
       {form.currency !== "IDR" && (
         <Field label={t("Nilai setara IDR")} htmlFor="account-reporting-balance" error={errors.reportingBalanceIdr ? t(errors.reportingBalanceIdr) : undefined} hint={t("Opsional, tetapi diperlukan agar akun masuk ke net worth IDR.")}>
           <input id="account-reporting-balance" type="number" min="0" step="any" inputMode="decimal" value={form.reportingBalanceIdr} onChange={(event) => setForm((current) => ({ ...current, reportingBalanceIdr: event.target.value }))} placeholder="0" className={fieldControlStyles} />
         </Field>
-      )}
+      )}</>}
+      {editing && <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">{t("Jenis akun, mata uang, dan saldo terkunci agar riwayat tetap konsisten.")}</p>}
     </AccountDialogFrame>
   );
 }
