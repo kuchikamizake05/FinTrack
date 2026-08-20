@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Settings, Tags, User, WalletCards, X } from "lucide-react";
-import { primaryNavigation } from "@/lib/navigation";
+import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Plus, Settings, Tags, User, WalletCards, X } from "lucide-react";
+import { isNavigationActive, primaryNavigation } from "@/lib/navigation";
 import { reportHandledError } from "@/lib/errors";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import BrandLockup from "@/components/BrandLockup";
@@ -95,7 +95,7 @@ export default function Navbar() {
     }
   };
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => isNavigationActive(href, pathname);
   const toggleProfile = (origin: Exclude<ProfileOrigin, null>) => {
     setProfileOrigin((current) => current === origin ? null : origin);
   };
@@ -171,26 +171,95 @@ export default function Navbar() {
 
       <nav
         aria-label={t("Navigasi utama")}
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:rgba(18,53,36,0.12)] bg-[color:rgba(244,251,246,0.96)] px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(18,53,36,0.08)] backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:rgba(18,53,36,0.12)] bg-[color:rgba(244,251,246,0.96)] px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(18,53,36,0.08)] backdrop-blur-xl md:hidden"
       >
-        <div className="mx-auto grid max-w-md grid-cols-4">
-          {primaryNavigation.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
+        <div className="mx-auto grid max-w-md grid-cols-5 items-center">
+          {(() => {
+            const item0 = primaryNavigation[0];
+            const active0 = isActive(item0.href);
+            const Icon0 = item0.icon;
             return (
               <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+                key={item0.href}
+                href={item0.href}
+                aria-current={active0 ? "page" : undefined}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active0 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
-                  <Icon className={`h-[18px] w-[18px] ${active ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active0 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                  <Icon0 className={`h-[18px] w-[18px] ${active0 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
                 </span>
-                <span className="truncate px-1">{t(item.name)}</span>
+                <span className="truncate px-1">{t(item0.name)}</span>
               </Link>
             );
-          })}
+          })()}
+
+          {(() => {
+            const item1 = primaryNavigation[1];
+            const active1 = isActive(item1.href);
+            const Icon1 = item1.icon;
+            return (
+              <Link
+                key={item1.href}
+                href={item1.href}
+                aria-current={active1 ? "page" : undefined}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active1 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+              >
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active1 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                  <Icon1 className={`h-[18px] w-[18px] ${active1 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
+                </span>
+                <span className="truncate px-1">{t(item1.name)}</span>
+              </Link>
+            );
+          })()}
+
+          <Link
+            href="/transactions?new=1"
+            aria-label={t("Buka form catat")}
+            className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"
+          >
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-[transform,box-shadow,background-color] group-hover:scale-105 group-hover:bg-[var(--brand-ink)] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-ink)] group-focus-visible:ring-offset-2">
+              <Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" />
+            </span>
+            <span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span>
+          </Link>
+
+          {(() => {
+            const item2 = primaryNavigation[2];
+            const active2 = isActive(item2.href);
+            const Icon2 = item2.icon;
+            return (
+              <Link
+                key={item2.href}
+                href={item2.href}
+                aria-current={active2 ? "page" : undefined}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active2 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+              >
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active2 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                  <Icon2 className={`h-[18px] w-[18px] ${active2 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
+                </span>
+                <span className="truncate px-1">{t(item2.name)}</span>
+              </Link>
+            );
+          })()}
+
+          {(() => {
+            const item3 = primaryNavigation[3];
+            const active3 = isActive(item3.href);
+            const Icon3 = item3.icon;
+            return (
+              <Link
+                key={item3.href}
+                href={item3.href}
+                aria-current={active3 ? "page" : undefined}
+                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-[color,transform] duration-200 active:scale-95 ${active3 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
+              >
+                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${active3 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
+                  <Icon3 className={`h-[18px] w-[18px] ${active3 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
+                </span>
+                <span className="truncate px-1">{t(item3.name)}</span>
+              </Link>
+            );
+          })()}
         </div>
       </nav>
     </>

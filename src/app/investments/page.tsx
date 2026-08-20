@@ -7,6 +7,7 @@ import { id as idLocale } from "date-fns/locale";
 import { BarChart3, Camera, LineChart as LineChartIcon, Plus, Search, TrendingDown, TrendingUp, WalletCards, X } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "@/components/Navbar";
+import { PortfolioTabs } from "@/components/PortfolioTabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DialogFrame } from "@/components/ui/DialogFrame";
@@ -129,6 +130,8 @@ export default function InvestmentsPage() {
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader eyebrow="Portfolio journal" title="Investasi" description="Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang." actions={<><Button variant="secondary" onClick={openSnapshot} disabled={!accounts.length}><Camera className="h-4 w-4" /> Update equity</Button><Button onClick={openExecution} disabled={!accounts.length}><Plus className="h-4 w-4" /> Catat eksekusi</Button></>} />
+
+        <PortfolioTabs />
 
         {pageError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{pageError}</span><Button variant="secondary" size="compact" onClick={() => void loadData()}>Coba lagi</Button></div>}
         {!loading && accounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Tambahkan akun berjenis Investasi terlebih dahulu melalui <Link href="/accounts" className="font-bold underline underline-offset-2">Akun & saldo</Link>.</div>}

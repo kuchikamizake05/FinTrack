@@ -12,6 +12,7 @@ import {
   type SetStateAction,
 } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import {
@@ -117,6 +118,9 @@ function createDefaultForm(): TransactionFormState {
 }
 
 export default function TransactionsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoOpenedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -202,14 +206,22 @@ export default function TransactionsPage() {
     [categories, form.type, selectedTx?.category],
   );
 
-  const openAdd = () => {
+  const openAdd = useCallback(() => {
     setSelectedTx(null);
     const nextForm = createDefaultForm();
     nextForm.category = buildTransactionCategoryOptions(categories, "expense")[0] ?? "";
     setForm(nextForm);
     setFormError(null);
     setModalOpen(true);
-  };
+  }, [categories]);
+
+  useEffect(() => {
+    if (!loading && searchParams.get("new") === "1" && !autoOpenedRef.current) {
+      autoOpenedRef.current = true;
+      openAdd();
+      router.replace("/transactions", { scroll: false });
+    }
+  }, [loading, openAdd, router, searchParams]);
 
   const openEdit = (transaction: Transaction) => {
     setSelectedTx(transaction);
