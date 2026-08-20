@@ -135,10 +135,10 @@ export default function LandingPage() {
 
       <section className={styles.ticker} aria-label={t("Ringkasan manfaat FinTrack")}>
         <div>
-          <span>Arus kas terbaca</span><i>✦</i>
-          <span>Target lebih dekat</span><i>✦</i>
-          <span>Data tetap milikmu</span><i>✦</i>
-          <span>Keputusan lebih tenang</span><i>✦</i>
+          <span>{t("Arus kas terbaca")}</span><i>✦</i>
+          <span>{t("Target lebih dekat")}</span><i>✦</i>
+          <span>{t("Data tetap milikmu")}</span><i>✦</i>
+          <span>{t("Keputusan lebih tenang")}</span><i>✦</i>
         </div>
       </section>
 

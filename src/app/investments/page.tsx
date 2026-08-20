@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
+import { enUS, id as idLocale } from "date-fns/locale";
 import { BarChart3, Camera, LineChart as LineChartIcon, Plus, Search, TrendingDown, TrendingUp, WalletCards, X } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "@/components/Navbar";
 import { PortfolioTabs } from "@/components/PortfolioTabs";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DialogFrame } from "@/components/ui/DialogFrame";
@@ -32,6 +33,8 @@ function createExecutionForm(accountId = "") { return { accountId, ticker: "", s
 function createSnapshotForm(accountId = "") { return { accountId, equity: "", recordedAt: nowLocal(), note: "" }; }
 
 export default function InvestmentsPage() {
+  const { language, t } = useLanguage();
+  const dateLocale = language === "en" ? enUS : idLocale;
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
@@ -66,11 +69,11 @@ export default function InvestmentsPage() {
       setSnapshots((snapshotsResult.data ?? []) as Snapshot[]);
     } catch (error) {
       reportHandledError("Investments unavailable", error, "Portfolio belum berhasil dimuat.");
-      setPageError("Portfolio belum berhasil dimuat. Coba lagi beberapa saat lagi.");
+      setPageError(t("Portfolio belum berhasil dimuat. Coba lagi beberapa saat lagi."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { const timer = window.setTimeout(() => void loadData(), 0); return () => window.clearTimeout(timer); }, [loadData]);
   const accountNames = useMemo(() => new Map(accounts.map((account) => [account.id, account.name])), [accounts]);
@@ -88,11 +91,11 @@ export default function InvestmentsPage() {
   async function saveExecution(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canWriteOnline()) {
-      setFormError(offlineWriteMessage);
+      setFormError(t(offlineWriteMessage));
       return;
     }
     const validation = validateExecutionForm(executionForm);
-    if (validation) { setFormError(validation); return; }
+    if (validation) { setFormError(t(validation)); return; }
     setSaving(true); setFormError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -101,18 +104,18 @@ export default function InvestmentsPage() {
       const { error } = await supabase.from("stock_executions").insert({ user_id: user.id, account_id: executionForm.accountId, ticker: executionForm.ticker.trim().toUpperCase(), side: executionForm.side, quantity: Number(executionForm.quantity), price: Number(executionForm.price), fee: Number(executionForm.fee), currency: account?.currency ?? "IDR", executed_at: new Date(executionForm.executedAt).toISOString(), note: executionForm.note.trim() || null });
       if (error) throw error;
       setExecutionOpen(false); await loadData();
-    } catch (error) { reportHandledError("Execution save failed", error, "Eksekusi belum berhasil disimpan."); setFormError("Eksekusi belum berhasil disimpan. Coba lagi."); }
+    } catch (error) { reportHandledError("Execution save failed", error, "Eksekusi belum berhasil disimpan."); setFormError(t("Eksekusi belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
   }
 
   async function saveSnapshot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canWriteOnline()) {
-      setFormError(offlineWriteMessage);
+      setFormError(t(offlineWriteMessage));
       return;
     }
     const validation = validateSnapshotForm(snapshotForm);
-    if (validation) { setFormError(validation); return; }
+    if (validation) { setFormError(t(validation)); return; }
     setSaving(true); setFormError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -121,7 +124,7 @@ export default function InvestmentsPage() {
       const { error } = await supabase.from("account_equity_snapshots").insert({ user_id: user.id, account_id: snapshotForm.accountId, equity: Number(snapshotForm.equity), currency: account?.currency ?? "IDR", recorded_at: new Date(snapshotForm.recordedAt).toISOString(), note: snapshotForm.note.trim() || null });
       if (error) throw error;
       setSnapshotOpen(false); await loadData();
-    } catch (error) { reportHandledError("Investment snapshot save failed", error, "Snapshot belum berhasil disimpan."); setFormError("Snapshot belum berhasil disimpan. Coba lagi."); }
+    } catch (error) { reportHandledError("Investment snapshot save failed", error, "Snapshot belum berhasil disimpan."); setFormError(t("Snapshot belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
   }
 
@@ -131,48 +134,48 @@ export default function InvestmentsPage() {
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <div className="space-y-4">
           <PageHeader
-            eyebrow="Portfolio journal"
-            title="Investasi"
-            description="Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang."
+            eyebrow={t("Portfolio journal")}
+            title={t("Investasi")}
+            description={t("Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang.")}
           />
 
           <PortfolioTabs />
 
-          <div role="group" aria-label="Aksi investasi" className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div role="group" aria-label={t("Aksi investasi")} className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
             <Button variant="secondary" onClick={openSnapshot} disabled={!accounts.length} className="w-full sm:w-auto">
-              <Camera className="h-4 w-4" /> Update equity
+              <Camera className="h-4 w-4" /> {t("Update equity")}
             </Button>
             <Button onClick={openExecution} disabled={!accounts.length} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4" /> Catat eksekusi
+              <Plus className="h-4 w-4" /> {t("Catat eksekusi")}
             </Button>
           </div>
         </div>
 
-        {pageError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{pageError}</span><Button variant="secondary" size="compact" onClick={() => void loadData()}>Coba lagi</Button></div>}
-        {!loading && accounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">Tambahkan akun berjenis Investasi terlebih dahulu melalui <Link href="/accounts" className="font-bold underline underline-offset-2">Akun & saldo</Link>.</div>}
+        {pageError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{pageError}</span><Button variant="secondary" size="compact" onClick={() => void loadData()}>{t("Coba lagi")}</Button></div>}
+        {!loading && accounts.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">{t("Tambahkan akun berjenis Investasi terlebih dahulu melalui ")}<Link href="/accounts" className="font-bold underline underline-offset-2">{t("Akun & saldo")}</Link>.</div>}
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan portfolio">
-          <Metric label="Posisi terbuka" value={String(openPositions.length)} hint="Ticker yang masih dimiliki" icon={BarChart3} />
-          <Metric label="Modal tersisa" value={formatIdr(totalCostBasis)} hint="Cost basis rata-rata tertimbang" icon={WalletCards} />
-          <Metric label="Equity terakhir" value={latestEquity === null ? "Belum ada" : formatIdr(latestEquity)} hint={latestEquity === null ? "Catat snapshot pertama" : "Snapshot portfolio terbaru"} icon={LineChartIcon} />
-          <Metric label="P/L terealisasi" value={formatSignedIdr(totalRealizedPnl)} hint="Setelah biaya jual" icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} tone={totalRealizedPnl >= 0 ? "text-emerald-700" : "text-rose-700"} />
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("Ringkasan portfolio")}>
+          <Metric label={t("Posisi terbuka")} value={String(openPositions.length)} hint={t("Ticker yang masih dimiliki")} icon={BarChart3} />
+          <Metric label={t("Modal tersisa")} value={formatIdr(totalCostBasis)} hint={t("Cost basis rata-rata tertimbang")} icon={WalletCards} />
+          <Metric label={t("Equity terakhir")} value={latestEquity === null ? t("Belum ada") : formatIdr(latestEquity)} hint={latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")} icon={LineChartIcon} />
+          <Metric label={t("P/L terealisasi")} value={formatSignedIdr(totalRealizedPnl)} hint={t("Setelah biaya jual")} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} tone={totalRealizedPnl >= 0 ? "text-emerald-700" : "text-rose-700"} />
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Surface className="p-4 sm:p-5">
-            <div><h2 className="flex items-center gap-2 text-base font-bold"><LineChartIcon className="h-4 w-4 text-emerald-700" aria-hidden="true" /> Equity mingguan</h2><p className="mt-1 text-xs leading-5 text-slate-500">Nilai terakhir tiap akun pada setiap minggu.</p></div>
-            {equitySeries.length > 1 ? <><figure aria-labelledby="portfolio-equity-caption" className="mt-4"><figcaption id="portfolio-equity-caption" className="sr-only">Perubahan total equity portofolio per minggu.</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><LineChart data={equitySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tickFormatter={(value) => `Rp${Number(value / 1_000_000).toFixed(1)}jt`} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={60} /><Tooltip formatter={(value) => formatIdr(Number(value))} contentStyle={{ borderRadius: 12, borderColor: "#d1fae5" }} /><Line type="monotone" dataKey="equity" name="Equity portofolio" stroke="#15803d" strokeWidth={3} dot={{ r: 3, fill: "#15803d" }} activeDot={{ r: 5, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div></figure><details className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5"><summary className="cursor-pointer text-xs font-semibold text-emerald-700">Lihat data tabel equity</summary><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[240px] text-left text-xs"><caption className="sr-only">Total equity portofolio per minggu.</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">Minggu</th><th scope="col" className="pb-2 text-right">Equity</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{equitySeries.map((point) => <tr key={point.week}><th scope="row" className="py-2 pr-4 font-semibold">{point.week}</th><td className="py-2 text-right font-medium">{formatIdr(point.equity)}</td></tr>)}</tbody></table></div></details></> : <div className="mt-4 rounded-xl bg-emerald-50/70 px-5 py-8 text-center"><LineChartIcon className="mx-auto h-6 w-6 text-emerald-700" aria-hidden="true" /><p className="mt-3 text-sm font-bold">Butuh dua snapshot untuk grafik</p><p className="mt-1 text-xs leading-5 text-slate-500">Catat nilai portfolio secara rutin agar arahnya terbaca.</p></div>}
+            <div><h2 className="flex items-center gap-2 text-base font-bold"><LineChartIcon className="h-4 w-4 text-emerald-700" aria-hidden="true" /> {t("Equity mingguan")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Nilai terakhir tiap akun pada setiap minggu.")}</p></div>
+            {equitySeries.length > 1 ? <><figure aria-labelledby="portfolio-equity-caption" className="mt-4"><figcaption id="portfolio-equity-caption" className="sr-only">{t("Perubahan total equity portofolio per minggu.")}</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><LineChart data={equitySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tickFormatter={(value) => `Rp${Number(value / 1_000_000).toFixed(1)}jt`} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} width={60} /><Tooltip formatter={(value) => formatIdr(Number(value))} contentStyle={{ borderRadius: 12, borderColor: "#d1fae5" }} /><Line type="monotone" dataKey="equity" name={t("Equity portofolio")} stroke="#15803d" strokeWidth={3} dot={{ r: 3, fill: "#15803d" }} activeDot={{ r: 5, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div></figure><details className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5"><summary className="cursor-pointer text-xs font-semibold text-emerald-700">{t("Lihat data tabel equity")}</summary><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[240px] text-left text-xs"><caption className="sr-only">{t("Total equity portofolio per minggu.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Minggu")}</th><th scope="col" className="pb-2 text-right">{t("Equity")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{equitySeries.map((point) => <tr key={point.week}><th scope="row" className="py-2 pr-4 font-semibold">{point.week}</th><td className="py-2 text-right font-medium">{formatIdr(point.equity)}</td></tr>)}</tbody></table></div></details></> : <div className="mt-4 rounded-xl bg-emerald-50/70 px-5 py-8 text-center"><LineChartIcon className="mx-auto h-6 w-6 text-emerald-700" aria-hidden="true" /><p className="mt-3 text-sm font-bold">{t("Butuh dua snapshot untuk grafik")}</p><p className="mt-1 text-xs leading-5 text-slate-500">{t("Catat nilai portfolio secara rutin agar arahnya terbaca.")}</p></div>}
           </Surface>
 
           <Surface className="overflow-hidden">
-            <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><h2 className="text-base font-bold">Posisi saat ini</h2><p className="mt-1 text-xs text-slate-500">Cost basis dari seluruh eksekusi tercatat.</p></div>
-            {loading ? <InvestmentSkeleton /> : openPositions.length === 0 ? <EmptyState icon={BarChart3} title="Belum ada posisi" description="Catat pembelian pertama untuk mulai menghitung jumlah, rata-rata, dan cost basis." action={accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> Catat pembelian</Button> : undefined} /> : <div className="divide-y divide-slate-100">{openPositions.map((position) => <PositionRow key={position.ticker} ticker={position.ticker} summary={position.summary} />)}</div>}
+            <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><h2 className="text-base font-bold">{t("Posisi saat ini")}</h2><p className="mt-1 text-xs text-slate-500">{t("Cost basis dari seluruh eksekusi tercatat.")}</p></div>
+            {loading ? <InvestmentSkeleton /> : openPositions.length === 0 ? <EmptyState icon={BarChart3} title={t("Belum ada posisi")} description={t("Catat pembelian pertama untuk mulai menghitung jumlah, rata-rata, dan cost basis.")} action={accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat pembelian")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{openPositions.map((position) => <PositionRow key={position.ticker} ticker={position.ticker} summary={position.summary} />)}</div>}
           </Surface>
         </div>
 
         <Surface className="overflow-hidden">
-          <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="text-base font-bold">Execution journal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Jejak beli dan jual yang menjadi dasar perhitungan posisi.</p></div><div className="flex flex-col gap-2 sm:flex-row"><div role="group" aria-label="Filter arah eksekusi" className="flex rounded-xl bg-slate-100 p-1">{(["all", "buy", "sell"] as const).map((side) => <button key={side} type="button" aria-pressed={sideFilter === side} onClick={() => setSideFilter(side)} className={cn("min-h-10 rounded-lg px-3 text-xs font-bold transition", sideFilter === side ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{side === "all" ? "Semua" : side === "buy" ? "Beli" : "Jual"}</button>)}</div><label className="relative" htmlFor="execution-search"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Cari ticker atau broker</span><input id="execution-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari ticker atau broker" className={cn(fieldControlStyles, "pl-10 sm:w-64")} /></label></div></div></div>
-          {loading ? <InvestmentSkeleton /> : filteredExecutions.length === 0 ? <EmptyState icon={Search} title={executions.length ? "Eksekusi tidak ditemukan" : "Journal masih kosong"} description={executions.length ? "Coba kata kunci atau tipe eksekusi lain." : "Setiap pembelian dan penjualan akan tampil kronologis di sini."} action={!executions.length && accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> Catat eksekusi</Button> : undefined} /> : <ExecutionJournal executions={filteredExecutions} accountNames={accountNames} />}
+          <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="text-base font-bold">{t("Execution journal")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Jejak beli dan jual yang menjadi dasar perhitungan posisi.")}</p></div><div className="flex flex-col gap-2 sm:flex-row"><div role="group" aria-label={t("Filter arah eksekusi")} className="flex rounded-xl bg-slate-100 p-1">{(["all", "buy", "sell"] as const).map((side) => <button key={side} type="button" aria-pressed={sideFilter === side} onClick={() => setSideFilter(side)} className={cn("min-h-10 rounded-lg px-3 text-xs font-bold transition", sideFilter === side ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{side === "all" ? t("Semua") : side === "buy" ? t("Beli") : t("Jual")}</button>)}</div><label className="relative" htmlFor="execution-search"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">{t("Cari ticker atau broker")}</span><input id="execution-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("Cari ticker atau broker")} className={cn(fieldControlStyles, "pl-10 sm:w-64")} /></label></div></div></div>
+          {loading ? <InvestmentSkeleton /> : filteredExecutions.length === 0 ? <EmptyState icon={Search} title={executions.length ? t("Eksekusi tidak ditemukan") : t("Journal masih kosong")} description={executions.length ? t("Coba kata kunci atau tipe eksekusi lain.") : t("Setiap pembelian dan penjualan akan tampil kronologis di sini.")} action={!executions.length && accounts.length ? <Button onClick={openExecution}><Plus className="h-4 w-4" /> {t("Catat eksekusi")}</Button> : undefined} /> : <ExecutionJournal executions={filteredExecutions} accountNames={accountNames} dateLocale={dateLocale} />}
         </Surface>
       </main>
 
@@ -184,27 +187,212 @@ export default function InvestmentsPage() {
 
 function Metric({ label, value, hint, icon: Icon, tone = "text-slate-900" }: { label: string; value: string; hint: string; icon: typeof BarChart3; tone?: string }) { return <Surface className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{label}</p><p className={cn("mt-2 text-xl font-bold tracking-tight", tone)}>{value}</p><p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p></div><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Icon className="h-5 w-5" /></span></div></Surface>; }
 
-function PositionRow({ ticker, summary }: { ticker: string; summary: ReturnType<typeof buildInvestmentPositions>[number]["summary"] }) { return <article className="p-4 sm:px-5"><div className="flex items-start justify-between"><div><p className="font-mono text-lg font-bold">{ticker}</p><p className="mt-0.5 text-xs text-slate-500">{summary.quantity.toLocaleString("id-ID")} lembar</p></div><span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", summary.realizedPnl >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{formatSignedIdr(summary.realizedPnl)} realized</span></div><div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs"><div><p className="text-slate-400">Rata-rata</p><p className="mt-1 font-bold">{formatIdr(summary.averageCost)}</p></div><div><p className="text-slate-400">Cost basis</p><p className="mt-1 font-bold">{formatIdr(summary.costBasis)}</p></div></div>{summary.oversoldQuantity > 0 && <p className="mt-3 text-xs leading-5 text-amber-700">Penjualan melebihi pembelian tercatat sebanyak {summary.oversoldQuantity.toLocaleString("id-ID")} lembar.</p>}</article>; }
+function PositionRow({ ticker, summary }: { ticker: string; summary: ReturnType<typeof buildInvestmentPositions>[number]["summary"] }) {
+  const { t } = useLanguage();
+  return (
+    <article className="p-4 sm:px-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-mono text-lg font-bold">{ticker}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{t("{count} lembar", { count: summary.quantity.toLocaleString("id-ID") })}</p>
+        </div>
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", summary.realizedPnl >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>
+          {formatSignedIdr(summary.realizedPnl)} {t("realized")}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+        <div>
+          <p className="text-slate-400">{t("Rata-rata")}</p>
+          <p className="mt-1 font-bold">{formatIdr(summary.averageCost)}</p>
+        </div>
+        <div>
+          <p className="text-slate-400">{t("Cost basis")}</p>
+          <p className="mt-1 font-bold">{formatIdr(summary.costBasis)}</p>
+        </div>
+      </div>
+      {summary.oversoldQuantity > 0 && (
+        <p className="mt-3 text-xs leading-5 text-amber-700">
+          {t("Penjualan melebihi pembelian tercatat sebanyak {count} lembar.", { count: summary.oversoldQuantity.toLocaleString("id-ID") })}
+        </p>
+      )}
+    </article>
+  );
+}
 
-function ExecutionJournal({ executions, accountNames }: { executions: Execution[]; accountNames: ReadonlyMap<string, string> }) { return <div><div className="hidden md:block"><table className="w-full text-left"><thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-[0.08em] text-slate-400"><tr><th className="px-5 py-3">Waktu</th><th className="px-4 py-3">Ticker</th><th className="px-4 py-3">Arah</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Harga</th><th className="px-5 py-3 text-right">Nilai + biaya</th></tr></thead><tbody className="divide-y divide-slate-100">{executions.map((item) => <tr key={item.id} className="hover:bg-emerald-50/30"><td className="px-5 py-4"><p className="text-sm font-semibold">{format(parseISO(item.executed_at), "dd MMM yyyy", { locale: idLocale })}</p><p className="mt-0.5 text-xs text-slate-400">{accountNames.get(item.account_id) ?? "Akun investasi"}</p></td><td className="px-4 py-4 font-mono text-sm font-bold">{item.ticker}</td><td className="px-4 py-4"><SideBadge side={item.side} /></td><td className="px-4 py-4 text-sm font-semibold">{Number(item.quantity).toLocaleString("id-ID")}</td><td className="px-4 py-4 text-sm">{formatMoney(item.price, item.currency)}</td><td className="px-5 py-4 text-right"><p className="text-sm font-bold">{formatMoney(Number(item.quantity) * Number(item.price), item.currency)}</p><p className="mt-0.5 text-xs text-slate-400">Biaya {formatMoney(item.fee, item.currency)}</p></td></tr>)}</tbody></table></div><div className="divide-y divide-slate-100 md:hidden">{executions.map((item) => <article key={item.id} className="space-y-3 p-4"><div className="flex items-start justify-between"><div><p className="font-mono text-base font-bold">{item.ticker}</p><p className="mt-0.5 text-xs text-slate-400">{format(parseISO(item.executed_at), "dd MMM yyyy, HH:mm", { locale: idLocale })}</p></div><SideBadge side={item.side} /></div><div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs"><div><p className="text-slate-400">Jumlah × harga</p><p className="mt-1 font-bold">{Number(item.quantity).toLocaleString("id-ID")} × {formatMoney(item.price, item.currency)}</p></div><div><p className="text-slate-400">Nilai eksekusi</p><p className="mt-1 font-bold">{formatMoney(Number(item.quantity) * Number(item.price), item.currency)}</p></div></div><p className="text-xs text-slate-500">{accountNames.get(item.account_id) ?? "Akun investasi"} · Biaya {formatMoney(item.fee, item.currency)}</p></article>)}</div></div>; }
+function ExecutionJournal({ executions, accountNames, dateLocale }: { executions: Execution[]; accountNames: ReadonlyMap<string, string>; dateLocale: typeof idLocale }) {
+  const { t } = useLanguage();
+  return (
+    <div>
+      <div className="hidden md:block">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
+            <tr>
+              <th className="px-5 py-3">{t("Waktu")}</th>
+              <th className="px-4 py-3">{t("Ticker")}</th>
+              <th className="px-4 py-3">{t("Arah")}</th>
+              <th className="px-4 py-3">{t("Jumlah")}</th>
+              <th className="px-4 py-3">{t("Harga")}</th>
+              <th className="px-5 py-3 text-right">{t("Nilai + biaya")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {executions.map((item) => (
+              <tr key={item.id} className="hover:bg-emerald-50/30">
+                <td className="px-5 py-4">
+                  <p className="text-sm font-semibold">{format(parseISO(item.executed_at), "dd MMM yyyy", { locale: dateLocale })}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{item.account_id ? accountNames.get(item.account_id) ?? t("Akun investasi") : t("Akun investasi")}</p>
+                </td>
+                <td className="px-4 py-4 font-mono text-sm font-bold">{item.ticker}</td>
+                <td className="px-4 py-4"><SideBadge side={item.side} /></td>
+                <td className="px-4 py-4 text-sm font-semibold">{Number(item.quantity).toLocaleString("id-ID")}</td>
+                <td className="px-4 py-4 text-sm">{formatMoney(item.price, item.currency)}</td>
+                <td className="px-5 py-4 text-right">
+                  <p className="text-sm font-bold">{formatMoney(Number(item.quantity) * Number(item.price), item.currency)}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{t("Biaya")} {formatMoney(item.fee, item.currency)}</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="divide-y divide-slate-100 md:hidden">
+        {executions.map((item) => (
+          <article key={item.id} className="space-y-3 p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono text-base font-bold">{item.ticker}</p>
+                <p className="mt-0.5 text-xs text-slate-400">{format(parseISO(item.executed_at), "dd MMM yyyy, HH:mm", { locale: dateLocale })}</p>
+              </div>
+              <SideBadge side={item.side} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+              <div>
+                <p className="text-slate-400">{t("Jumlah × harga")}</p>
+                <p className="mt-1 font-bold">{Number(item.quantity).toLocaleString("id-ID")} × {formatMoney(item.price, item.currency)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">{t("Nilai eksekusi")}</p>
+                <p className="mt-1 font-bold">{formatMoney(Number(item.quantity) * Number(item.price), item.currency)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">{item.account_id ? accountNames.get(item.account_id) ?? t("Akun investasi") : t("Akun investasi")} · {t("Biaya")} {formatMoney(item.fee, item.currency)}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-function SideBadge({ side }: { side: "buy" | "sell" }) { return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-bold", side === "buy" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{side === "buy" ? "Beli" : "Jual"}</span>; }
+function SideBadge({ side }: { side: "buy" | "sell" }) {
+  const { t } = useLanguage();
+  return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-bold", side === "buy" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>{side === "buy" ? t("Beli") : t("Jual")}</span>;
+}
 
-function ExecutionDialog({ accounts, form, setForm, saving, error, tickerRef, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createExecutionForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createExecutionForm>>>; saving: boolean; error: string | null; tickerRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) { return <Dialog title="Catat eksekusi" eyebrow="Execution journal" description="Simpan detail sesuai trade confirmation broker." saving={saving} initialFocusRef={tickerRef} onClose={onClose}><form onSubmit={onSubmit}><div className="space-y-4 px-5 py-5 sm:px-6"><Field label="Akun investasi" htmlFor="execution-account"><select id="execution-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}</select></Field><div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1">{(["buy", "sell"] as const).map((side) => <button key={side} type="button" aria-pressed={form.side === side} onClick={() => setForm((current) => ({ ...current, side }))} className={cn("min-h-11 rounded-lg text-sm font-bold", form.side === side ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{side === "buy" ? "Beli" : "Jual"}</button>)}</div><div className="grid gap-4 sm:grid-cols-2"><Field label="Ticker" htmlFor="execution-ticker"><input ref={tickerRef} id="execution-ticker" required maxLength={16} value={form.ticker} onChange={(event) => setForm((current) => ({ ...current, ticker: event.target.value.toUpperCase() }))} placeholder="BBCA" className={fieldControlStyles} /></Field><Field label="Waktu eksekusi" htmlFor="execution-time"><input id="execution-time" type="datetime-local" required value={form.executedAt} onChange={(event) => setForm((current) => ({ ...current, executedAt: event.target.value }))} className={fieldControlStyles} /></Field></div><div className="grid gap-4 sm:grid-cols-3"><Field label="Jumlah" htmlFor="execution-quantity"><input id="execution-quantity" type="number" min="0.00000001" step="any" required value={form.quantity} onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))} className={fieldControlStyles} /></Field><Field label="Harga" htmlFor="execution-price"><input id="execution-price" type="number" min="0" step="any" required value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} className={fieldControlStyles} /></Field><Field label="Biaya" htmlFor="execution-fee"><input id="execution-fee" type="number" min="0" step="any" required value={form.fee} onChange={(event) => setForm((current) => ({ ...current, fee: event.target.value }))} className={fieldControlStyles} /></Field></div><Field label="Catatan" htmlFor="execution-note" hint="Opsional—misalnya alasan entry atau nomor order."><textarea id="execution-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} className={cn(fieldControlStyles, "resize-none")} /></Field>{error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}</div><DialogActions saving={saving} onClose={onClose} label="Simpan eksekusi" /></form></Dialog>; }
+function ExecutionDialog({ accounts, form, setForm, saving, error, tickerRef, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createExecutionForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createExecutionForm>>>; saving: boolean; error: string | null; tickerRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const { t } = useLanguage();
+  return (
+    <Dialog title={t("Catat eksekusi")} eyebrow={t("Execution journal")} description={t("Simpan detail sesuai trade confirmation broker.")} saving={saving} initialFocusRef={tickerRef} onClose={onClose}>
+      <form onSubmit={onSubmit}>
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          <Field label={t("Akun investasi")} htmlFor="execution-account">
+            <select id="execution-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
+            </select>
+          </Field>
+          <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+            {(["buy", "sell"] as const).map((side) => (
+              <button key={side} type="button" aria-pressed={form.side === side} onClick={() => setForm((current) => ({ ...current, side }))} className={cn("min-h-11 rounded-lg text-sm font-bold", form.side === side ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>
+                {side === "buy" ? t("Beli") : t("Jual")}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t("Ticker")} htmlFor="execution-ticker">
+              <input ref={tickerRef} id="execution-ticker" required maxLength={16} value={form.ticker} onChange={(event) => setForm((current) => ({ ...current, ticker: event.target.value.toUpperCase() }))} placeholder="BBCA" className={fieldControlStyles} />
+            </Field>
+            <Field label={t("Waktu eksekusi")} htmlFor="execution-time">
+              <input id="execution-time" type="datetime-local" required value={form.executedAt} onChange={(event) => setForm((current) => ({ ...current, executedAt: event.target.value }))} className={fieldControlStyles} />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label={t("Jumlah")} htmlFor="execution-quantity">
+              <input id="execution-quantity" type="number" min="0.00000001" step="any" required value={form.quantity} onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value }))} className={fieldControlStyles} />
+            </Field>
+            <Field label={t("Harga")} htmlFor="execution-price">
+              <input id="execution-price" type="number" min="0" step="any" required value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} className={fieldControlStyles} />
+            </Field>
+            <Field label={t("Biaya")} htmlFor="execution-fee">
+              <input id="execution-fee" type="number" min="0" step="any" required value={form.fee} onChange={(event) => setForm((current) => ({ ...current, fee: event.target.value }))} className={fieldControlStyles} />
+            </Field>
+          </div>
+          <Field label={t("Catatan")} htmlFor="execution-note" hint={t("Opsional—misalnya alasan entry atau nomor order.")}>
+            <textarea id="execution-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} className={cn(fieldControlStyles, "resize-none")} />
+          </Field>
+          {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+        </div>
+        <DialogActions saving={saving} onClose={onClose} label={t("Simpan eksekusi")} />
+      </form>
+    </Dialog>
+  );
+}
 
-function SnapshotDialog({ accounts, form, setForm, saving, error, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createSnapshotForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createSnapshotForm>>>; saving: boolean; error: string | null; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) { return <Dialog title="Update equity" eyebrow="Portfolio snapshot" description="Catat total nilai akun, termasuk kas broker dan nilai saham." saving={saving} onClose={onClose}><form onSubmit={onSubmit}><div className="space-y-4 px-5 py-5 sm:px-6"><Field label="Akun investasi" htmlFor="snapshot-account"><select id="snapshot-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}</select></Field><Field label="Total equity" htmlFor="snapshot-equity" hint="Gunakan mata uang akun yang dipilih."><input id="snapshot-equity" type="number" min="0" step="any" required value={form.equity} onChange={(event) => setForm((current) => ({ ...current, equity: event.target.value }))} placeholder="0" className={cn(fieldControlStyles, "text-lg font-bold")} /></Field><Field label="Waktu pencatatan" htmlFor="snapshot-time"><input id="snapshot-time" type="datetime-local" required value={form.recordedAt} onChange={(event) => setForm((current) => ({ ...current, recordedAt: event.target.value }))} className={fieldControlStyles} /></Field><Field label="Catatan" htmlFor="snapshot-note" hint="Opsional—misalnya setelah market close."><textarea id="snapshot-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} className={cn(fieldControlStyles, "resize-none")} /></Field>{error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}</div><DialogActions saving={saving} onClose={onClose} label="Simpan snapshot" /></form></Dialog>; }
+function SnapshotDialog({ accounts, form, setForm, saving, error, onClose, onSubmit }: { accounts: Account[]; form: ReturnType<typeof createSnapshotForm>; setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof createSnapshotForm>>>; saving: boolean; error: string | null; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const { t } = useLanguage();
+  return (
+    <Dialog title={t("Update equity")} eyebrow={t("Portfolio snapshot")} description={t("Catat total nilai akun, termasuk kas broker dan nilai saham.")} saving={saving} onClose={onClose}>
+      <form onSubmit={onSubmit}>
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          <Field label={t("Akun investasi")} htmlFor="snapshot-account">
+            <select id="snapshot-account" required value={form.accountId} onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))} className={fieldControlStyles}>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
+            </select>
+          </Field>
+          <Field label={t("Total equity")} htmlFor="snapshot-equity" hint={t("Gunakan mata uang akun yang dipilih.")}>
+            <input id="snapshot-equity" type="number" min="0" step="any" required value={form.equity} onChange={(event) => setForm((current) => ({ ...current, equity: event.target.value }))} placeholder="0" className={cn(fieldControlStyles, "text-lg font-bold")} />
+          </Field>
+          <Field label={t("Waktu pencatatan")} htmlFor="snapshot-time">
+            <input id="snapshot-time" type="datetime-local" required value={form.recordedAt} onChange={(event) => setForm((current) => ({ ...current, recordedAt: event.target.value }))} className={fieldControlStyles} />
+          </Field>
+          <Field label={t("Catatan")} htmlFor="snapshot-note" hint={t("Opsional—misalnya setelah market close.")}>
+            <textarea id="snapshot-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} className={cn(fieldControlStyles, "resize-none")} />
+          </Field>
+          {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+        </div>
+        <DialogActions saving={saving} onClose={onClose} label={t("Simpan snapshot")} />
+      </form>
+    </Dialog>
+  );
+}
 
 function Dialog({ title, eyebrow, description, saving, onClose, initialFocusRef, children }: { title: string; eyebrow: string; description: string; saving: boolean; onClose: () => void; initialFocusRef?: React.RefObject<HTMLElement | null>; children: React.ReactNode }) {
+  const { t } = useLanguage();
   return (
     <DialogFrame titleId="investment-dialog-title" descriptionId="investment-dialog-description" initialFocusRef={initialFocusRef} onClose={onClose} closeDisabled={saving}>
       <section>
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6"><div><p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{eyebrow}</p><h2 id="investment-dialog-title" className="mt-1 text-xl font-bold tracking-tight">{title}</h2><p id="investment-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p></div><Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label="Tutup form investasi"><X className="h-5 w-5" /></Button></div>
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{eyebrow}</p>
+            <h2 id="investment-dialog-title" className="mt-1 text-xl font-bold tracking-tight">{title}</h2>
+            <p id="investment-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label={t("Tutup form investasi")}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
         {children}
       </section>
     </DialogFrame>
   );
 }
-function DialogActions({ saving, onClose, label }: { saving: boolean; onClose: () => void; label: string }) { return <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4"><Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button><Button type="submit" loading={saving} className="flex-[1.4] sm:flex-none">{label}</Button></div>; }
+function DialogActions({ saving, onClose, label }: { saving: boolean; onClose: () => void; label: string }) {
+  const { t } = useLanguage();
+  return (
+    <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4">
+      <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">{t("Batal")}</Button>
+      <Button type="submit" loading={saving} className="flex-[1.4] sm:flex-none">{label}</Button>
+    </div>
+  );
+}
 function InvestmentSkeleton() { return <div className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-20 bg-slate-50/60" />)}</div>; }
 function formatIdr(value: number) { return `Rp${Math.abs(Number(value)).toLocaleString("id-ID")}`; }
 function formatSignedIdr(value: number) { return `${value >= 0 ? "+" : "−"}${formatIdr(value)}`; }

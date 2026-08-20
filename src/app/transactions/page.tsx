@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
+import { enUS, id as idLocale } from "date-fns/locale";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -36,6 +36,7 @@ import {
   X,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { buttonStyles } from "@/components/ui/button-styles";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -118,6 +119,8 @@ function createDefaultForm(): TransactionFormState {
 }
 
 export default function TransactionsPage() {
+  const { language, t } = useLanguage();
+  const dateLocale = language === "en" ? enUS : idLocale;
   const router = useRouter();
   const searchParams = useSearchParams();
   const autoOpenedRef = useRef(false);
@@ -347,32 +350,32 @@ export default function TransactionsPage() {
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader
-          eyebrow="Ledger keuangan"
-          title="Transaksi"
-          description={`${filteredTx.length} dari ${transactions.length} transaksi ditampilkan. Cari, tinjau, dan catat arus uang tanpa kehilangan konteks.`}
+          eyebrow={t("Ledger keuangan")}
+          title={t("Transaksi")}
+          description={t("{shown} dari {total} transaksi ditampilkan. Cari, tinjau, dan catat arus uang tanpa kehilangan konteks.", { shown: filteredTx.length, total: transactions.length })}
           actions={(
             <>
               <Link href="/categories" className={buttonStyles({ variant: "secondary" })}>
-                <Tags className="h-4 w-4" /> Kategori
+                <Tags className="h-4 w-4" /> {t("Kategori")}
               </Link>
               <Button onClick={openAdd}>
-                <Plus className="h-4 w-4" /> Catat
+                <Plus className="h-4 w-4" /> {t("Catat")}
               </Button>
             </>
           )}
         />
 
         <Surface className="grid overflow-hidden sm:grid-cols-3">
-          <SummaryMetric icon={ArrowUpRight} label="Pemasukan terkonfirmasi" value={formatIdr(summary.income)} tone="emerald" />
-          <SummaryMetric icon={ArrowDownRight} label="Pengeluaran terkonfirmasi" value={formatIdr(summary.expense)} tone="rose" />
-          <SummaryMetric icon={CircleDollarSign} label="Selisih hasil filter" value={formatSignedIdr(summary.net)} tone={summary.net >= 0 ? "emerald" : "rose"} />
+          <SummaryMetric icon={ArrowUpRight} label={t("Pemasukan terkonfirmasi")} value={formatIdr(summary.income)} tone="emerald" />
+          <SummaryMetric icon={ArrowDownRight} label={t("Pengeluaran terkonfirmasi")} value={formatIdr(summary.expense)} tone="rose" />
+          <SummaryMetric icon={CircleDollarSign} label={t("Selisih hasil filter")} value={formatSignedIdr(summary.net)} tone={summary.net >= 0 ? "emerald" : "rose"} />
         </Surface>
 
         {pageError && (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
             <span>{pageError}</span>
             <Button variant="ghost" size="compact" onClick={() => void fetchTransactions()}>
-              <RotateCcw className="h-4 w-4" /> Coba lagi
+              <RotateCcw className="h-4 w-4" /> {t("Coba lagi")}
             </Button>
           </div>
         )}
@@ -381,13 +384,13 @@ export default function TransactionsPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                <SlidersHorizontal className="h-4 w-4 text-emerald-700" /> Cari dan filter
+                <SlidersHorizontal className="h-4 w-4 text-emerald-700" /> {t("Cari dan filter")}
               </h2>
-              <p className="mt-1 text-xs text-slate-500">Persempit ledger berdasarkan detail yang kamu ingat.</p>
+              <p className="mt-1 text-xs text-slate-500">{t("Persempit ledger berdasarkan detail yang kamu ingat.")}</p>
             </div>
             {filtersActive && (
               <Button variant="ghost" size="compact" onClick={resetFilters}>
-                <RotateCcw className="h-3.5 w-3.5" /> Reset
+                <RotateCcw className="h-3.5 w-3.5" /> {t("Reset")}
               </Button>
             )}
           </div>
@@ -396,45 +399,45 @@ export default function TransactionsPage() {
             <div className="relative sm:col-span-2 lg:col-span-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
-                aria-label="Cari transaksi"
+                aria-label={t("Cari transaksi")}
                 type="search"
-                placeholder="Cari merchant, catatan, atau kategori"
+                placeholder={t("Cari merchant, catatan, atau kategori")}
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                 className={cn(fieldControlStyles, "pl-11")}
               />
             </div>
             <select
-              aria-label="Filter tipe transaksi"
+              aria-label={t("Filter tipe transaksi")}
               value={filters.type}
               onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value as TransactionFilters["type"] }))}
               className={fieldControlStyles}
             >
-              <option value="all">Semua tipe</option>
-              <option value="expense">Pengeluaran</option>
-              <option value="income">Pemasukan</option>
+              <option value="all">{t("Semua tipe")}</option>
+              <option value="expense">{t("Pengeluaran")}</option>
+              <option value="income">{t("Pemasukan")}</option>
             </select>
             <select
-              aria-label="Filter kategori"
+              aria-label={t("Filter kategori")}
               value={filters.category}
               onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}
               className={fieldControlStyles}
             >
-              <option value="all">Semua kategori</option>
-              {filterCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+              <option value="all">{t("Semua kategori")}</option>
+              {filterCategoryOptions.map((category) => <option key={category} value={category}>{t(category)}</option>)}
             </select>
             <select
-              aria-label="Filter status transaksi"
+              aria-label={t("Filter status transaksi")}
               value={filters.status}
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as TransactionFilters["status"] }))}
               className={fieldControlStyles}
             >
-              <option value="active">Transaksi aktif</option>
-              <option value="confirmed">Terkonfirmasi</option>
-              <option value="pending_approval">Perlu persetujuan</option>
-              <option value="needs_review">Perlu ditinjau</option>
-              <option value="deleted">Sampah</option>
-              <option value="all">Semua riwayat</option>
+              <option value="active">{t("Transaksi aktif")}</option>
+              <option value="confirmed">{t("Terkonfirmasi")}</option>
+              <option value="pending_approval">{t("Perlu persetujuan")}</option>
+              <option value="needs_review">{t("Perlu ditinjau")}</option>
+              <option value="deleted">{t("Sampah")}</option>
+              <option value="all">{t("Semua riwayat")}</option>
             </select>
           </div>
 
@@ -444,11 +447,11 @@ export default function TransactionsPage() {
             aria-expanded={dateFiltersOpen}
             className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 sm:hidden"
           >
-            <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-emerald-700" /> Rentang tanggal</span>
+            <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-emerald-700" /> {t("Rentang tanggal")}</span>
             <ChevronDown className={cn("h-4 w-4 transition-transform", dateFiltersOpen && "rotate-180")} />
           </button>
           <div className={cn("mt-3 gap-3 sm:grid sm:grid-cols-2", dateFiltersOpen ? "grid" : "hidden")}>
-            <Field label="Mulai tanggal" htmlFor="filter-start-date">
+            <Field label={t("Mulai tanggal")} htmlFor="filter-start-date">
               <input
                 id="filter-start-date"
                 type="date"
@@ -457,7 +460,7 @@ export default function TransactionsPage() {
                 className={fieldControlStyles}
               />
             </Field>
-            <Field label="Sampai tanggal" htmlFor="filter-end-date">
+            <Field label={t("Sampai tanggal")} htmlFor="filter-end-date">
               <input
                 id="filter-end-date"
                 type="date"
@@ -475,17 +478,18 @@ export default function TransactionsPage() {
           <Surface>
             <EmptyState
               icon={filtersActive ? Search : ReceiptText}
-              title={filtersActive ? "Tidak ada transaksi yang cocok" : "Belum ada transaksi"}
-              description={filtersActive ? "Coba ubah kata kunci atau reset filter untuk melihat transaksi lain." : "Catat pemasukan atau pengeluaran pertama agar arus kas mulai terbaca."}
+              title={filtersActive ? t("Tidak ada transaksi yang cocok") : t("Belum ada transaksi")}
+              description={filtersActive ? t("Coba ubah kata kunci atau reset filter untuk melihat transaksi lain.") : t("Catat pemasukan atau pengeluaran pertama agar arus kas mulai terbaca.")}
               action={filtersActive
-                ? <Button variant="secondary" onClick={resetFilters}><RotateCcw className="h-4 w-4" /> Reset filter</Button>
-                : <Button onClick={openAdd}><Plus className="h-4 w-4" /> Catat</Button>}
+                ? <Button variant="secondary" onClick={resetFilters}><RotateCcw className="h-4 w-4" /> {t("Reset filter")}</Button>
+                : <Button onClick={openAdd}><Plus className="h-4 w-4" /> {t("Catat")}</Button>}
             />
           </Surface>
         ) : (
           <TransactionResults
             transactions={filteredTx}
             accountNames={accountNames}
+            dateLocale={dateLocale}
             onEdit={openEdit}
             onDelete={requestDelete}
             onRestore={handleRestore}
@@ -499,9 +503,9 @@ export default function TransactionsPage() {
         <ConfirmDialog
           titleId="delete-transaction-title"
           descriptionId="delete-transaction-description"
-          title={`Hapus “${deleteTarget.merchant || deleteTarget.category}”?`}
-          description="Transaksi akan dipindahkan ke Sampah. Saldo dan riwayat tetap dapat dipulihkan dari sana."
-          confirmLabel="Hapus transaksi"
+          title={t("Hapus “{name}”?", { name: deleteTarget.merchant || deleteTarget.category })}
+          description={t("Transaksi akan dipindahkan ke Sampah. Saldo dan riwayat tetap dapat dipulihkan dari sana.")}
+          confirmLabel={t("Hapus transaksi")}
           onClose={() => {
             if (!deletingId) {
               setDeleteTarget(null);
@@ -551,58 +555,60 @@ function SummaryMetric({ icon: Icon, label, value, tone }: {
   );
 }
 
-function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRestore, deletingId, restoringId }: {
+function TransactionResults({ transactions, accountNames, dateLocale, onEdit, onDelete, onRestore, deletingId, restoringId }: {
   transactions: Transaction[];
   accountNames: ReadonlyMap<string, string>;
+  dateLocale: typeof idLocale;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onRestore: (transactionId: string) => Promise<void>;
   deletingId: string | null;
   restoringId: string | null;
 }) {
+  const { t } = useLanguage();
   return (
     <>
       <Surface className="hidden overflow-hidden md:block">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Ledger transaksi</h2>
-            <p className="mt-1 text-xs text-slate-500">Urutan terbaru berdasarkan tanggal transaksi.</p>
+            <h2 className="text-base font-bold text-slate-900">{t("Ledger transaksi")}</h2>
+            <p className="mt-1 text-xs text-slate-500">{t("Urutan terbaru berdasarkan tanggal transaksi.")}</p>
           </div>
-          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">{transactions.length} item</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">{t("{count} item", { count: transactions.length })}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left">
             <thead className="bg-slate-50/80 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
               <tr>
-                <th className="px-5 py-3">Transaksi</th>
-                <th className="px-5 py-3">Akun & kategori</th>
-                <th className="px-5 py-3 text-right">Jumlah</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Aksi</th>
+                <th className="px-5 py-3">{t("Transaksi")}</th>
+                <th className="px-5 py-3">{t("Akun & kategori")}</th>
+                <th className="px-5 py-3 text-right">{t("Jumlah")}</th>
+                <th className="px-5 py-3">{t("Status")}</th>
+                <th className="px-5 py-3 text-right">{t("Aksi")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {transactions.map((transaction) => (
                 <tr key={transaction.id} className="group hover:bg-emerald-50/35">
                   <td className="px-5 py-4">
-                    <p className="font-bold text-slate-800">{transaction.merchant || transaction.category}</p>
+                    <p className="font-bold text-slate-800">{transaction.merchant || t(transaction.category)}</p>
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                      <CalendarDays className="h-3.5 w-3.5" /> {format(parseISO(transaction.date), "dd MMM yyyy", { locale: idLocale })}
+                      <CalendarDays className="h-3.5 w-3.5" /> {format(parseISO(transaction.date), "dd MMM yyyy", { locale: dateLocale })}
                       {transaction.note && <span className="max-w-[220px] truncate">· {transaction.note}</span>}
                     </p>
                   </td>
                   <td className="px-5 py-4">
                     <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                      <WalletCards className="h-4 w-4 text-emerald-700" /> {transaction.account_id ? accountNames.get(transaction.account_id) ?? "Akun tidak tersedia" : "Tanpa akun"}
+                      <WalletCards className="h-4 w-4 text-emerald-700" /> {transaction.account_id ? accountNames.get(transaction.account_id) ?? t("Akun tidak tersedia") : t("Tanpa akun")}
                     </p>
-                    <span className="mt-1.5 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{transaction.category}</span>
+                    <span className="mt-1.5 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{t(transaction.category)}</span>
                   </td>
                   <td className={cn("px-5 py-4 text-right text-sm font-bold", transaction.type === "income" ? "text-emerald-700" : "text-slate-800")}>
                     {transaction.type === "income" ? "+" : "−"}{formatIdr(transaction.amount)}
                   </td>
                   <td className="px-5 py-4">
                     <StatusBadge status={transaction.status} />
-                    <p className="mt-1.5 text-[11px] font-medium text-slate-400">{getTransactionSourceLabel(transaction.source)}</p>
+                    <p className="mt-1.5 text-[11px] font-medium text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</p>
                   </td>
                   <td className="px-5 py-4">
                     <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
@@ -619,9 +625,9 @@ function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRe
           <Surface key={transaction.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-bold text-slate-900">{transaction.merchant || transaction.category}</p>
+                <p className="truncate font-bold text-slate-900">{transaction.merchant || t(transaction.category)}</p>
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                  <CalendarDays className="h-3.5 w-3.5" /> {format(parseISO(transaction.date), "dd MMM yyyy", { locale: idLocale })}
+                  <CalendarDays className="h-3.5 w-3.5" /> {format(parseISO(transaction.date), "dd MMM yyyy", { locale: dateLocale })}
                 </p>
               </div>
               <p className={cn("shrink-0 text-sm font-bold", transaction.type === "income" ? "text-emerald-700" : "text-slate-900")}>
@@ -631,11 +637,11 @@ function TransactionResults({ transactions, accountNames, onEdit, onDelete, onRe
             <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-slate-100 pt-3">
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold text-slate-600">
-                  {transaction.account_id ? accountNames.get(transaction.account_id) ?? "Akun tidak tersedia" : "Tanpa akun"} · {transaction.category}
+                  {transaction.account_id ? accountNames.get(transaction.account_id) ?? t("Akun tidak tersedia") : t("Tanpa akun")} · {t(transaction.category)}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge status={transaction.status} />
-                  <span className="text-[11px] text-slate-400">{getTransactionSourceLabel(transaction.source)}</span>
+                  <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
                 </div>
               </div>
               <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} deletingId={deletingId} restoringId={restoringId} />
@@ -656,6 +662,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
   deletingId: string | null;
   restoringId: string | null;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center justify-end gap-1">
       {transaction.receipt_url && (
@@ -663,7 +670,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
           href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/private/${transaction.receipt_url}`}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Lihat struk ${transaction.merchant || transaction.category}`}
+          aria-label={t("Lihat struk {name}", { name: transaction.merchant || transaction.category })}
           className={buttonStyles({ variant: "ghost", size: "icon", className: "h-9 min-h-9 w-9 rounded-lg" })}
         >
           <Eye className="h-4 w-4" />
@@ -671,14 +678,14 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
       )}
       {transaction.status === "deleted" ? (
         <Button variant="secondary" size="compact" onClick={() => void onRestore(transaction.id)} loading={restoringId === transaction.id}>
-          <RotateCcw className="h-3.5 w-3.5" /> Pulihkan
+          <RotateCcw className="h-3.5 w-3.5" /> {t("Pulihkan")}
         </Button>
       ) : (
         <>
-          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => onEdit(transaction)} aria-label={`Edit ${transaction.merchant || transaction.category}`}>
+          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => onEdit(transaction)} aria-label={t("Edit {name}", { name: transaction.merchant || transaction.category })}>
             <Edit3 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => onDelete(transaction)} disabled={Boolean(deletingId)} aria-label={`Hapus ${transaction.merchant || transaction.category}`}>
+          <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={() => onDelete(transaction)} disabled={Boolean(deletingId)} aria-label={t("Hapus {name}", { name: transaction.merchant || transaction.category })}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </>
@@ -688,13 +695,14 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, deleting
 }
 
 function StatusBadge({ status }: { status: Transaction["status"] }) {
+  const { t } = useLanguage();
   const tones = {
     confirmed: "bg-emerald-50 text-emerald-700",
     pending_approval: "bg-amber-50 text-amber-700",
     needs_review: "bg-rose-50 text-rose-700",
     deleted: "bg-slate-100 text-slate-500",
   };
-  return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold", tones[status])}>{getTransactionStatusLabel(status)}</span>;
+  return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold", tones[status])}>{t(getTransactionStatusLabel(status))}</span>;
 }
 
 function TransactionDialog({ form, setForm, accounts, categories, categoryOptions, isEditMode, saving, error, merchantInputRef, onClose, onSubmit }: {
@@ -710,6 +718,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const changeType = (type: CategoryType) => {
     const options = buildTransactionCategoryOptions(categories, type);
     setForm((current) => ({ ...current, type, category: options.includes(current.category) ? current.category : options[0] ?? "" }));
@@ -725,26 +734,26 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
       <form onSubmit={onSubmit}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{isEditMode ? "Perbarui ledger" : "Transaksi baru"}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{isEditMode ? t("Perbarui ledger") : t("Transaksi baru")}</p>
             <h2 id="transaction-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">
-              {isEditMode ? "Edit transaksi" : "Catat transaksi"}
+              {isEditMode ? t("Edit transaksi") : t("Catat transaksi")}
             </h2>
-            <p id="transaction-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">Isi detail utama. Biasanya selesai kurang dari satu menit.</p>
+            <p id="transaction-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{t("Isi detail utama. Biasanya selesai kurang dari satu menit.")}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label="Tutup form transaksi">
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label={t("Tutup form transaksi")}>
             <X className="h-5 w-5" />
           </Button>
         </div>
 
         <div className="space-y-5 px-5 py-5 sm:px-6">
-          <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label="Tipe transaksi">
+          <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label={t("Tipe transaksi")}>
             <button
               type="button"
               aria-pressed={form.type === "expense"}
               onClick={() => changeType("expense")}
               className={cn("min-h-11 rounded-lg text-sm font-bold transition", form.type === "expense" ? "bg-white text-rose-700 shadow-sm" : "text-slate-500")}
             >
-              Pengeluaran
+              {t("Pengeluaran")}
             </button>
             <button
               type="button"
@@ -752,22 +761,22 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
               onClick={() => changeType("income")}
               className={cn("min-h-11 rounded-lg text-sm font-bold transition", form.type === "income" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500")}
             >
-              Pemasukan
+              {t("Pemasukan")}
             </button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Merchant atau sumber" htmlFor="transaction-merchant" hint="Contoh: Superindo atau Gaji bulanan.">
+            <Field label={t("Merchant atau sumber")} htmlFor="transaction-merchant" hint={t("Contoh: Superindo atau Gaji bulanan.")}>
               <input
                 ref={merchantInputRef}
                 id="transaction-merchant"
                 value={form.merchant}
                 onChange={(event) => setForm((current) => ({ ...current, merchant: event.target.value }))}
-                placeholder="Nama transaksi"
+                placeholder={t("Nama transaksi")}
                 className={fieldControlStyles}
               />
             </Field>
-            <Field label="Tanggal" htmlFor="transaction-date">
+            <Field label={t("Tanggal")} htmlFor="transaction-date">
               <input
                 id="transaction-date"
                 type="date"
@@ -779,7 +788,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
             </Field>
           </div>
 
-          <Field label="Akun" htmlFor="transaction-account" hint={accounts.length === 0 ? "Tambahkan akun dahulu melalui halaman Akun & saldo." : "Saldo akun akan mengikuti transaksi ini."}>
+          <Field label={t("Akun")} htmlFor="transaction-account" hint={accounts.length === 0 ? t("Tambahkan akun dahulu melalui halaman Akun & saldo.") : t("Saldo akun akan mengikuti transaksi ini.")}>
             <select
               id="transaction-account"
               required
@@ -787,12 +796,12 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
               onChange={(event) => setForm((current) => ({ ...current, accountId: event.target.value }))}
               className={fieldControlStyles}
             >
-              <option value="">Pilih akun</option>
+              <option value="">{t("Pilih akun")}</option>
               {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
             </select>
           </Field>
 
-          <Field label="Nominal" htmlFor="transaction-amount" hint="Masukkan angka tanpa tanda titik atau koma." descriptionId="transaction-amount-hint">
+          <Field label={t("Nominal")} htmlFor="transaction-amount" hint={t("Masukkan angka tanpa tanda titik atau koma.")} descriptionId="transaction-amount-hint">
             <div className="relative">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">Rp</span>
               <input
@@ -811,7 +820,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
             </div>
           </Field>
 
-          <Field label="Kategori" htmlFor="transaction-category">
+          <Field label={t("Kategori")} htmlFor="transaction-category">
             <select
               id="transaction-category"
               required
@@ -819,19 +828,19 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
               onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
               className={fieldControlStyles}
             >
-              {categoryOptions.length === 0 && <option value="">Belum ada kategori untuk tipe ini</option>}
-              {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+              {categoryOptions.length === 0 && <option value="">{t("Belum ada kategori untuk tipe ini")}</option>}
+              {categoryOptions.map((category) => <option key={category} value={category}>{t(category)}</option>)}
             </select>
-            {categoryOptions.length === 0 && <p className="mt-2 text-xs leading-5 text-amber-700">Buat kategori {form.type === "expense" ? "pengeluaran" : "pemasukan"} di <Link href="/categories" className="font-bold underline underline-offset-2">halaman Kategori</Link>.</p>}
+            {categoryOptions.length === 0 && <p className="mt-2 text-xs leading-5 text-amber-700">{t("Buat kategori {type} di ", { type: form.type === "expense" ? t("Pengeluaran") : t("Pemasukan") })}<Link href="/categories" className="font-bold underline underline-offset-2">{t("halaman Kategori")}</Link>.</p>}
           </Field>
 
-          <Field label="Catatan" htmlFor="transaction-note" hint="Opsional—tambahkan konteks yang berguna saat ditinjau nanti.">
+          <Field label={t("Catatan")} htmlFor="transaction-note" hint={t("Opsional—tambahkan konteks yang berguna saat ditinjau nanti.")}>
             <textarea
               id="transaction-note"
               rows={3}
               value={form.note}
               onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
-              placeholder="Catatan singkat"
+              placeholder={t("Catatan singkat")}
               className={cn(fieldControlStyles, "resize-none")}
             />
           </Field>
@@ -842,9 +851,9 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
         </div>
 
         <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4">
-          <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">Batal</Button>
+          <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">{t("Batal")}</Button>
           <Button type="submit" disabled={saving || accounts.length === 0 || categoryOptions.length === 0} className="flex-[1.4] sm:flex-none">
-            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <><FileSpreadsheet className="h-4 w-4" /> {isEditMode ? "Simpan perubahan" : "Simpan transaksi"}</>}
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("Menyimpan...")}</> : <><FileSpreadsheet className="h-4 w-4" /> {isEditMode ? t("Simpan perubahan") : t("Simpan transaksi")}</>}
           </Button>
         </div>
       </form>
