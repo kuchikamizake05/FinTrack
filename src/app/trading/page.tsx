@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { BrainCircuit, Camera, CheckCircle2, Loader2, Plus, Search, Target, TrendingDown, TrendingUp, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { PortfolioTabs } from "@/components/PortfolioTabs";
 import TradingAnalytics from "@/components/TradingAnalytics";
 import TradingInsights from "@/components/TradingInsights";
 import { Button } from "@/components/ui/Button";
@@ -154,6 +155,8 @@ export default function TradingPage() {
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
         <PageHeader eyebrow="Trading journal" title="Trading" description="Rekam rencana, risiko, hasil, dan refleksi. Review AI tetap advisory dan tidak pernah mengubah jurnal." actions={activeTab === "journal" ? <><Button variant="secondary" onClick={openSnapshotForm} disabled={!accounts.length}><Camera className="h-4 w-4" /> Update equity</Button><Button onClick={openTradeForm} disabled={!accounts.length}><Plus className="h-4 w-4" /> Catat trade</Button></> : undefined} />
+
+        <PortfolioTabs />
 
         <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Bagian trading"><button id="trading-tab-journal" type="button" role="tab" aria-controls="trading-panel-journal" aria-selected={activeTab === "journal"} tabIndex={activeTab === "journal" ? 0 : -1} onClick={() => setActiveTab("journal")} className={cn("min-h-10 rounded-lg px-4 text-sm font-bold transition", activeTab === "journal" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>Jurnal & statistik</button><button id="trading-tab-reviews" type="button" role="tab" aria-controls="trading-panel-reviews" aria-selected={activeTab === "reviews"} tabIndex={activeTab === "reviews" ? 0 : -1} onClick={() => setActiveTab("reviews")} className={cn("min-h-10 rounded-lg px-4 text-sm font-bold transition", activeTab === "reviews" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>Review</button></div>
 
