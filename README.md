@@ -291,6 +291,8 @@ The canonical template is [`.env.example`](.env.example).
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser-safe | Supabase anon key; safe only with correct RLS policies |
 | `GROQ_API_KEY` | For AI insights | Server only | Generates the optional Smart Insights explanation |
 | `GROQ_INSIGHTS_MODEL` | No | Server only | Groq model ID; defaults to `openai/gpt-oss-20b` |
+| `GEMINI_API_KEY` | For receipt extraction | Server only | Powers automatic receipt parsing from shared images |
+| `GEMINI_RECEIPT_MODEL` | No | Server only | Gemini model ID; defaults to `gemini-1.5-flash` |
 | `N8N_TRADE_REVIEW_WEBHOOK_URL` | For trade review | Server only | n8n webhook receiving authenticated review jobs |
 | `N8N_TRADE_REVIEW_SHARED_SECRET` | For trade review | Server only | Shared secret sent to and verified by n8n |
 
