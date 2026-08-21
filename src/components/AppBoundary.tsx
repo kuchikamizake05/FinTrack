@@ -65,12 +65,11 @@ export default function AppBoundary({ children }: { children: React.ReactNode })
 export function ApplicationLoading() {
   return (
     <main id="main-content" tabIndex={-1} className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0%,#f7faf7_48%,#f8faf9_100%)] px-6 outline-none">
-      <div className="text-center" role="status" aria-live="polite">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-emerald-700 shadow-[0_10px_30px_rgba(22,101,52,0.1)]">
+      <div role="status" aria-live="polite">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-emerald-700 shadow-[0_10px_30px_rgba(22,101,52,0.1)]">
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
         </span>
-        <p className="mt-4 text-sm font-bold text-slate-800">Membuka ruang keuanganmu</p>
-        <p className="mt-1 text-xs text-slate-500">Memeriksa sesi dengan aman.</p>
+        <span className="sr-only">Memuat aplikasi</span>
       </div>
     </main>
   );

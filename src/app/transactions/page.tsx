@@ -679,7 +679,6 @@ export default function TransactionsPage() {
               </div>
               <Button
                 variant="secondary"
-                size="compact"
                 onClick={() => void syncQueuedOperations()}
                 loading={syncingQueue}
                 disabled={pendingQueuedOperations.length === 0}
@@ -687,7 +686,7 @@ export default function TransactionsPage() {
               >
                 <RotateCcw className="h-4 w-4" /> <span className="sm:hidden">{t("Sinkronkan")}</span><span className="hidden sm:inline">{t("Sinkronkan sekarang")}</span>
               </Button>
-              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary", size: "compact" }), "sm:hidden")} aria-label={t("Kategori")} data-print-hide>
+              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "sm:hidden")} aria-label={t("Kategori")} data-print-hide>
                 <Tags className="h-4 w-4" />
               </Link>
               <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "hidden sm:inline-flex")} data-print-hide>
