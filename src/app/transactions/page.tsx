@@ -650,25 +650,47 @@ export default function TransactionsPage() {
           description={t("{shown} dari {total} transaksi ditampilkan. Cari, tinjau, dan catat arus uang tanpa kehilangan konteks.", { shown: filteredTx.length, total: transactions.length })}
           actions={(
             <>
-              <Button variant="secondary" onClick={exportLedger}>
-                <Download className="h-4 w-4" /> {t("Ekspor transaksi CSV")}
-              </Button>
-              <Button variant="secondary" onClick={() => void exportReport()}>
-                <FileSpreadsheet className="h-4 w-4" /> {t("Ekspor laporan CSV")}
-              </Button>
-              <Button variant="secondary" onClick={() => void printReport()}>
-                <Printer className="h-4 w-4" /> {t("Cetak laporan")}
-              </Button>
+              <details className="group relative sm:hidden" data-print-hide>
+                <summary className={cn(buttonStyles({ variant: "secondary" }), "cursor-pointer list-none [&::-webkit-details-marker]:hidden")}>
+                  {t("Lainnya")} <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 grid w-56 gap-1 rounded-xl border border-emerald-100 bg-white p-1.5 shadow-[var(--shadow-elevated)]">
+                  <Button variant="ghost" size="compact" onClick={exportLedger}>
+                    <Download className="h-4 w-4" /> {t("Ekspor transaksi CSV")}
+                  </Button>
+                  <Button variant="ghost" size="compact" onClick={() => void exportReport()}>
+                    <FileSpreadsheet className="h-4 w-4" /> {t("Ekspor laporan CSV")}
+                  </Button>
+                  <Button variant="ghost" size="compact" onClick={() => void printReport()}>
+                    <Printer className="h-4 w-4" /> {t("Cetak laporan")}
+                  </Button>
+                </div>
+              </details>
+              <div className="hidden items-center gap-2 sm:flex">
+                <Button variant="secondary" onClick={exportLedger}>
+                  <Download className="h-4 w-4" /> {t("Ekspor transaksi CSV")}
+                </Button>
+                <Button variant="secondary" onClick={() => void exportReport()}>
+                  <FileSpreadsheet className="h-4 w-4" /> {t("Ekspor laporan CSV")}
+                </Button>
+                <Button variant="secondary" onClick={() => void printReport()}>
+                  <Printer className="h-4 w-4" /> {t("Cetak laporan")}
+                </Button>
+              </div>
               <Button
                 variant="secondary"
+                size="compact"
                 onClick={() => void syncQueuedOperations()}
                 loading={syncingQueue}
                 disabled={pendingQueuedOperations.length === 0}
                 data-print-hide
               >
-                <RotateCcw className="h-4 w-4" /> {t("Sinkronkan sekarang")}
+                <RotateCcw className="h-4 w-4" /> <span className="sm:hidden">{t("Sinkronkan")}</span><span className="hidden sm:inline">{t("Sinkronkan sekarang")}</span>
               </Button>
-              <Link href="/categories" className={buttonStyles({ variant: "secondary" })} data-print-hide>
+              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary", size: "compact" }), "sm:hidden")} aria-label={t("Kategori")} data-print-hide>
+                <Tags className="h-4 w-4" />
+              </Link>
+              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "hidden sm:inline-flex")} data-print-hide>
                 <Tags className="h-4 w-4" /> {t("Kategori")}
               </Link>
               <Button onClick={openAdd} data-print-hide>

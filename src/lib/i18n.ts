@@ -301,6 +301,8 @@ const englishTranslations: Record<string, string> = {
   "Ekspor transaksi CSV": "Export transactions CSV",
   "Ekspor laporan CSV": "Export report CSV",
   "Cetak laporan": "Print report",
+  "Lainnya": "More",
+  "Sinkronkan": "Sync",
   "Sinkronkan sekarang": "Sync now",
   "Sinkronisasi tertunda": "Sync pending",
   "{count} perubahan manual menunggu sinkronisasi.": "{count} manual change(s) pending sync.",

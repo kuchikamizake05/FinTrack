@@ -104,7 +104,10 @@ export default function DashboardPage() {
   const { language, t } = useLanguage();
   const dateLocale = language === "en" ? enUS : id;
   const router = useRouter();
-  const { eligibility: onboardingEligibility, progress: onboardingProgress, saveProgress } = useOnboarding();
+  const onboarding = useOnboarding(false);
+  const onboardingEligibility = onboarding?.eligibility;
+  const onboardingProgress = onboarding?.progress;
+  const saveProgress = onboarding?.saveProgress;
   const [today] = useState(() => new Date());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -280,7 +283,7 @@ export default function DashboardPage() {
     (account.institution || account.name).toLowerCase().includes("gopay"),
   ) || accounts.find((account) => account.kind === "ewallet") || accounts[0];
   const recentTransactions = transactions.slice(0, 5);
-  const showSetupCard = shouldShowOnboardingResume({
+  const showSetupCard = onboardingEligibility !== undefined && shouldShowOnboardingResume({
     eligibility: onboardingEligibility,
     hasConfirmedTransaction: transactions.length > 0,
     dismissed: setupCardDismissed,
@@ -288,7 +291,7 @@ export default function DashboardPage() {
   const completedSetupDataSteps = Number(Boolean(onboardingProgress?.accountId)) + Number(Boolean(onboardingProgress?.transactionId));
 
   const resumeSetup = () => {
-    if (!onboardingProgress) return;
+    if (!onboardingProgress || !saveProgress) return;
     saveProgress({ ...onboardingProgress, deferredUntil: null });
     router.push("/onboarding");
   };

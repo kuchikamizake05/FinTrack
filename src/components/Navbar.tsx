@@ -183,7 +183,7 @@ export default function Navbar() {
               <Link
                 key={item0.href}
                 href={item0.href}
-                prefetch={true}
+                prefetch={false}
                 aria-current={active0 ? "page" : undefined}
                 className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active0 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
@@ -203,7 +203,7 @@ export default function Navbar() {
               <Link
                 key={item1.href}
                 href={item1.href}
-                prefetch={true}
+                prefetch={false}
                 aria-current={active1 ? "page" : undefined}
                 className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active1 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
@@ -217,7 +217,7 @@ export default function Navbar() {
 
           <Link
             href="/transactions?new=1"
-            prefetch={true}
+            prefetch={false}
             aria-label={t("Buka form catat")}
             className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"
           >
@@ -235,7 +235,7 @@ export default function Navbar() {
               <Link
                 key={item2.href}
                 href={item2.href}
-                prefetch={true}
+                prefetch={false}
                 aria-current={active2 ? "page" : undefined}
                 className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active2 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >
@@ -255,7 +255,7 @@ export default function Navbar() {
               <Link
                 key={item3.href}
                 href={item3.href}
-                prefetch={true}
+                prefetch={false}
                 aria-current={active3 ? "page" : undefined}
                 className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active3 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
               >

@@ -37,9 +37,11 @@ type OnboardingContextValue = {
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
-export function useOnboarding() {
+export function useOnboarding(): OnboardingContextValue;
+export function useOnboarding(required: false): OnboardingContextValue | null;
+export function useOnboarding(required = true) {
   const value = useContext(OnboardingContext);
-  if (!value) throw new Error("useOnboarding must be used inside OnboardingBoundary.");
+  if (!value && required) throw new Error("useOnboarding must be used inside a resolved OnboardingBoundary.");
   return value;
 }
 
@@ -55,9 +57,10 @@ export default function OnboardingBoundary({ children }: { children: React.React
     setError(null);
 
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) return;
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session?.user) return;
+      const user = session.user;
 
       const stored = parseOnboardingProgress(
         window.localStorage.getItem(buildOnboardingStorageKey(user.id)),
@@ -146,8 +149,12 @@ export default function OnboardingBoundary({ children }: { children: React.React
   }, [destination, router]);
 
   if (!protectedRoute) return children;
-  if (error) return <OnboardingGateError message={error} onRetry={() => void loadEligibility()} />;
-  if (!contextValue || destination) return <ApplicationLoading />;
+  if (pathname === "/onboarding") {
+    if (error) return <OnboardingGateError message={error} onRetry={() => void loadEligibility()} />;
+    if (!contextValue || destination) return <ApplicationLoading />;
+  }
+  if (destination) return <ApplicationLoading />;
+  if (!contextValue) return children;
 
   return <OnboardingContext.Provider value={contextValue}>{children}</OnboardingContext.Provider>;
 }

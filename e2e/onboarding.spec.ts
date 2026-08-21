@@ -18,6 +18,8 @@ type MockState = {
   transaction: null | { id: string; type: "income" | "expense"; amount: number; merchant: string; category: string; date: string; account_id: string };
   failNextAccountSave?: boolean;
   failNextTransactionSave?: boolean;
+  failEligibility?: boolean;
+  onboardingCompleted?: boolean;
 };
 
 async function fulfillRows(route: Route, rows: unknown[]) {
@@ -31,7 +33,7 @@ async function fulfillRows(route: Route, rows: unknown[]) {
 
 async function mockOnboardingSupabase(page: Page, initial: Partial<MockState> = {}) {
   const state: MockState = { account: null, transaction: null, ...initial };
-  await mockAuthenticatedSession(page, false);
+  await mockAuthenticatedSession(page, initial.onboardingCompleted ?? false);
   await page.route("https://e2e-project.supabase.co/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -42,6 +44,10 @@ async function mockOnboardingSupabase(page: Page, initial: Partial<MockState> = 
     }
 
     if (url.pathname === "/rest/v1/financial_accounts") {
+      if (state.failEligibility && request.method() === "GET") {
+        await route.fulfill({ status: 503, json: { message: "temporary eligibility failure" } });
+        return;
+      }
       if (request.method() === "POST") {
         if (state.failNextAccountSave) {
           state.failNextAccountSave = false;
@@ -75,6 +81,10 @@ async function mockOnboardingSupabase(page: Page, initial: Partial<MockState> = 
     }
 
     if (url.pathname === "/rest/v1/transactions") {
+      if (state.failEligibility && request.method() === "GET") {
+        await route.fulfill({ status: 503, json: { message: "temporary eligibility failure" } });
+        return;
+      }
       if (request.method() === "POST") {
         if (state.failNextTransactionSave) {
           state.failNextTransactionSave = false;
@@ -113,6 +123,8 @@ async function chooseIntentAndCreateAccount(page: Page) {
 }
 
 test.describe("premium onboarding @critical", () => {
+  test.use({ allowedConsoleErrors: ["Failed to load resource: the server responded with a status of 503"] });
+
   test("empty user completes a real account and transaction flow", async ({ page }) => {
     await mockOnboardingSupabase(page);
     await page.goto("/dashboard");
@@ -166,6 +178,13 @@ test.describe("premium onboarding @critical", () => {
       await page.getByRole("button", { name: /Simpan akun/ }).click();
       await expect(page.getByRole("heading", { name: "Catat satu aktivitas nyata." })).toBeVisible();
     });
+  });
+
+  test("keeps dashboard reachable when onboarding eligibility is temporarily unavailable", async ({ page }) => {
+    await mockOnboardingSupabase(page, { failEligibility: true, onboardingCompleted: true });
+    await page.goto("/dashboard");
+    await expect(page.getByRole("heading", { name: dashboardHeading })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Penyiapan belum bisa diperiksa" })).not.toBeVisible();
   });
 
   test("legacy data bypasses onboarding", async ({ page }) => {

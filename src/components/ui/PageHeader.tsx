@@ -27,7 +27,7 @@ export function PageHeader({ eyebrow, title, description, actions, id }: PageHea
         <p id={descriptionId} className="mt-2 max-w-xl text-[13px] leading-5 text-slate-500 sm:text-sm sm:leading-6">{t(description)}</p>
       </div>
       {actions && (
-        <div role="group" aria-label={t("Aksi halaman")} className="flex w-full flex-wrap items-center gap-2 [&>*]:min-w-0 [&>*]:flex-1 sm:w-auto sm:justify-end sm:[&>*]:flex-none">
+        <div role="group" aria-label={t("Aksi halaman")} className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {actions}
         </div>
       )}
