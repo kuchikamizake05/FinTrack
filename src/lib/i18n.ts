@@ -253,6 +253,11 @@ const englishTranslations: Record<string, string> = {
   "Buat akun": "Create account",
   "Masuk ke FinTrack": "Sign in to FinTrack",
   "Kembali ke halaman masuk": "Back to sign in",
+  "Perangkat dikenal": "Recognized device",
+  "Buka FinTrack": "Unlock FinTrack",
+  "Buka dengan Passkey": "Unlock with Passkey",
+  "Gunakan login biasa": "Use regular sign in",
+  "Ganti akun": "Switch account",
   "Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.":
     "Each account can only access its own data through RLS policies.",
   "Periksa email untuk konfirmasi. Jika akun sudah ada, silakan masuk.":

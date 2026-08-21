@@ -189,14 +189,14 @@ export default function SettingsPage() {
                 <p className="mt-1 text-xs leading-5 text-slate-500">{t("Data keuangan hanya dibuka lewat akun terautentikasi ini.")}</p>
               </div>
               <div className="mt-5 rounded-xl border border-slate-200 p-3">
-                <div className="flex items-start gap-2"><Fingerprint className="mt-0.5 h-4 w-4 text-emerald-700" /><div><p className="text-xs font-bold text-slate-700">Passkey perangkat</p><p className="mt-1 text-xs leading-5 text-slate-500">Daftarkan keamanan perangkat. FinTrack tidak menerima data biometrik atau PIN.</p></div></div>
+                <div className="flex items-center gap-2"><Fingerprint className="h-4 w-4 text-emerald-700" /><p className="text-xs font-bold text-slate-700">Passkey perangkat</p></div>
                 {!isWebAuthnSupported() && <p role="alert" className="mt-3 text-xs leading-5 text-rose-700">Perangkat atau browser ini belum mendukung Passkey.</p>}
                 {passkeyError && <p role="alert" className="mt-3 text-xs leading-5 text-rose-700">{passkeyError}</p>}
                 <div className="mt-3 space-y-2">
                   {passkeys.map((passkey) => <div key={passkey.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{passkey.friendly_name || "Passkey perangkat"}</p><p className="text-[11px] text-slate-500">{passkey.last_used_at ? "Pernah digunakan" : "Baru didaftarkan"}</p></div><Button variant="ghost" size="compact" onClick={() => setPasskeyDeleteId(passkey.id)} disabled={passkeyBusy !== null}>Hapus</Button></div>)}
                 </div>
                 <Button variant="secondary" size="compact" loading={passkeyBusy === "enroll"} onClick={() => void enrollPasskey()} disabled={!userId || !isWebAuthnSupported() || passkeyBusy !== null} className="mt-3 w-full"><Fingerprint className="h-4 w-4" /> Daftarkan Passkey</Button>
-                <label className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5"><span><span className="block text-xs font-bold text-slate-700">Kunci FinTrack di perangkat ini</span><span className="mt-0.5 block text-[11px] leading-4 text-slate-500">Muncul saat aplikasi dibuka kembali.</span></span><input type="checkbox" checked={deviceLockEnabled} onChange={(event) => toggleDeviceLock(event.target.checked)} disabled={!passkeys.length || !isWebAuthnSupported()} className="h-5 w-5 accent-emerald-700" /></label>
+                <label className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5"><span className="text-xs font-bold text-slate-700">Kunci FinTrack di perangkat ini</span><input type="checkbox" checked={deviceLockEnabled} onChange={(event) => toggleDeviceLock(event.target.checked)} disabled={!passkeys.length || !isWebAuthnSupported()} className="h-5 w-5 accent-emerald-700" /></label>
                 {deviceLockEnabled && <Button variant="secondary" size="compact" onClick={lockNow} className="mt-3 w-full">Kunci sekarang</Button>}
               </div>
               {logoutError && <p role="alert" className="mt-4 text-xs leading-5 text-rose-700">{t(logoutError)}</p>}

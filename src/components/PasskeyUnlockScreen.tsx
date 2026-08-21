@@ -5,6 +5,7 @@ import { Fingerprint, LogOut, ShieldCheck } from "lucide-react";
 import BrandLockup from "@/components/BrandLockup";
 import { Button } from "@/components/ui/Button";
 import { getPasskeyErrorMessage } from "@/lib/passkeys";
+import { useLanguage } from "@/components/LanguageProvider";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 
 type PasskeyUnlockScreenProps = {
@@ -15,6 +16,7 @@ type PasskeyUnlockScreenProps = {
 };
 
 export default function PasskeyUnlockScreen({ emailHint, userId, onUnlock, onUseNormalLogin }: PasskeyUnlockScreenProps) {
+  const { t } = useLanguage();
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,14 +44,13 @@ export default function PasskeyUnlockScreen({ emailHint, userId, onUnlock, onUse
       <section aria-labelledby="passkey-unlock-title" className="w-full max-w-sm rounded-3xl border border-emerald-900/15 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(18,53,36,0.16)] sm:p-8">
         <div className="flex justify-center"><BrandLockup href="/" priority compact ariaLabel="FinTrack" /></div>
         <span className="mx-auto mt-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700 shadow-inner"><Fingerprint className="h-10 w-10" aria-hidden="true" /></span>
-        <span className="mx-auto mt-4 flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.1em] text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> Perangkat dikenal</span>
-        <h1 id="passkey-unlock-title" className="mt-4 text-2xl font-black tracking-tight text-[var(--brand-ink)]">Buka FinTrack</h1>
+        <span className="mx-auto mt-4 flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.1em] text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> {t("Perangkat dikenal")}</span>
+        <h1 id="passkey-unlock-title" className="mt-4 text-2xl font-black tracking-tight text-[var(--brand-ink)]">{t("Buka FinTrack")}</h1>
         <p className="mt-2 text-sm text-slate-500">{emailHint}</p>
-        <p className="mt-5 text-sm leading-6 text-slate-600">Gunakan metode keamanan perangkatmu. Sistem memilih biometrik atau PIN perangkat secara otomatis.</p>
         {error && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-sm leading-5 text-rose-700">{error}</p>}
-        <Button className="mt-6 w-full" loading={checking} onClick={() => void unlock()}><Fingerprint className="h-4 w-4" /> Buka dengan Passkey</Button>
-        <button type="button" disabled={checking} onClick={() => void onUseNormalLogin()} className="mt-3 min-h-11 w-full text-sm font-bold text-slate-600 hover:text-emerald-700 disabled:opacity-60">Gunakan login biasa</button>
-        <button type="button" disabled={checking} onClick={() => void onUseNormalLogin()} className="mt-1 inline-flex min-h-10 items-center gap-2 text-xs font-bold text-slate-500 hover:text-rose-700 disabled:opacity-60"><LogOut className="h-3.5 w-3.5" /> Ganti akun</button>
+        <Button className="mt-6 w-full" loading={checking} onClick={() => void unlock()}><Fingerprint className="h-4 w-4" /> {t("Buka dengan Passkey")}</Button>
+        <button type="button" disabled={checking} onClick={() => void onUseNormalLogin()} className="mt-3 min-h-11 w-full text-sm font-bold text-slate-600 hover:text-emerald-700 disabled:opacity-60">{t("Gunakan login biasa")}</button>
+        <button type="button" disabled={checking} onClick={() => void onUseNormalLogin()} className="mt-1 inline-flex min-h-10 items-center gap-2 text-xs font-bold text-slate-500 hover:text-rose-700 disabled:opacity-60"><LogOut className="h-3.5 w-3.5" /> {t("Ganti akun")}</button>
       </section>
     </main>
   );
