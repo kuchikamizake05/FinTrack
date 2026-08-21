@@ -15,4 +15,10 @@ export const isSupabaseConfigured = supabaseConfiguration.configured;
 const url = supabaseConfiguration.configured ? supabaseConfiguration.url : SUPABASE_PLACEHOLDER_URL;
 const key = supabaseConfiguration.configured ? supabaseConfiguration.anonKey : SUPABASE_PLACEHOLDER_KEY;
 
-export const supabase = createClient(url, key);
+export const supabase = createClient(url, key, {
+  auth: {
+    experimental: {
+      passkey: true,
+    },
+  },
+});

@@ -24,6 +24,8 @@ export default function SettingsPage() {
   const [copyError, setCopyError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [passkeyCheck, setPasskeyCheck] = useState<"idle" | "checking" | "available" | "unavailable">("idle");
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const online = useSyncExternalStore(subscribeToNetworkStatus, getNetworkSnapshot, getServerNetworkSnapshot);
   const [standalone, setStandalone] = useState(false);
   const copyTimer = useRef<number | null>(null);
@@ -82,6 +84,20 @@ export default function SettingsPage() {
     }
   }
 
+  async function checkPasskeySupport() {
+    if (passkeyCheck === "checking") return;
+    setPasskeyCheck("checking");
+    setPasskeyError(null);
+    try {
+      const { error } = await supabase.auth.passkey.list();
+      if (error) throw error;
+      setPasskeyCheck("available");
+    } catch (error) {
+      setPasskeyCheck("unavailable");
+      setPasskeyError(error instanceof Error ? error.message : "Layanan Passkeys belum dapat diverifikasi.");
+    }
+  }
+
   return (
     <div className="app-page">
       <Navbar />
@@ -113,6 +129,13 @@ export default function SettingsPage() {
               <div className="mt-5 rounded-xl bg-slate-50 p-3">
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-700"><ShieldCheck className="h-4 w-4 text-emerald-700" /> {t("Sesi privat")}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{t("Data keuangan hanya dibuka lewat akun terautentikasi ini.")}</p>
+              </div>
+              <div className="mt-5 rounded-xl border border-slate-200 p-3">
+                <p className="text-xs font-bold text-slate-700">{t("Pemeriksaan Passkeys")}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{t("Uji koneksi fitur Passkeys Supabase tanpa menyimpan data biometrik atau kredensial.")}</p>
+                {passkeyCheck === "available" && <p role="status" className="mt-2 text-xs font-semibold text-emerald-700">{t("Passkeys tersedia di proyek ini.")}</p>}
+                {passkeyCheck === "unavailable" && <p role="alert" className="mt-2 text-xs leading-5 text-rose-700">{passkeyError}</p>}
+                <Button variant="secondary" size="compact" loading={passkeyCheck === "checking"} onClick={() => void checkPasskeySupport()} className="mt-3 w-full">{t("Cek dukungan Passkeys")}</Button>
               </div>
               {logoutError && <p role="alert" className="mt-4 text-xs leading-5 text-rose-700">{t(logoutError)}</p>}
               <Button variant="destructive" loading={loggingOut} onClick={() => void handleLogout()} className="mt-5 w-full"><LogOut className="h-4 w-4" /> {t("Keluar dari sesi")}</Button>
