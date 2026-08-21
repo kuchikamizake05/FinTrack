@@ -29,6 +29,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
+import { getCachedIdrRate } from "@/lib/fx";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import {
   buildDeterministicInsight,
@@ -60,6 +61,14 @@ const moneyFormatter = new Intl.NumberFormat("id-ID", {
 
 function formatMoney(value: number) {
   return moneyFormatter.format(value);
+}
+
+function formatCurrency(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: currency === "IDR" ? 0 : 2 }).format(value);
+  } catch {
+    return `${currency} ${value.toLocaleString("id-ID")}`;
+  }
 }
 
 function monthBounds(monthValue: string, dateLocale: typeof enUS | typeof idLocale) {
@@ -113,13 +122,13 @@ export default function InsightsPage() {
       const [currentResult, previousResult, accountsResult] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id, date, type, category, amount, status")
+          .select("id, date, type, category, amount, status, account_id")
           .eq("user_id", session.user.id)
           .gte("date", bounds.currentStart)
           .lte("date", bounds.currentEnd),
         supabase
           .from("transactions")
-          .select("id, date, type, category, amount, status")
+          .select("id, date, type, category, amount, status, account_id")
           .eq("user_id", session.user.id)
           .gte("date", bounds.previousStart)
           .lte("date", bounds.previousEnd),
@@ -135,6 +144,14 @@ export default function InsightsPage() {
       if (controller.signal.aborted) return;
 
       const accounts = accountsResult.data ?? [];
+      const accountCurrencies = new Map(accounts.map((account) => [account.id, account.currency]));
+      const allTransactions = [...currentResult.data ?? [], ...previousResult.data ?? []] as InsightTransaction[];
+      const transactionCurrencies = allTransactions.flatMap((transaction) => {
+        const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : null;
+        return currency ? [currency] : [];
+      });
+      const rates = new Map([...new Set(transactionCurrencies)].map((currency) => [currency, getCachedIdrRate(currency)] as const));
+      const rateValues = new Map([...rates].flatMap(([currency, rate]) => rate.rate === null ? [] : [[currency, rate.rate] as const]));
       const nextSnapshot = buildInsightSnapshot({
         current: (currentResult.data ?? []) as InsightTransaction[],
         previous: (previousResult.data ?? []) as InsightTransaction[],
@@ -142,6 +159,8 @@ export default function InsightsPage() {
         previousPeriodLabel: bounds.previousPeriodLabel,
         activeAccountCount: accounts.length,
         uncoveredForeignAccountCount: accounts.filter((account) => account.currency !== "IDR" && account.reporting_balance_idr === null).length,
+        accountCurrencies,
+        rates: rateValues,
       });
       calculatedSnapshot = nextSnapshot;
       const fallback = buildDeterministicInsight(nextSnapshot);
@@ -150,10 +169,16 @@ export default function InsightsPage() {
       setLoadingData(false);
 
       if (nextSnapshot.current.confirmedCount === 0) return;
+      if (nextSnapshot.fxState !== "converted") {
+        setAiError(t("Kurs IDR belum tersedia untuk semua transaksi. Insight tetap dipisahkan per mata uang dan tidak dikirim ke AI."));
+        return;
+      }
       if (!canWriteOnline()) {
         setAiError(offlineWriteMessage);
         return;
       }
+      const payload = buildPrivateInsightPayload(nextSnapshot);
+      if (!payload) return;
       setLoadingAi(true);
       const response = await fetch("/api/insights/generate", {
         method: "POST",
@@ -161,7 +186,7 @@ export default function InsightsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(buildPrivateInsightPayload(nextSnapshot)),
+        body: JSON.stringify(payload),
         cache: "no-store",
         signal: controller.signal,
       });
@@ -223,7 +248,7 @@ export default function InsightsPage() {
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-6">
                 <AiNarrative insight={displayInsight} loading={loadingAi} error={aiError} onRetry={() => setRefreshKey((value) => value + 1)} />
-                <Patterns snapshot={snapshot} observations={displayInsight.observations} />
+                {snapshot.fxState === "converted" ? <Patterns snapshot={snapshot} observations={displayInsight.observations} /> : <CurrencyPulse snapshot={snapshot} />}
               </div>
               <aside className="space-y-6 lg:sticky lg:top-24">
                 <PriorityActions actions={displayInsight.actions} />
@@ -255,6 +280,17 @@ function mapGeneratedInsight(generated: GeneratedInsightEnvelope, candidates: In
 
 function Pulse({ snapshot }: { snapshot: InsightSnapshot }) {
   const { t } = useLanguage();
+  if (snapshot.fxState === "separate") {
+    return (
+      <Surface className="overflow-hidden">
+        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-amber-700">{t("Financial pulse")}</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{snapshot.periodLabel}</h2>
+          <p className="mt-2 text-sm text-amber-800">{t("Kurs IDR belum tersedia untuk semua transaksi. Nilai tidak digabung.")}</p>
+        </div>
+      </Surface>
+    );
+  }
   const metrics = [
     { label: t("Pemasukan"), value: formatMoney(snapshot.current.income), detail: snapshot.incomeChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.incomeChange > 0 ? "+" : ""}${snapshot.incomeChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowUpRight, tone: "text-emerald-700 bg-emerald-50" },
     { label: t("Pengeluaran"), value: formatMoney(snapshot.current.expense), detail: snapshot.expenseChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.expenseChange > 0 ? "+" : ""}${snapshot.expenseChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50" },
@@ -274,6 +310,25 @@ function Pulse({ snapshot }: { snapshot: InsightSnapshot }) {
             <p className="mt-4 text-xs font-semibold text-slate-500">{label}</p>
             <p className="mt-1 font-mono text-xl font-bold tracking-tight text-slate-900">{value}</p>
             <p className="mt-1 text-[11px] leading-5 text-slate-400">{detail}</p>
+          </div>
+        ))}
+      </div>
+    </Surface>
+  );
+}
+
+function CurrencyPulse({ snapshot }: { snapshot: InsightSnapshot }) {
+  const { t } = useLanguage();
+  return (
+    <Surface className="p-5 sm:p-7">
+      <p className="text-xs font-bold uppercase tracking-[0.1em] text-sky-700">{t("Ringkasan per mata uang")}</p>
+      <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Nilai hanya dijumlahkan dalam mata uang yang sama.")}</h2>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {snapshot.currencyGroups.map((group) => (
+          <div key={group.currency} className="rounded-xl border border-slate-100 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{group.currency}</p>
+            <p className={cn("mt-2 text-lg font-bold", group.current.netCashFlow >= 0 ? "text-emerald-700" : "text-rose-600")}>{formatCurrency(group.current.netCashFlow, group.currency)}</p>
+            <p className="mt-1 text-xs text-slate-500">{t("Pemasukan")} {formatCurrency(group.current.income, group.currency)} · {t("Pengeluaran")} {formatCurrency(group.current.expense, group.currency)}</p>
           </div>
         ))}
       </div>

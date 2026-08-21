@@ -261,6 +261,43 @@ main [class~="text-emerald-300"] { color: #047857 !important; }
   outline-offset: 1px;
 }
 
+@page {
+  margin: 16mm;
+}
+
+[data-print-report] {
+  display: none;
+}
+
+@media print {
+  body, .app-page {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .app-page > :not(main), main > :not([data-print-report]) {
+    display: none !important;
+  }
+
+  [data-print-hide], [role="dialog"] {
+    display: none !important;
+  }
+
+  [data-print-report] {
+    display: block !important;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.35;
+  }
+
+  [data-print-report] h1 { font-size: 20pt; margin: 0 0 0.5rem; }
+  [data-print-report] h2 { font-size: 13pt; margin: 1.25rem 0 0.4rem; }
+  [data-print-report] table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+  [data-print-report] th, [data-print-report] td { border: 1px solid #777; padding: 0.35rem; text-align: left; vertical-align: top; }
+  [data-print-report] thead { display: table-header-group; }
+  [data-print-report] tr { break-inside: avoid; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

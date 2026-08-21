@@ -2,15 +2,15 @@ import type { Page, Route } from "@playwright/test";
 import { expect, mockAuthenticatedSession, test, user } from "./fixtures";
 
 const currentTransactions = [
-  { id: "income-1", date: "2026-07-01", type: "income", category: "Gaji", amount: 10_000_000, status: "confirmed" },
-  { id: "expense-1", date: "2026-07-03", type: "expense", category: "Hunian", amount: 2_500_000, status: "confirmed" },
-  { id: "expense-2", date: "2026-07-05", type: "expense", category: "Makanan", amount: 1_500_000, status: "confirmed" },
-  { id: "pending-1", date: "2026-07-06", type: "expense", category: "Belanja", amount: 500_000, status: "pending_approval" },
+  { id: "income-1", date: "2026-07-01", type: "income", category: "Gaji", amount: 10_000_000, status: "confirmed", account_id: "account-1" },
+  { id: "expense-1", date: "2026-07-03", type: "expense", category: "Hunian", amount: 2_500_000, status: "confirmed", account_id: "account-1" },
+  { id: "expense-2", date: "2026-07-05", type: "expense", category: "Makanan", amount: 1_500_000, status: "confirmed", account_id: "account-1" },
+  { id: "pending-1", date: "2026-07-06", type: "expense", category: "Belanja", amount: 500_000, status: "pending_approval", account_id: "account-1" },
 ];
 
 const previousTransactions = [
-  { id: "old-income", date: "2026-06-01", type: "income", category: "Gaji", amount: 9_000_000, status: "confirmed" },
-  { id: "old-expense", date: "2026-06-03", type: "expense", category: "Makanan", amount: 3_500_000, status: "confirmed" },
+  { id: "old-income", date: "2026-06-01", type: "income", category: "Gaji", amount: 9_000_000, status: "confirmed", account_id: "account-1" },
+  { id: "old-expense", date: "2026-06-03", type: "expense", category: "Makanan", amount: 3_500_000, status: "confirmed", account_id: "account-1" },
 ];
 
 async function fulfillRows(route: Route, rows: unknown[]) {

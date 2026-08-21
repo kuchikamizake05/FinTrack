@@ -29,6 +29,7 @@ describe("buildSecurityHeaders", () => {
     expect(headers["Content-Security-Policy"]).toContain("object-src 'none'");
     expect(headers["Content-Security-Policy"]).toContain("frame-ancestors 'none'");
     expect(headers["Content-Security-Policy"]).toContain("https://project.supabase.co");
+    expect(headers["Content-Security-Policy"]).toContain("https://api.frankfurter.dev");
   });
 
   it("omits HSTS outside production", () => {

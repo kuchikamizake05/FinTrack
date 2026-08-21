@@ -10,6 +10,13 @@ export type InsightTransaction = {
   merchant?: string | null;
   note?: string | null;
   receipt_url?: string | null;
+  account_id?: string | null;
+};
+
+export type CurrencyInsightGroup = {
+  currency: string;
+  current: PeriodMetrics;
+  previous: PeriodMetrics;
 };
 
 export type InsightActionId =
@@ -38,6 +45,8 @@ type PeriodMetrics = {
 
 export type InsightSnapshot = {
   periodLabel: string;
+  fxState: "converted" | "separate";
+  currencyGroups: CurrencyInsightGroup[];
   previousPeriodLabel: string;
   current: PeriodMetrics;
   previous: PeriodMetrics;
@@ -91,6 +100,48 @@ function categoryTotals(transactions: readonly InsightTransaction[]) {
   }, {});
 }
 
+function groupTransactionsByCurrency(
+  transactions: readonly InsightTransaction[],
+  accountCurrencies: ReadonlyMap<string, string>,
+) {
+  return transactions.reduce<Map<string, InsightTransaction[]>>((groups, transaction) => {
+    const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined;
+    const key = currency ?? "Tidak diketahui";
+    const existing = groups.get(key) ?? [];
+    existing.push(transaction);
+    groups.set(key, existing);
+    return groups;
+  }, new Map());
+}
+
+function convertTransactionsToIdr(
+  transactions: readonly InsightTransaction[],
+  accountCurrencies: ReadonlyMap<string, string>,
+  rates: ReadonlyMap<string, number>,
+) {
+  return transactions.map((transaction) => {
+    const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined;
+    const rate = currency ? rates.get(currency) : undefined;
+    return rate === undefined ? null : { ...transaction, amount: Number(transaction.amount) * rate };
+  });
+}
+
+function buildCurrencyInsightGroups(
+  current: readonly InsightTransaction[],
+  previous: readonly InsightTransaction[],
+  accountCurrencies: ReadonlyMap<string, string>,
+): CurrencyInsightGroup[] {
+  const currentGroups = groupTransactionsByCurrency(current, accountCurrencies);
+  const previousGroups = groupTransactionsByCurrency(previous, accountCurrencies);
+  return [...new Set([...currentGroups.keys(), ...previousGroups.keys()])]
+    .sort((left, right) => left.localeCompare(right))
+    .map((currency) => ({
+      currency,
+      current: summarize(currentGroups.get(currency) ?? []),
+      previous: summarize(previousGroups.get(currency) ?? []),
+    }));
+}
+
 export function calculateSavingsRate(income: number, expense: number) {
   if (!Number.isFinite(income) || !Number.isFinite(expense) || income <= 0) return null;
   return round(((income - expense) / income) * 100, 1);
@@ -103,6 +154,8 @@ export function buildInsightSnapshot({
   previousPeriodLabel,
   activeAccountCount,
   uncoveredForeignAccountCount,
+  accountCurrencies = new Map(),
+  rates = new Map(),
 }: {
   current: readonly InsightTransaction[];
   previous: readonly InsightTransaction[];
@@ -110,11 +163,19 @@ export function buildInsightSnapshot({
   previousPeriodLabel: string;
   activeAccountCount: number;
   uncoveredForeignAccountCount: number;
+  accountCurrencies?: ReadonlyMap<string, string>;
+  rates?: ReadonlyMap<string, number>;
 }): InsightSnapshot {
-  const currentMetrics = summarize(current);
-  const previousMetrics = summarize(previous);
-  const currentCategories = categoryTotals(current);
-  const previousCategories = categoryTotals(previous);
+  const allTransactions = [...current, ...previous];
+  const usesCurrencyData = accountCurrencies.size > 0;
+  const currencies = new Set(allTransactions.map((transaction) => transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined));
+  const canConvert = !usesCurrencyData || (currencies.size > 0 && [...currencies].every((currency) => currency !== undefined && Number.isFinite(rates.get(currency)) && Number(rates.get(currency)) > 0));
+  const currentForMetrics = canConvert && usesCurrencyData ? convertTransactionsToIdr(current, accountCurrencies, rates).filter((transaction): transaction is InsightTransaction => transaction !== null) : current;
+  const previousForMetrics = canConvert && usesCurrencyData ? convertTransactionsToIdr(previous, accountCurrencies, rates).filter((transaction): transaction is InsightTransaction => transaction !== null) : previous;
+  const currentMetrics = summarize(currentForMetrics);
+  const previousMetrics = summarize(previousForMetrics);
+  const currentCategories = categoryTotals(currentForMetrics);
+  const previousCategories = categoryTotals(previousForMetrics);
   const topCategories = Object.entries(currentCategories)
     .sort((left, right) => right[1] - left[1])
     .map(([name, amount]) => ({
@@ -134,6 +195,8 @@ export function buildInsightSnapshot({
 
   return {
     periodLabel,
+    fxState: canConvert ? "converted" : "separate",
+    currencyGroups: buildCurrencyInsightGroups(current, previous, accountCurrencies),
     previousPeriodLabel,
     current: currentMetrics,
     previous: previousMetrics,
@@ -162,6 +225,16 @@ function buildCandidateActions(snapshot: InsightSnapshot): InsightAction[] {
     impact: "high",
     href: "/transactions",
   });
+  if (snapshot.fxState === "separate") {
+    if (snapshot.uncoveredForeignAccountCount > 0) actions.push({
+      id: "complete-account-reporting",
+      title: "Lengkapi nilai akun valuta asing",
+      reason: `${snapshot.uncoveredForeignAccountCount} akun belum memiliki nilai pelaporan IDR.`,
+      impact: "medium",
+      href: "/accounts",
+    });
+    return actions.slice(0, 3);
+  }
   if (snapshot.current.netCashFlow < 0) actions.push({
     id: "improve-negative-cashflow",
     title: "Pulihkan arus kas bulan ini",
@@ -194,6 +267,15 @@ function buildCandidateActions(snapshot: InsightSnapshot): InsightAction[] {
 }
 
 export function buildDeterministicInsight(snapshot: InsightSnapshot): DeterministicInsight {
+  if (snapshot.fxState === "separate") {
+    return {
+      headline: "Arus kas dipisahkan per mata uang",
+      summary: "Kurs IDR belum tersedia untuk semua transaksi. Nilai lintas mata uang tidak digabung dan tidak dikirim ke AI.",
+      tone: "neutral",
+      actions: buildCandidateActions(snapshot),
+      observations: snapshot.pendingCount > 0 ? [`${snapshot.pendingCount} transaksi masih menunggu peninjauan.`] : [],
+    };
+  }
   const positive = snapshot.current.netCashFlow >= 0;
   const observations: string[] = [];
   if (snapshot.categoryConcentration) observations.push(
@@ -216,6 +298,7 @@ export function buildDeterministicInsight(snapshot: InsightSnapshot): Determinis
 }
 
 export function buildPrivateInsightPayload(snapshot: InsightSnapshot) {
+  if (snapshot.fxState !== "converted") return null;
   const fallback = buildDeterministicInsight(snapshot);
   return {
     version: 1 as const,

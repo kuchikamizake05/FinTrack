@@ -24,6 +24,7 @@ import {
   Landmark,
   Plus,
   RefreshCw,
+  RotateCw,
   Smartphone,
   WalletCards,
   X,
@@ -38,6 +39,7 @@ import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
+import { getIdrRates, type FxRateResult } from "@/lib/fx";
 import {
   filterAccounts,
   getAccountKindLabel,
@@ -148,6 +150,9 @@ export default function AccountsPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [refreshingFx, setRefreshingFx] = useState(false);
+  const [fxRefreshMessage, setFxRefreshMessage] = useState<string | null>(null);
+  const [fxRates, setFxRates] = useState<Map<string, FxRateResult>>(new Map());
   const [activeDialog, setActiveDialog] = useState<DialogKind>(null);
   const [activeFilter, setActiveFilter] = useState<AccountFilter>("all");
   const [balanceAccount, setBalanceAccount] = useState<AccountOverviewRecord | null>(null);
@@ -275,6 +280,46 @@ export default function AccountsPage() {
     setFormError(null);
     setFormErrors({});
     setActiveDialog("balance");
+  }
+
+  async function refreshForeignBalances() {
+    const foreignAccounts = activeAccounts.filter((account) => account.currency !== "IDR");
+    if (!foreignAccounts.length || refreshingFx) return;
+    if (!canWriteOnline()) {
+      setFxRefreshMessage(t(offlineWriteMessage));
+      return;
+    }
+
+    setRefreshingFx(true);
+    setFxRefreshMessage(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesi login tidak ditemukan.");
+      const rates = await getIdrRates(foreignAccounts.map((account) => account.currency), { forceRefresh: true });
+      setFxRates(rates);
+      const updates = await Promise.all(foreignAccounts.map(async (account) => {
+        const rate = rates.get(account.currency);
+        if (!rate || rate.rate === null) return false;
+        const { error } = await supabase
+          .from("financial_accounts")
+          .update({ reporting_balance_idr: Number(account.current_balance) * rate.rate })
+          .eq("id", account.id)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        return true;
+      }));
+      const updatedCount = updates.filter(Boolean).length;
+      const missingCount = foreignAccounts.length - updatedCount;
+      setFxRefreshMessage(missingCount
+        ? t("Kurs diperbarui untuk {count} akun. {missing} akun mempertahankan nilai manual karena kurs tidak tersedia.", { count: updatedCount, missing: missingCount })
+        : t("Kurs IDR terbaru diperbarui untuk {count} akun.", { count: updatedCount }));
+      await loadAccounts();
+    } catch (error) {
+      reportHandledError("FX refresh failed", error, "Kurs IDR belum berhasil diperbarui.");
+      setFxRefreshMessage(t("Kurs IDR belum berhasil diperbarui. Nilai manual tetap dipakai."));
+    } finally {
+      setRefreshingFx(false);
+    }
   }
 
   async function saveAccount(event: FormEvent<HTMLFormElement>) {
@@ -446,6 +491,9 @@ export default function AccountsPage() {
           description={t("Lihat kekayaan bersih, cek kesegaran saldo, dan pindahkan dana tanpa kehilangan konteks.")}
           actions={
             <>
+              <Button variant="secondary" onClick={() => void refreshForeignBalances()} disabled={!activeAccounts.some((account) => account.currency !== "IDR")} loading={refreshingFx}>
+                <RotateCw className="h-4 w-4" /> {t("Perbarui kurs IDR")}
+              </Button>
               <div className="min-w-0">
                 <Button variant="secondary" onClick={openTransferDialog} disabled={activeAccounts.length < 2} aria-describedby={activeAccounts.length < 2 ? "transfer-prerequisite" : undefined}>
                   <ArrowLeftRight className="h-4 w-4" /> {t("Transfer")}
@@ -465,6 +513,15 @@ export default function AccountsPage() {
             <Button variant="secondary" size="compact" onClick={() => void loadAccounts()}>
               <RefreshCw className="h-4 w-4" /> {t("Coba lagi")}
             </Button>
+          </div>
+        )}
+
+        {fxRefreshMessage && (
+          <div aria-live="polite" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+            <p>{fxRefreshMessage}</p>
+            {[...fxRates.values()].filter((rate) => rate.rate !== null && rate.base !== "IDR").map((rate) => (
+              <p key={rate.base} className="mt-1 text-xs text-sky-700">{rate.base}/IDR · Frankfurter · {rate.providerDate ?? t("tanggal kurs tidak tersedia")} · {rate.state}</p>
+            ))}
           </div>
         )}
 

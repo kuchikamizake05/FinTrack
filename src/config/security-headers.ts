@@ -17,7 +17,7 @@ export function buildSecurityHeaders({ environment, supabaseUrl }: {
   supabaseUrl?: string;
 }): SecurityHeader[] {
   const production = environment === "production";
-  const connectSources = ["'self'", ...getSupabaseConnectSources(supabaseUrl)];
+  const connectSources = ["'self'", "https://api.frankfurter.dev", ...getSupabaseConnectSources(supabaseUrl)];
   const scriptSources = ["'self'", "'unsafe-inline'", ...(production ? [] : ["'unsafe-eval'"])];
   const directives = [
     "default-src 'self'",

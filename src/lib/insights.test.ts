@@ -66,6 +66,8 @@ describe("smart insight privacy and fallback", () => {
   it("sends only bounded aggregate data to the external model", () => {
     const snapshot = buildInsightSnapshot({ current, previous, periodLabel: "Juli 2026", previousPeriodLabel: "Juni 2026", activeAccountCount: 2, uncoveredForeignAccountCount: 1 });
     const payload = buildPrivateInsightPayload(snapshot);
+    expect(payload).not.toBeNull();
+    if (!payload) throw new Error("Expected aggregate insight payload");
     const serialized = JSON.stringify(payload);
     expect(payload.version).toBe(1);
     expect(payload.topCategories).toHaveLength(2);
@@ -75,6 +77,50 @@ describe("smart insight privacy and fallback", () => {
     expect(serialized).not.toContain("Catatan rahasia");
     expect(serialized).not.toContain("2026-07-03");
     expect(serialized).not.toContain("user");
+  });
+
+  it("keeps mixed currencies separate and blocks AI payload when a rate is missing", () => {
+    const mixed = [
+      { id: "idr", date: "2026-07-01", type: "income" as const, category: "Gaji", amount: 1_000_000, status: "confirmed" as const, account_id: "idr-account" },
+      { id: "usd", date: "2026-07-02", type: "expense" as const, category: "Makan", amount: 100, status: "confirmed" as const, account_id: "usd-account" },
+    ];
+    const snapshot = buildInsightSnapshot({
+      current: mixed,
+      previous: [],
+      periodLabel: "Juli 2026",
+      previousPeriodLabel: "Juni 2026",
+      activeAccountCount: 2,
+      uncoveredForeignAccountCount: 0,
+      accountCurrencies: new Map([["idr-account", "IDR"], ["usd-account", "USD"]]),
+      rates: new Map([["IDR", 1]]),
+    });
+
+    expect(snapshot.fxState).toBe("separate");
+    expect(snapshot.currencyGroups).toMatchObject([
+      { currency: "IDR", current: { income: 1_000_000, expense: 0 } },
+      { currency: "USD", current: { income: 0, expense: 100 } },
+    ]);
+    expect(buildPrivateInsightPayload(snapshot)).toBeNull();
+  });
+
+  it("converts every currency before aggregate insight metrics", () => {
+    const snapshot = buildInsightSnapshot({
+      current: [
+        { id: "idr", date: "2026-07-01", type: "income", category: "Gaji", amount: 1_000_000, status: "confirmed", account_id: "idr-account" },
+        { id: "usd", date: "2026-07-02", type: "expense", category: "Makan", amount: 100, status: "confirmed", account_id: "usd-account" },
+      ],
+      previous: [],
+      periodLabel: "Juli 2026",
+      previousPeriodLabel: "Juni 2026",
+      activeAccountCount: 2,
+      uncoveredForeignAccountCount: 0,
+      accountCurrencies: new Map([["idr-account", "IDR"], ["usd-account", "USD"]]),
+      rates: new Map([["IDR", 1], ["USD", 16_000]]),
+    });
+
+    expect(snapshot.fxState).toBe("converted");
+    expect(snapshot.current).toMatchObject({ income: 1_000_000, expense: 1_600_000, netCashFlow: -600_000 });
+    expect(buildPrivateInsightPayload(snapshot)).not.toBeNull();
   });
 
   it("trims category labels and limits the external category list", () => {
@@ -88,6 +134,8 @@ describe("smart insight privacy and fallback", () => {
     }));
     const snapshot = buildInsightSnapshot({ current: manyCategories, previous: [], periodLabel: "Juli 2026", previousPeriodLabel: "Juni 2026", activeAccountCount: 1, uncoveredForeignAccountCount: 0 });
     const payload = buildPrivateInsightPayload(snapshot);
+    expect(payload).not.toBeNull();
+    if (!payload) throw new Error("Expected aggregate insight payload");
     expect(payload.topCategories).toHaveLength(5);
     expect(payload.topCategories.every((category) => category.name.length <= 40)).toBe(true);
   });

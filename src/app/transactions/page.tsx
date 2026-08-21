@@ -16,11 +16,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   CalendarDays,
   ChevronDown,
-  CircleDollarSign,
+  Download,
   Edit3,
   Eye,
   FileSpreadsheet,
@@ -32,6 +30,7 @@ import {
   Search,
   SlidersHorizontal,
   Tags,
+  Printer,
   Trash2,
   WalletCards,
   X,
@@ -47,6 +46,7 @@ import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
+import { getIdrRates, type FxRateResult } from "@/lib/fx";
 import {
   buildCategoryFilterOptions,
   buildTransactionCategoryOptions,
@@ -62,11 +62,21 @@ import {
   getTransactionSourceLabel,
   getTransactionStatusLabel,
   hasActiveTransactionFilters,
-  summarizeTransactionList,
   validateTransactionForm,
 } from "@/lib/transactions";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import { formatLocalDate } from "@/lib/planning";
+import {
+  createQueuedTransactionOperation,
+  listQueuedTransactionOperations,
+  projectQueuedTransactionOperations,
+  queueTransactionOperation,
+  removeQueuedTransactionOperation,
+  replayQueuedTransactionOperations,
+  updateQueuedTransactionOperation,
+  type QueuedTransactionOperation,
+} from "@/lib/offline-transaction-queue";
+import { buildFinancialReport, serializeFinancialReportCsv, serializeRichTransactionCsv, type FinancialReport } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
 
 type Transaction = {
@@ -83,7 +93,9 @@ type Transaction = {
   ai_confidence: number | null;
   status: "confirmed" | "pending_approval" | "needs_review" | "deleted";
   created_at: string;
+  updated_at: string;
   account_id: string | null;
+  syncPending?: boolean;
 };
 
 type FinancialAccount = {
@@ -140,6 +152,15 @@ export default function TransactionsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [reportRates, setReportRates] = useState<Map<string, FxRateResult>>(new Map());
+  const [queueUserId, setQueueUserId] = useState<string | null>(null);
+  const [queuedOperations, setQueuedOperations] = useState<QueuedTransactionOperation[]>([]);
+  const [syncingQueue, setSyncingQueue] = useState(false);
+  const syncingQueueRef = useRef(false);
+  const [queueMessage, setQueueMessage] = useState<string | null>(null);
+  const [conflictTarget, setConflictTarget] = useState<QueuedTransactionOperation | null>(null);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
@@ -155,7 +176,11 @@ export default function TransactionsPage() {
     setPageError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setQueueUserId(null);
+        setQueuedOperations([]);
+        return;
+      }
 
       const [transactionResult, accountResult, categoryResult] = await Promise.all([
         supabase
@@ -168,7 +193,6 @@ export default function TransactionsPage() {
           .from("financial_accounts")
           .select("id, name, currency")
           .eq("user_id", user.id)
-          .eq("is_active", true)
           .order("created_at", { ascending: true }),
         supabase
           .from("categories")
@@ -179,6 +203,7 @@ export default function TransactionsPage() {
       if (transactionResult.error) throw transactionResult.error;
       if (accountResult.error) throw accountResult.error;
       if (categoryResult.error) throw categoryResult.error;
+      setQueueUserId(user.id);
       setTransactions((transactionResult.data ?? []) as Transaction[]);
       setFinancialAccounts((accountResult.data ?? []) as FinancialAccount[]);
       setCategories((categoryResult.data ?? []) as CategoryRecord[]);
@@ -197,14 +222,97 @@ export default function TransactionsPage() {
     return () => window.clearTimeout(timer);
   }, [fetchTransactions]);
 
+  const loadQueuedOperations = useCallback(async (userId: string) => {
+    try {
+      setQueuedOperations(await listQueuedTransactionOperations(userId));
+    } catch (error) {
+      reportHandledError("Offline queue unavailable", error, "Antrean offline belum dapat dibuka.");
+      setQueueMessage("Antrean offline perangkat belum dapat dibuka.");
+    }
+  }, []);
+
+  const syncQueuedOperations = useCallback(async () => {
+    if (syncingQueueRef.current || !canWriteOnline()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    syncingQueueRef.current = true;
+    setSyncingQueue(true);
+    try {
+      const results = await replayQueuedTransactionOperations(user.id, {
+        create: async (operation) => {
+          const { data: existing, error: existingError } = await supabase.from("transactions").select("id").eq("id", operation.transactionId).eq("user_id", user.id).maybeSingle();
+          if (existingError) throw existingError;
+          if (existing) return "done";
+          const { error } = await supabase.from("transactions").insert({ id: operation.transactionId, user_id: user.id, ...operation.payload, source: "manual" });
+          if (error) throw error;
+          return "done";
+        },
+        edit: async (operation) => {
+          const query = supabase.from("transactions").update({ ...operation.payload, source: "manual" }).eq("id", operation.transactionId).eq("user_id", user.id);
+          const { data, error } = operation.baseUpdatedAt
+            ? await query.eq("updated_at", operation.baseUpdatedAt).select("id")
+            : await query.select("id");
+          if (error) throw error;
+          return data?.length ? "done" : "conflict";
+        },
+        softDelete: async (operation) => {
+          const query = supabase.from("transactions").update({ status: "deleted" }).eq("id", operation.transactionId).eq("user_id", user.id);
+          const { data, error } = operation.baseUpdatedAt
+            ? await query.eq("updated_at", operation.baseUpdatedAt).select("id")
+            : await query.select("id");
+          if (error) throw error;
+          return data?.length ? "done" : "conflict";
+        },
+      });
+      await loadQueuedOperations(user.id);
+      if (results.some((result) => result.state === "done")) await fetchTransactions();
+      if (results.some((result) => result.state === "conflict")) setQueueMessage("Sebagian perubahan offline perlu ditinjau sebelum disinkronkan.");
+    } catch (error) {
+      reportHandledError("Offline queue sync failed", error, "Sinkronisasi offline belum berhasil.");
+      setQueueMessage("Sinkronisasi offline belum berhasil. Perubahan tetap tersimpan di perangkat.");
+    } finally {
+      syncingQueueRef.current = false;
+      setSyncingQueue(false);
+    }
+  }, [fetchTransactions, loadQueuedOperations]);
+
+  useEffect(() => {
+    if (!queueUserId) return;
+    const timer = window.setTimeout(() => {
+      void loadQueuedOperations(queueUserId);
+      if (canWriteOnline()) void syncQueuedOperations();
+    }, 0);
+    const handleOnline = () => void syncQueuedOperations();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [loadQueuedOperations, queueUserId, syncQueuedOperations]);
+
+  const displayedTransactions = useMemo(
+    () => projectQueuedTransactionOperations(transactions, queuedOperations) as Transaction[],
+    [queuedOperations, transactions],
+  );
   const filteredTx = useMemo(
+    () => filterTransactions(displayedTransactions, filters),
+    [displayedTransactions, filters],
+  );
+  const filteredServerTx = useMemo(
     () => filterTransactions(transactions, filters),
     [filters, transactions],
   );
-  const summary = useMemo(() => summarizeTransactionList(filteredTx), [filteredTx]);
   const accountNames = useMemo(
     () => new Map(financialAccounts.map((account) => [account.id, account.name])),
     [financialAccounts],
+  );
+  const accountCurrencies = useMemo(
+    () => new Map(financialAccounts.map((account) => [account.id, account.currency])),
+    [financialAccounts],
+  );
+  const report = useMemo<FinancialReport>(
+    () => buildFinancialReport(filteredServerTx, accountNames, accountCurrencies, reportRates),
+    [accountCurrencies, accountNames, filteredServerTx, reportRates],
   );
   const filtersActive = hasActiveTransactionFilters(filters);
   const isEditMode = selectedTx !== null;
@@ -216,6 +324,51 @@ export default function TransactionsPage() {
     () => buildTransactionCategoryOptions(categories, form.type, selectedTx?.category),
     [categories, form.type, selectedTx?.category],
   );
+  const filterSummary = useMemo(() => [
+    filters.type !== "all" ? filters.type : null,
+    filters.category !== "all" ? filters.category : null,
+    filters.status !== "active" ? filters.status : null,
+    filters.startDate ? `≥ ${filters.startDate}` : null,
+    filters.endDate ? `≤ ${filters.endDate}` : null,
+    filters.search.trim() || null,
+  ].filter(Boolean).join(" · ") || "Semua transaksi", [filters]);
+
+  const downloadCsv = (contents: string, filename: string) => {
+    const blob = new Blob([contents], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const refreshReportRates = async () => {
+    const currencies = filteredServerTx.flatMap((transaction) => {
+      const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : null;
+      return currency ? [currency] : [];
+    });
+    const rates = await getIdrRates(currencies);
+    setReportRates(rates);
+    return rates;
+  };
+
+  const exportLedger = () => {
+    downloadCsv(serializeRichTransactionCsv(report), `fintrack-ledger-${formatLocalDate(new Date())}.csv`);
+  };
+
+  const exportReport = async () => {
+    const rates = await refreshReportRates().catch(() => reportRates);
+    const currentReport = buildFinancialReport(filteredServerTx, accountNames, accountCurrencies, rates);
+    downloadCsv(
+      serializeFinancialReportCsv(currentReport, { generatedAt: new Date().toISOString(), filterSummary }),
+      `fintrack-report-${formatLocalDate(new Date())}.csv`,
+    );
+  };
+
+  const printReport = async () => {
+    await refreshReportRates().catch(() => undefined);
+    window.setTimeout(() => window.print(), 0);
+  };
 
   const openAdd = useCallback(() => {
     setSelectedTx(null);
@@ -277,7 +430,8 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (!canWriteOnline()) {
+    const offline = !canWriteOnline();
+    if (offline && selectedTx?.source && selectedTx.source !== "manual") {
       setFormError(offlineWriteMessage);
       return;
     }
@@ -288,22 +442,40 @@ export default function TransactionsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Missing authenticated user");
 
-      const payload = {
-        user_id: user.id,
+      const offlinePayload = {
         date: form.date,
         type: form.type,
         merchant: form.merchant.trim() || null,
         category: form.category,
         amount: Number(form.amount),
         note: form.note.trim() || null,
-        source: selectedTx?.source ?? "manual",
-        status: getTransactionSaveStatus(selectedTx?.status),
+        source: "manual" as const,
         account_id: form.accountId,
       };
+      const onlinePayload = {
+        ...offlinePayload,
+        source: selectedTx?.source ?? "manual",
+        status: getTransactionSaveStatus(selectedTx?.status),
+      };
+
+      if (offline) {
+        const transactionId = selectedTx?.id ?? crypto.randomUUID();
+        await queueTransactionOperation(createQueuedTransactionOperation({
+          userId: user.id,
+          kind: selectedTx ? "edit" : "create",
+          transactionId,
+          payload: selectedTx ? offlinePayload : { ...offlinePayload, id: transactionId },
+          baseUpdatedAt: selectedTx?.updated_at ?? null,
+        }));
+        await loadQueuedOperations(user.id);
+        setModalOpen(false);
+        setQueueMessage("Perubahan manual disimpan di perangkat dan menunggu sinkronisasi.");
+        return;
+      }
 
       const result = isEditMode
-        ? await supabase.from("transactions").update(payload).eq("id", selectedTx.id)
-        : await supabase.from("transactions").insert([payload]);
+        ? await supabase.from("transactions").update(onlinePayload).eq("id", selectedTx.id)
+        : await supabase.from("transactions").insert([{ user_id: user.id, ...onlinePayload }]);
       if (result.error) throw result.error;
 
       setModalOpen(false);
@@ -350,7 +522,8 @@ export default function TransactionsPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget || deletingId) return;
-    if (!canWriteOnline()) {
+    const offline = !canWriteOnline();
+    if (offline && deleteTarget.source !== "manual") {
       setDeleteError(offlineWriteMessage);
       return;
     }
@@ -359,10 +532,24 @@ export default function TransactionsPage() {
     setDeletingId(transactionId);
     setDeleteError(null);
     try {
-      const { error } = await supabase.from("transactions").update({ status: "deleted" }).eq("id", transactionId);
-      if (error) throw error;
+      if (offline) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Missing authenticated user");
+        await queueTransactionOperation(createQueuedTransactionOperation({
+          userId: user.id,
+          kind: "soft-delete",
+          transactionId,
+          payload: { status: "deleted", source: "manual" },
+          baseUpdatedAt: deleteTarget.updated_at,
+        }));
+        await loadQueuedOperations(user.id);
+        setQueueMessage("Penghapusan manual disimpan di perangkat dan menunggu sinkronisasi.");
+      } else {
+        const { error } = await supabase.from("transactions").update({ status: "deleted" }).eq("id", transactionId);
+        if (error) throw error;
+        await fetchTransactions();
+      }
       setDeleteTarget(null);
-      await fetchTransactions();
     } catch (error) {
       reportHandledError("Transaction delete failed", error, "Transaksi belum berhasil dihapus.");
       setDeleteError("Transaksi belum berhasil dihapus. Coba lagi.");
@@ -391,10 +578,67 @@ export default function TransactionsPage() {
     }
   };
 
+  const discardQueuedOperation = async () => {
+    if (!conflictTarget || resolvingConflict || !queueUserId) return;
+    setResolvingConflict(true);
+    setConflictError(null);
+    try {
+      await removeQueuedTransactionOperation(conflictTarget.opId);
+      await loadQueuedOperations(queueUserId);
+      await fetchTransactions();
+      setConflictTarget(null);
+      setQueueMessage("Perubahan offline dibuang. Data server dipertahankan.");
+    } catch (error) {
+      reportHandledError("Offline queue conflict discard failed", error, "Perubahan offline belum dapat dibuang.");
+      setConflictError("Perubahan offline belum dapat dibuang. Coba lagi.");
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
+  const retryQueuedOperation = async (operation: QueuedTransactionOperation) => {
+    if (resolvingConflict || !queueUserId || !canWriteOnline()) return;
+    setResolvingConflict(true);
+    setConflictError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== queueUserId) throw new Error("Missing authenticated user");
+      const { data: serverRow, error } = await supabase
+        .from("transactions")
+        .select("id, updated_at")
+        .eq("id", operation.transactionId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!serverRow && operation.kind !== "create") {
+        setQueueMessage("Data server sudah tidak tersedia. Buang perubahan offline atau buat transaksi baru.");
+        return;
+      }
+      await updateQueuedTransactionOperation({
+        ...operation,
+        baseUpdatedAt: serverRow?.updated_at ?? null,
+        attempts: 0,
+        state: "pending",
+        lastError: null,
+      });
+      await loadQueuedOperations(user.id);
+      setQueueMessage("Perubahan offline siap dicoba ulang dengan versi server terbaru.");
+      await syncQueuedOperations();
+    } catch (error) {
+      reportHandledError("Offline queue conflict retry failed", error, "Perubahan offline belum dapat disiapkan ulang.");
+      setQueueMessage("Perubahan offline belum dapat disiapkan ulang. Coba lagi.");
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
   const resetFilters = () => {
     setFilters(defaultFilters);
     setDateFiltersOpen(false);
   };
+
+  const pendingQueuedOperations = queuedOperations.filter((operation) => operation.state === "pending");
+  const conflictQueuedOperations = queuedOperations.filter((operation) => operation.state === "conflict");
 
   return (
     <div className="app-page">
@@ -406,21 +650,35 @@ export default function TransactionsPage() {
           description={t("{shown} dari {total} transaksi ditampilkan. Cari, tinjau, dan catat arus uang tanpa kehilangan konteks.", { shown: filteredTx.length, total: transactions.length })}
           actions={(
             <>
-              <Link href="/categories" className={buttonStyles({ variant: "secondary" })}>
+              <Button variant="secondary" onClick={exportLedger}>
+                <Download className="h-4 w-4" /> {t("Ekspor transaksi CSV")}
+              </Button>
+              <Button variant="secondary" onClick={() => void exportReport()}>
+                <FileSpreadsheet className="h-4 w-4" /> {t("Ekspor laporan CSV")}
+              </Button>
+              <Button variant="secondary" onClick={() => void printReport()}>
+                <Printer className="h-4 w-4" /> {t("Cetak laporan")}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void syncQueuedOperations()}
+                loading={syncingQueue}
+                disabled={pendingQueuedOperations.length === 0}
+                data-print-hide
+              >
+                <RotateCcw className="h-4 w-4" /> {t("Sinkronkan sekarang")}
+              </Button>
+              <Link href="/categories" className={buttonStyles({ variant: "secondary" })} data-print-hide>
                 <Tags className="h-4 w-4" /> {t("Kategori")}
               </Link>
-              <Button onClick={openAdd}>
+              <Button onClick={openAdd} data-print-hide>
                 <Plus className="h-4 w-4" /> {t("Catat")}
               </Button>
             </>
           )}
         />
 
-        <Surface className="grid overflow-hidden sm:grid-cols-3">
-          <SummaryMetric icon={ArrowUpRight} label={t("Pemasukan terkonfirmasi")} value={formatIdr(summary.income)} tone="emerald" />
-          <SummaryMetric icon={ArrowDownRight} label={t("Pengeluaran terkonfirmasi")} value={formatIdr(summary.expense)} tone="rose" />
-          <SummaryMetric icon={CircleDollarSign} label={t("Selisih hasil filter")} value={formatSignedIdr(summary.net)} tone={summary.net >= 0 ? "emerald" : "rose"} />
-        </Surface>
+        <CurrencySummary report={report} />
 
         {pageError && (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
@@ -428,6 +686,28 @@ export default function TransactionsPage() {
             <Button variant="ghost" size="compact" onClick={() => void fetchTransactions()}>
               <RotateCcw className="h-4 w-4" /> {t("Coba lagi")}
             </Button>
+          </div>
+        )}
+
+        {(queueMessage || pendingQueuedOperations.length > 0 || conflictQueuedOperations.length > 0) && (
+          <div aria-live="polite" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            {queueMessage && <p>{queueMessage}</p>}
+            {pendingQueuedOperations.length > 0 && <p className={queueMessage ? "mt-1" : ""}>{t("{count} perubahan manual menunggu sinkronisasi.", { count: pendingQueuedOperations.length })}</p>}
+            {conflictQueuedOperations.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p>{t("{count} perubahan offline perlu ditinjau.", { count: conflictQueuedOperations.length })}</p>
+                {conflictQueuedOperations.map((operation) => (
+                  <div key={operation.opId} className="flex items-center gap-2">
+                    <Button variant="secondary" size="compact" onClick={() => void retryQueuedOperation(operation)} disabled={resolvingConflict}>
+                      {t("Coba ulang dengan data server terbaru")}
+                    </Button>
+                    <Button variant="ghost" size="compact" onClick={() => { setConflictTarget(operation); setConflictError(null); }}>
+                      {t("Buang perubahan offline")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -524,6 +804,8 @@ export default function TransactionsPage() {
           </div>
         </Surface>
 
+        <PrintReport report={report} filterSummary={filterSummary} />
+
         {loading ? (
           <TransactionSkeleton />
         ) : filteredTx.length === 0 ? (
@@ -541,6 +823,7 @@ export default function TransactionsPage() {
           <TransactionResults
             transactions={filteredTx}
             accountNames={accountNames}
+            accountCurrencies={accountCurrencies}
             dateLocale={dateLocale}
             onEdit={openEdit}
             onDelete={requestDelete}
@@ -591,6 +874,25 @@ export default function TransactionsPage() {
         />
       )}
 
+      {conflictTarget && (
+        <ConfirmDialog
+          titleId="discard-offline-operation-title"
+          descriptionId="discard-offline-operation-description"
+          title={t("Buang perubahan offline?")}
+          description={t("Perubahan lokal akan dihapus. Data server tetap dipertahankan.")}
+          confirmLabel={t("Buang perubahan offline")}
+          onClose={() => {
+            if (!resolvingConflict) {
+              setConflictTarget(null);
+              setConflictError(null);
+            }
+          }}
+          onConfirm={() => void discardQueuedOperation()}
+          loading={resolvingConflict}
+          error={conflictError}
+        />
+      )}
+
       {modalOpen && (
         <TransactionDialog
           form={form}
@@ -611,27 +913,58 @@ export default function TransactionsPage() {
   );
 }
 
-function SummaryMetric({ icon: Icon, label, value, tone }: {
-  icon: typeof ArrowUpRight;
-  label: string;
-  value: string;
-  tone: "emerald" | "rose";
-}) {
+function CurrencySummary({ report }: { report: FinancialReport }) {
+  const { t } = useLanguage();
   return (
-    <div className="border-b border-emerald-100 px-5 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-        <Icon className={cn("h-4 w-4", tone === "emerald" ? "text-emerald-700" : "text-rose-600")} /> {label}
-      </p>
-      <p className={cn("mt-2 text-xl font-bold tracking-[-0.03em]", tone === "emerald" ? "text-emerald-700" : "text-rose-600")}>
-        {value}
-      </p>
-    </div>
+    <Surface className="overflow-hidden">
+      <div className="border-b border-emerald-100 px-5 py-4">
+        <h2 className="text-sm font-bold text-slate-900">{t("Ringkasan arus kas")}</h2>
+        <p className="mt-1 text-xs text-slate-500">{t("Nilai hanya dijumlahkan dalam mata uang yang sama.")}</p>
+      </div>
+      {report.currencyGroups.length ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3">
+          {report.currencyGroups.map((group) => (
+            <div key={group.currency} className="border-b border-emerald-100 px-5 py-4 last:border-b-0 sm:border-r sm:last:border-r-0 lg:border-b-0">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{group.currency}</p>
+              <p className={cn("mt-2 text-xl font-bold tracking-[-0.03em]", group.net >= 0 ? "text-emerald-700" : "text-rose-600")}>{formatCurrency(group.net, group.currency)}</p>
+              <p className="mt-1 text-xs text-slate-500">{t("Masuk")} {formatCurrency(group.income, group.currency)} · {t("Keluar")} {formatCurrency(group.expense, group.currency)}</p>
+              {group.convertedNetIdr !== null && group.currency !== "IDR" && <p className="mt-2 text-[11px] text-sky-700">{t("Setara IDR terbaru")} {formatCurrency(group.convertedNetIdr, "IDR")} · Frankfurter · {group.rate.state}</p>}
+              {group.rate.state === "missing" && group.currency !== "IDR" && <p className="mt-2 text-[11px] text-amber-700">{t("Kurs IDR belum tersedia. Nilai tidak digabung.")}</p>}
+            </div>
+          ))}
+        </div>
+      ) : <p className="px-5 py-4 text-sm text-slate-500">{t("Belum ada transaksi terkonfirmasi pada filter ini.")}</p>}
+    </Surface>
   );
 }
 
-function TransactionResults({ transactions, accountNames, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId }: {
+function PrintReport({ report, filterSummary }: { report: FinancialReport; filterSummary: string }) {
+  const { t } = useLanguage();
+  return (
+    <section data-print-report className="hidden">
+      <h1>{t("Laporan FinTrack")}</h1>
+      <p>{t("Dibuat")} {new Date().toLocaleString("id-ID")}</p>
+      <p>{t("Filter")}: {filterSummary}</p>
+      <h2>{t("Ringkasan per mata uang")}</h2>
+      <table><thead><tr><th scope="col">{t("Mata uang")}</th><th scope="col">{t("Pemasukan")}</th><th scope="col">{t("Pengeluaran")}</th><th scope="col">{t("Bersih")}</th><th scope="col">{t("Kurs")}</th></tr></thead><tbody>
+        {report.currencyGroups.map((group) => <tr key={group.currency}><td>{group.currency}</td><td>{formatCurrency(group.income, group.currency)}</td><td>{formatCurrency(group.expense, group.currency)}</td><td>{formatCurrency(group.net, group.currency)}</td><td>{group.rate.rate === null ? t("Tidak tersedia") : `Frankfurter · ${group.rate.providerDate ?? "—"} · ${group.rate.state}`}</td></tr>)}
+      </tbody></table>
+      <h2>{t("Kategori pengeluaran terkonfirmasi")}</h2>
+      <table><thead><tr><th scope="col">{t("Mata uang")}</th><th scope="col">{t("Kategori")}</th><th scope="col">{t("Jumlah")}</th></tr></thead><tbody>
+        {report.categoryTotals.map((item) => <tr key={`${item.currency}-${item.category}`}><td>{item.currency}</td><td>{t(item.category)}</td><td>{formatCurrency(item.amount, item.currency)}</td></tr>)}
+      </tbody></table>
+      <h2>{t("Ledger transaksi")}</h2>
+      <table><caption>{t("Transaksi sesuai filter aktif")}</caption><thead><tr><th scope="col">{t("Tanggal")}</th><th scope="col">{t("Tipe transaksi")}</th><th scope="col">{t("Merchant atau sumber")}</th><th scope="col">{t("Kategori")}</th><th scope="col">{t("Jumlah")}</th><th scope="col">{t("Mata uang")}</th><th scope="col">{t("Akun")}</th><th scope="col">{t("Status")}</th></tr></thead><tbody>
+        {report.rows.map((row, index) => <tr key={`${row.date}-${row.account}-${index}`}><td>{row.date}</td><td>{t(row.type === "income" ? "Pemasukan" : "Pengeluaran")}</td><td>{row.merchant ?? ""}</td><td>{t(row.category)}</td><td>{formatCurrency(row.amount, row.currency)}</td><td>{row.currency}</td><td>{row.account}</td><td>{t(getTransactionStatusLabel(row.status))}</td></tr>)}
+      </tbody></table>
+    </section>
+  );
+}
+
+function TransactionResults({ transactions, accountNames, accountCurrencies, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId }: {
   transactions: Transaction[];
   accountNames: ReadonlyMap<string, string>;
+  accountCurrencies: ReadonlyMap<string, string>;
   dateLocale: typeof idLocale;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
@@ -680,10 +1013,11 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
                     <span className="mt-1.5 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{t(transaction.category)}</span>
                   </td>
                   <td className={cn("px-5 py-4 text-right text-sm font-bold", transaction.type === "income" ? "text-emerald-700" : "text-slate-800")}>
-                    {transaction.type === "income" ? "+" : "−"}{formatIdr(transaction.amount)}
+                    {transaction.type === "income" ? "+" : "−"}{formatCurrency(transaction.amount, transaction.account_id ? accountCurrencies.get(transaction.account_id) ?? "IDR" : "IDR")}
                   </td>
                   <td className="px-5 py-4">
                     <StatusBadge status={transaction.status} />
+                    {transaction.syncPending && <p aria-live="polite" className="mt-1.5 text-[11px] font-medium text-sky-700">{t("Sinkronisasi tertunda")}</p>}
                     <p className="mt-1.5 text-[11px] font-medium text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</p>
                   </td>
                   <td className="px-5 py-4">
@@ -707,7 +1041,7 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
                 </p>
               </div>
               <p className={cn("shrink-0 text-sm font-bold", transaction.type === "income" ? "text-emerald-700" : "text-slate-900")}>
-                {transaction.type === "income" ? "+" : "−"}{formatIdr(transaction.amount)}
+                {transaction.type === "income" ? "+" : "−"}{formatCurrency(transaction.amount, transaction.account_id ? accountCurrencies.get(transaction.account_id) ?? "IDR" : "IDR")}
               </p>
             </div>
             <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-slate-100 pt-3">
@@ -717,6 +1051,7 @@ function TransactionResults({ transactions, accountNames, dateLocale, onEdit, on
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge status={transaction.status} />
+                  {transaction.syncPending && <span aria-live="polite" className="text-[11px] font-semibold text-sky-700">{t("Sinkronisasi tertunda")}</span>}
                   <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
                 </div>
               </div>
@@ -766,12 +1101,12 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, onApprov
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-1">
-      {transaction.receipt_url && (
+      {transaction.receipt_url && !transaction.syncPending && (
         <Button variant="ghost" size="icon" className="h-9 min-h-9 w-9 rounded-lg" onClick={() => void openReceipt()} loading={openingReceipt} aria-label={t("Lihat struk {name}", { name: transaction.merchant || transaction.category })}>
           <Eye className="h-4 w-4" />
         </Button>
       )}
-      {transaction.status === "deleted" ? (
+      {!transaction.syncPending && (transaction.status === "deleted" ? (
         <Button variant="secondary" size="compact" onClick={() => void onRestore(transaction.id)} loading={restoringId === transaction.id}>
           <RotateCcw className="h-3.5 w-3.5" /> {t("Pulihkan")}
         </Button>
@@ -789,7 +1124,7 @@ function TransactionActions({ transaction, onEdit, onDelete, onRestore, onApprov
             <Trash2 className="h-4 w-4" />
           </Button>
         </>
-      )}
+      ))}
       {receiptError && <p role="alert" className="basis-full text-right text-[11px] text-rose-700">{receiptError}</p>}
     </div>
   );
@@ -983,10 +1318,10 @@ function TransactionSkeleton() {
   );
 }
 
-function formatIdr(value: number) {
-  return `Rp${Math.abs(value).toLocaleString("id-ID")}`;
-}
-
-function formatSignedIdr(value: number) {
-  return `${value >= 0 ? "+" : "−"}${formatIdr(value)}`;
+function formatCurrency(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: currency === "IDR" ? 0 : 2 }).format(value);
+  } catch {
+    return `${currency} ${value.toLocaleString("id-ID")}`;
+  }
 }
