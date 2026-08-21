@@ -1271,6 +1271,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
                 step="1"
                 required
                 value={form.amount}
+                onFocus={(event) => { if (!isEditMode && event.target.value === "0") event.target.select(); }}
                 onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
                 placeholder="0"
                 className={cn(fieldControlStyles, "pl-11 text-lg font-bold")}

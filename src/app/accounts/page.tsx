@@ -158,6 +158,7 @@ export default function AccountsPage() {
   const [balanceAccount, setBalanceAccount] = useState<AccountOverviewRecord | null>(null);
   const [editingAccount, setEditingAccount] = useState<AccountOverviewRecord | null>(null);
   const [accountToToggle, setAccountToToggle] = useState<AccountOverviewRecord | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<AccountOverviewRecord | null>(null);
   const [accountForm, setAccountForm] = useState<AccountFormState>(emptyAccountForm);
   const [transferForm, setTransferForm] = useState<TransferFormState>(createTransferForm);
   const [balanceForm, setBalanceForm] = useState<BalanceFormState>({ currentBalance: "", reportingBalanceIdr: "" });
@@ -260,6 +261,62 @@ export default function AccountsPage() {
     rememberTrigger();
     setFormError(null);
     setAccountToToggle(account);
+  }
+
+  function openAccountDeleteDialog(account: AccountOverviewRecord) {
+    rememberTrigger();
+    setFormError(null);
+    setAccountToDelete(account);
+  }
+
+  async function deleteAccount() {
+    if (!accountToDelete) return;
+    if (!canWriteOnline()) {
+      setFormError(t(offlineWriteMessage));
+      return;
+    }
+    if (Number(accountToDelete.current_balance) !== 0) {
+      setFormError(t("Saldo akun harus nol sebelum dihapus permanen."));
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sesi login tidak ditemukan.");
+      const accountId = accountToDelete.id;
+      const linkedResults = await Promise.all([
+        supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+        supabase.from("account_transfers").select("id", { count: "exact", head: true }).eq("user_id", user.id).or(`source_account_id.eq.${accountId},destination_account_id.eq.${accountId}`),
+        supabase.from("recurring_transactions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+        supabase.from("account_reconciliations").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+        supabase.from("stock_executions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+        supabase.from("forex_trades").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+        supabase.from("account_equity_snapshots").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("account_id", accountId),
+      ]);
+      const linkedError = linkedResults.find((result) => result.error)?.error;
+      if (linkedError) throw linkedError;
+      if (linkedResults.some((result) => (result.count ?? 0) > 0)) {
+        setFormError(t("Akun punya riwayat terhubung dan tidak dapat dihapus. Arsipkan akun sebagai gantinya."));
+        return;
+      }
+
+      const { error } = await supabase
+        .from("financial_accounts")
+        .delete()
+        .eq("id", accountId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setAccountToDelete(null);
+      await loadAccounts();
+      window.setTimeout(() => lastTriggerRef.current?.focus(), 0);
+    } catch (error) {
+      reportHandledError("Account delete failed", error, "Akun belum berhasil dihapus.");
+      setFormError(t("Akun belum berhasil dihapus. Coba lagi."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   function openTransferDialog() {
@@ -589,7 +646,7 @@ export default function AccountsPage() {
                   action={<Button variant="secondary" onClick={() => setActiveFilter("all")}>{t("Lihat semua akun")}</Button>}
                 />
               ) : (
-                <AccountLedger accounts={filteredAccounts} onUpdateBalance={openBalanceDialog} onEdit={openEditAccountDialog} onToggleActive={openAccountToggleDialog} dateLocale={dateLocale} />
+                <AccountLedger accounts={filteredAccounts} onUpdateBalance={openBalanceDialog} onEdit={openEditAccountDialog} onToggleActive={openAccountToggleDialog} onDelete={openAccountDeleteDialog} dateLocale={dateLocale} />
               )}
             </Surface>
 
@@ -626,6 +683,20 @@ export default function AccountsPage() {
           cancelLabel={t("Batal")}
           onClose={() => { if (!saving) setAccountToToggle(null); }}
           onConfirm={() => void toggleAccountActive()}
+          loading={saving}
+          error={formError}
+        />
+      )}
+      {accountToDelete && (
+        <ConfirmDialog
+          titleId="account-delete-title"
+          descriptionId="account-delete-description"
+          title={t("Hapus permanen {name}?", { name: accountToDelete.name })}
+          description={t("Tindakan ini tidak dapat dibatalkan. Akun hanya bisa dihapus bila saldo nol dan tidak punya riwayat transaksi, transfer, jadwal, atau jurnal.")}
+          confirmLabel={t("Hapus permanen")}
+          cancelLabel={t("Batal")}
+          onClose={() => { if (!saving) setAccountToDelete(null); }}
+          onConfirm={() => void deleteAccount()}
           loading={saving}
           error={formError}
         />
@@ -702,18 +773,18 @@ function OverviewMetric({ icon, label, value, tone = "neutral" }: { icon: ReactN
   );
 }
 
-function AccountLedger({ accounts, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { accounts: AccountOverviewRecord[]; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountLedger({ accounts, onUpdateBalance, onEdit, onToggleActive, onDelete, dateLocale }: { accounts: AccountOverviewRecord[]; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; onDelete: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <>
       <div className="hidden md:block">
         <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,1fr)_auto] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
-          <span>{t("Akun")}</span><span>{t("Jenis")}</span><span className="text-right">{t("Saldo")}</span><span className="w-56 text-right">{t("Aksi")}</span>
+          <span>{t("Akun")}</span><span>{t("Jenis")}</span><span className="text-right">{t("Saldo")}</span><span className="w-72 text-right">{t("Aksi")}</span>
         </div>
-        {accounts.map((account) => <AccountRow key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} dateLocale={dateLocale} />)}
+        {accounts.map((account) => <AccountRow key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} dateLocale={dateLocale} />)}
       </div>
       <div className="divide-y divide-slate-100 md:hidden">
-        {accounts.map((account) => <AccountCard key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} dateLocale={dateLocale} />)}
+        {accounts.map((account) => <AccountCard key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} dateLocale={dateLocale} />)}
       </div>
     </>
   );
@@ -752,19 +823,19 @@ function AccountBalance({ account, align = "right" }: { account: AccountOverview
   );
 }
 
-function AccountRow({ account, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountRow({ account, onUpdateBalance, onEdit, onToggleActive, onDelete, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; onDelete: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <article className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,.8fr)_minmax(0,1fr)_auto] items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 hover:bg-emerald-50/35">
       <AccountIdentity account={account} dateLocale={dateLocale} />
       <div><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))} · {account.currency}</span></div>
       <AccountBalance account={account} />
-      <div className="flex w-56 justify-end gap-1"><Button variant="ghost" size="compact" onClick={() => onEdit(account)}>{t("Edit")}</Button>{account.is_active && <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)}>{t("Perbarui saldo")}</Button>}<Button variant="ghost" size="compact" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button></div>
+      <div className="flex w-72 justify-end gap-1"><Button variant="ghost" size="compact" onClick={() => onEdit(account)}>{t("Edit")}</Button>{account.is_active && <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)}>{t("Perbarui saldo")}</Button>}<Button variant="ghost" size="compact" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button><Button variant="ghost" size="compact" onClick={() => onDelete(account)}>{t("Hapus")}</Button></div>
     </article>
   );
 }
 
-function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
+function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, onDelete, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; onDelete: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
   return (
     <article className="p-4">
@@ -773,7 +844,7 @@ function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, dateLoc
         <AccountBalance account={account} align="left" />
         <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))}</span>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui saldo")}</Button>}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui saldo")}</Button>}<Button variant="ghost" onClick={() => onDelete(account)} className="col-span-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800">{t("Hapus permanen")}</Button></div>
     </article>
   );
 }
