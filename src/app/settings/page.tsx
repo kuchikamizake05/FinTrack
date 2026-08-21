@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Check, Clipboard, Database, Eye, EyeOff, Globe2, LogOut, ShieldCheck, Smartphone, User, WalletCards, Wifi, WifiOff } from "lucide-react";
+import { Bot, Check, Clipboard, Database, Eye, EyeOff, Fingerprint, Globe2, LogOut, ShieldCheck, Smartphone, User, WalletCards, Wifi, WifiOff } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { maskUserIdentifier } from "@/lib/settings";
+import { clearPasskeyDeviceState, getPasskeyErrorMessage, isWebAuthnSupported, maskPasskeyEmail, readPasskeyDeviceState, writePasskeyDeviceState } from "@/lib/passkeys";
 import { getNetworkSnapshot, getServerNetworkSnapshot, subscribeToNetworkStatus } from "@/lib/pwa";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 
@@ -24,8 +26,11 @@ export default function SettingsPage() {
   const [copyError, setCopyError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [passkeyCheck, setPasskeyCheck] = useState<"idle" | "checking" | "available" | "unavailable">("idle");
+  const [passkeys, setPasskeys] = useState<Array<{ id: string; friendly_name?: string; created_at: string; last_used_at?: string }>>([]);
+  const [passkeyBusy, setPasskeyBusy] = useState<"enroll" | "delete" | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeyDeleteId, setPasskeyDeleteId] = useState<string | null>(null);
+  const [deviceLockEnabled, setDeviceLockEnabled] = useState(false);
   const online = useSyncExternalStore(subscribeToNetworkStatus, getNetworkSnapshot, getServerNetworkSnapshot);
   const [standalone, setStandalone] = useState(false);
   const copyTimer = useRef<number | null>(null);
@@ -40,6 +45,11 @@ export default function SettingsPage() {
       }
       setUserEmail(session.user.email ?? null);
       setUserId(session.user.id);
+      const { data, error } = await supabase.auth.passkey.list();
+      if (!error) {
+        setPasskeys(data ?? []);
+        setDeviceLockEnabled(Boolean((data?.length ?? 0) && readPasskeyDeviceState(session.user.id)?.enabled));
+      }
       setLoading(false);
     };
     void fetchUser();
@@ -63,6 +73,7 @@ export default function SettingsPage() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      if (userId) clearPasskeyDeviceState(userId);
       router.push("/login");
     } catch {
       setLogoutError("Sesi belum dapat ditutup. Coba lagi.");
@@ -84,18 +95,65 @@ export default function SettingsPage() {
     }
   }
 
-  async function checkPasskeySupport() {
-    if (passkeyCheck === "checking") return;
-    setPasskeyCheck("checking");
+  async function refreshPasskeys() {
+    const { data, error } = await supabase.auth.passkey.list();
+    if (error) throw error;
+    setPasskeys(data ?? []);
+    return data ?? [];
+  }
+
+  async function enrollPasskey() {
+    if (!userId || passkeyBusy || !isWebAuthnSupported()) return;
+    setPasskeyBusy("enroll");
     setPasskeyError(null);
     try {
-      const { error } = await supabase.auth.passkey.list();
+      const { error } = await supabase.auth.registerPasskey();
       if (error) throw error;
-      setPasskeyCheck("available");
+      const nextPasskeys = await refreshPasskeys();
+      if (nextPasskeys.length) {
+        writePasskeyDeviceState({ userId, emailHint: maskPasskeyEmail(userEmail), enabled: true, locked: false });
+        setDeviceLockEnabled(true);
+      }
     } catch (error) {
-      setPasskeyCheck("unavailable");
-      setPasskeyError(error instanceof Error ? error.message : "Layanan Passkeys belum dapat diverifikasi.");
+      setPasskeyError(getPasskeyErrorMessage(error));
+    } finally {
+      setPasskeyBusy(null);
     }
+  }
+
+  async function deletePasskey() {
+    if (!passkeyDeleteId || !userId) return;
+    setPasskeyBusy("delete");
+    setPasskeyError(null);
+    try {
+      const { error } = await supabase.auth.passkey.delete({ passkeyId: passkeyDeleteId });
+      if (error) throw error;
+      const nextPasskeys = await refreshPasskeys();
+      if (!nextPasskeys.length) {
+        clearPasskeyDeviceState(userId);
+        setDeviceLockEnabled(false);
+      }
+      setPasskeyDeleteId(null);
+    } catch (error) {
+      setPasskeyError(getPasskeyErrorMessage(error));
+    } finally {
+      setPasskeyBusy(null);
+    }
+  }
+
+  function toggleDeviceLock(enabled: boolean) {
+    if (!userId || !passkeys.length) return;
+    setDeviceLockEnabled(enabled);
+    if (!enabled) {
+      clearPasskeyDeviceState(userId);
+      return;
+    }
+    writePasskeyDeviceState({ userId, emailHint: maskPasskeyEmail(userEmail), enabled: true, locked: false });
+  }
+
+  function lockNow() {
+    if (!userId || !deviceLockEnabled || !passkeys.length) return;
+    writePasskeyDeviceState({ userId, emailHint: maskPasskeyEmail(userEmail), enabled: true, locked: true });
   }
 
   return (
@@ -131,11 +189,15 @@ export default function SettingsPage() {
                 <p className="mt-1 text-xs leading-5 text-slate-500">{t("Data keuangan hanya dibuka lewat akun terautentikasi ini.")}</p>
               </div>
               <div className="mt-5 rounded-xl border border-slate-200 p-3">
-                <p className="text-xs font-bold text-slate-700">{t("Pemeriksaan Passkeys")}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{t("Uji koneksi fitur Passkeys Supabase tanpa menyimpan data biometrik atau kredensial.")}</p>
-                {passkeyCheck === "available" && <p role="status" className="mt-2 text-xs font-semibold text-emerald-700">{t("Passkeys tersedia di proyek ini.")}</p>}
-                {passkeyCheck === "unavailable" && <p role="alert" className="mt-2 text-xs leading-5 text-rose-700">{passkeyError}</p>}
-                <Button variant="secondary" size="compact" loading={passkeyCheck === "checking"} onClick={() => void checkPasskeySupport()} className="mt-3 w-full">{t("Cek dukungan Passkeys")}</Button>
+                <div className="flex items-start gap-2"><Fingerprint className="mt-0.5 h-4 w-4 text-emerald-700" /><div><p className="text-xs font-bold text-slate-700">Passkey perangkat</p><p className="mt-1 text-xs leading-5 text-slate-500">Daftarkan keamanan perangkat. FinTrack tidak menerima data biometrik atau PIN.</p></div></div>
+                {!isWebAuthnSupported() && <p role="alert" className="mt-3 text-xs leading-5 text-rose-700">Perangkat atau browser ini belum mendukung Passkey.</p>}
+                {passkeyError && <p role="alert" className="mt-3 text-xs leading-5 text-rose-700">{passkeyError}</p>}
+                <div className="mt-3 space-y-2">
+                  {passkeys.map((passkey) => <div key={passkey.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-700">{passkey.friendly_name || "Passkey perangkat"}</p><p className="text-[11px] text-slate-500">{passkey.last_used_at ? "Pernah digunakan" : "Baru didaftarkan"}</p></div><Button variant="ghost" size="compact" onClick={() => setPasskeyDeleteId(passkey.id)} disabled={passkeyBusy !== null}>Hapus</Button></div>)}
+                </div>
+                <Button variant="secondary" size="compact" loading={passkeyBusy === "enroll"} onClick={() => void enrollPasskey()} disabled={!userId || !isWebAuthnSupported() || passkeyBusy !== null} className="mt-3 w-full"><Fingerprint className="h-4 w-4" /> Daftarkan Passkey</Button>
+                <label className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5"><span><span className="block text-xs font-bold text-slate-700">Kunci FinTrack di perangkat ini</span><span className="mt-0.5 block text-[11px] leading-4 text-slate-500">Muncul saat aplikasi dibuka kembali.</span></span><input type="checkbox" checked={deviceLockEnabled} onChange={(event) => toggleDeviceLock(event.target.checked)} disabled={!passkeys.length || !isWebAuthnSupported()} className="h-5 w-5 accent-emerald-700" /></label>
+                {deviceLockEnabled && <Button variant="secondary" size="compact" onClick={lockNow} className="mt-3 w-full">Kunci sekarang</Button>}
               </div>
               {logoutError && <p role="alert" className="mt-4 text-xs leading-5 text-rose-700">{t(logoutError)}</p>}
               <Button variant="destructive" loading={loggingOut} onClick={() => void handleLogout()} className="mt-5 w-full"><LogOut className="h-4 w-4" /> {t("Keluar dari sesi")}</Button>
@@ -183,6 +245,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+      {passkeyDeleteId && <ConfirmDialog titleId="passkey-delete-title" descriptionId="passkey-delete-description" title="Hapus Passkey?" description="Perangkat ini tidak lagi dapat membuka FinTrack dengan Passkey tersebut." confirmLabel="Hapus" onClose={() => { if (!passkeyBusy) setPasskeyDeleteId(null); }} onConfirm={() => void deletePasskey()} loading={passkeyBusy === "delete"} error={passkeyError} />}
     </div>
   );
 }

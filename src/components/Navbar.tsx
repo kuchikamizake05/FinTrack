@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Plus, Settings, Tags, User, WalletCards, X } from "lucide-react";
 import { isNavigationActive, primaryNavigation } from "@/lib/navigation";
 import { reportHandledError } from "@/lib/errors";
+import { clearPasskeyDeviceState } from "@/lib/passkeys";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import BrandLockup from "@/components/BrandLockup";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -29,6 +30,7 @@ export default function Navbar() {
   const mobileProfileTriggerRef = useRef<HTMLButtonElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -44,10 +46,16 @@ export default function Navbar() {
   useEffect(() => {
     let active = true;
     void supabase.auth.getSession().then(({ data }) => {
-      if (active) setUserEmail(data.session?.user.email ?? null);
+      if (active) {
+        setUserEmail(data.session?.user.email ?? null);
+        setUserId(data.session?.user.id ?? null);
+      }
     });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active) setUserEmail(session?.user.email ?? null);
+      if (active) {
+        setUserEmail(session?.user.email ?? null);
+        setUserId(session?.user.id ?? null);
+      }
     });
     return () => {
       active = false;
@@ -86,6 +94,7 @@ export default function Navbar() {
       closeProfile();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      if (userId) clearPasskeyDeviceState(userId);
       router.replace("/login");
     } catch (error) {
       reportHandledError("Navbar logout failed", error, "Sesi belum dapat ditutup. Coba lagi.");

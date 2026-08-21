@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { Session } from "@supabase/supabase-js";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AlertTriangle, CloudOff, Database, RefreshCw } from "lucide-react";
@@ -8,13 +9,24 @@ import { Button } from "@/components/ui/Button";
 import { getAuthGateState, sanitizeNextPath } from "@/lib/auth";
 import { getNetworkSnapshot, getServerNetworkSnapshot, subscribeToNetworkStatus } from "@/lib/pwa";
 import { isSupabaseConfigured, supabase } from "@/infrastructure/supabase/browser-client";
+import PasskeyUnlockScreen from "@/components/PasskeyUnlockScreen";
+import { PASSKEY_STATE_CHANGE_EVENT, clearPasskeyDeviceState, readPasskeyDeviceState, writePasskeyDeviceState } from "@/lib/passkeys";
 
 export default function AppBoundary({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const online = useSyncExternalStore(subscribeToNetworkStatus, getNetworkSnapshot, getServerNetworkSnapshot);
   const [resolved, setResolved] = useState(!isSupabaseConfigured);
+  const [session, setSession] = useState<Session | null>(null);
   const [hasSession, setHasSession] = useState(false);
+  const [passkeyLocked, setPasskeyLocked] = useState(false);
+  const sessionRef = useRef<Session | null>(null);
+
+  const updatePasskeyLock = useCallback((nextSession: Session | null) => {
+    sessionRef.current = nextSession;
+    const deviceState = nextSession ? readPasskeyDeviceState(nextSession.user.id) : null;
+    setPasskeyLocked(Boolean(deviceState?.enabled && deviceState.locked));
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -22,25 +34,43 @@ export default function AppBoundary({ children }: { children: React.ReactNode })
 
     void supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      setSession(data.session);
       setHasSession(Boolean(data.session));
+      const deviceState = data.session ? readPasskeyDeviceState(data.session.user.id) : null;
+      if (data.session && deviceState?.enabled) {
+        writePasskeyDeviceState({ ...deviceState, locked: true });
+        setPasskeyLocked(true);
+      } else {
+        updatePasskeyLock(data.session);
+      }
       setResolved(true);
     }).catch(() => {
       if (!active) return;
+      setSession(null);
       setHasSession(false);
+      setPasskeyLocked(false);
       setResolved(true);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return;
-      setHasSession(Boolean(session));
+      setSession(nextSession);
+      setHasSession(Boolean(nextSession));
+      updatePasskeyLock(nextSession);
       setResolved(true);
     });
+
+    const updateFromStorage = () => updatePasskeyLock(sessionRef.current);
+    window.addEventListener("storage", updateFromStorage);
+    window.addEventListener(PASSKEY_STATE_CHANGE_EVENT, updateFromStorage);
 
     return () => {
       active = false;
       subscription.subscription.unsubscribe();
+      window.removeEventListener("storage", updateFromStorage);
+      window.removeEventListener(PASSKEY_STATE_CHANGE_EVENT, updateFromStorage);
     };
-  }, []);
+  }, [updatePasskeyLock]);
 
   const gate = getAuthGateState({
     pathname,
@@ -56,7 +86,28 @@ export default function AppBoundary({ children }: { children: React.ReactNode })
     router.replace(`/login?next=${encodeURIComponent(destination)}`);
   }, [gate, pathname, router]);
 
-  if (gate === "public" || gate === "authenticated") return children;
+  if (gate === "public") return children;
+  if (gate === "authenticated" && passkeyLocked && session) {
+    const deviceState = readPasskeyDeviceState(session.user.id);
+    return (
+      <PasskeyUnlockScreen
+        emailHint={deviceState?.emailHint ?? "Akun FinTrack"}
+        userId={session.user.id}
+        onUnlock={() => writePasskeyDeviceState({
+          userId: session.user.id,
+          emailHint: deviceState?.emailHint ?? "Akun FinTrack",
+          enabled: true,
+          locked: false,
+        })}
+        onUseNormalLogin={async () => {
+          clearPasskeyDeviceState(session.user.id);
+          await supabase.auth.signOut();
+          router.replace("/login");
+        }}
+      />
+    );
+  }
+  if (gate === "authenticated") return children;
   if (gate === "configuration-error") return <ConfigurationRequired />;
   if (gate === "offline") return <OfflineRecovery />;
   return <ApplicationLoading />;
