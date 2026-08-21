@@ -258,6 +258,15 @@ const englishTranslations: Record<string, string> = {
   "Buka dengan Passkey": "Unlock with Passkey",
   "Gunakan login biasa": "Use regular sign in",
   "Ganti akun": "Switch account",
+  "Passkey perangkat": "Device passkey",
+  "Perangkat atau browser ini belum mendukung Passkey.": "This device or browser does not support Passkeys.",
+  "Pernah digunakan": "Used before",
+  "Baru didaftarkan": "Newly registered",
+  "Daftarkan Passkey": "Register Passkey",
+  "Kunci FinTrack di perangkat ini": "Lock FinTrack on this device",
+  "Kunci sekarang": "Lock now",
+  "Hapus Passkey?": "Delete Passkey?",
+  "Perangkat ini tidak lagi dapat membuka FinTrack dengan Passkey tersebut.": "This device will no longer unlock FinTrack with this Passkey.",
   "Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.":
     "Each account can only access its own data through RLS policies.",
   "Periksa email untuk konfirmasi. Jika akun sudah ada, silakan masuk.":
