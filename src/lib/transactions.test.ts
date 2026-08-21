@@ -81,7 +81,7 @@ describe("transaction presentation helpers", () => {
     expect(validateTransactionForm({ accountId: "", amount: "0" })).toBe(
       "Pilih akun dan masukkan nominal lebih dari nol.",
     );
-    expect(validateTransactionForm({ accountId: "account-1", amount: "125000" })).toBeNull();
+    expect(validateTransactionForm({ accountId: "account-1", amount: "0125000" })).toBeNull();
   });
 
   it("maps technical source and status values to readable Indonesian labels", () => {

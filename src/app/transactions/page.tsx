@@ -129,7 +129,7 @@ function createDefaultForm(): TransactionFormState {
     type: "expense",
     merchant: "",
     category: "",
-    amount: "",
+    amount: "0",
     note: "",
     accountId: "",
   };
