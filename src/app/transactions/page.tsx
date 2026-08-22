@@ -171,6 +171,7 @@ export default function TransactionsPage() {
   const [dateFiltersOpen, setDateFiltersOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [scanDerived, setScanDerived] = useState(false);
   const [form, setForm] = useState<TransactionFormState>(createDefaultForm);
   const merchantInputRef = useRef<HTMLInputElement>(null);
 
@@ -305,6 +306,10 @@ export default function TransactionsPage() {
     () => filterTransactions(transactions, filters),
     [filters, transactions],
   );
+  const queuedOperationByTransactionId = useMemo(
+    () => new Map(queuedOperations.map((operation) => [operation.transactionId, operation])),
+    [queuedOperations],
+  );
   const accountNames = useMemo(
     () => new Map(financialAccounts.map((account) => [account.id, account.name])),
     [financialAccounts],
@@ -378,6 +383,7 @@ export default function TransactionsPage() {
     const nextForm = createDefaultForm();
     nextForm.category = buildTransactionCategoryOptions(categories, "expense")[0] ?? "";
     setForm(nextForm);
+    setScanDerived(false);
     setFormError(null);
     setModalOpen(true);
   }, [categories]);
@@ -408,6 +414,7 @@ export default function TransactionsPage() {
 
   const openEdit = (transaction: Transaction) => {
     setSelectedTx(transaction);
+    setScanDerived(false);
     setForm({
       date: transaction.date,
       type: transaction.type,
@@ -458,7 +465,7 @@ export default function TransactionsPage() {
       const onlinePayload = {
         ...offlinePayload,
         source: selectedTx?.source ?? "manual",
-        status: getTransactionSaveStatus(selectedTx?.status),
+        status: getTransactionSaveStatus(selectedTx?.status, scanDerived),
       };
 
       if (offline) {
@@ -467,7 +474,7 @@ export default function TransactionsPage() {
           userId: user.id,
           kind: selectedTx ? "edit" : "create",
           transactionId,
-          payload: selectedTx ? offlinePayload : { ...offlinePayload, id: transactionId },
+          payload: selectedTx ? offlinePayload : { ...offlinePayload, id: transactionId, ...(scanDerived ? { status: "needs_review" as const } : {}) },
           baseUpdatedAt: selectedTx?.updated_at ?? null,
         }));
         await loadQueuedOperations(user.id);
@@ -859,6 +866,9 @@ export default function TransactionsPage() {
             deletingId={deletingId}
             restoringId={restoringId}
             approvingId={approvingId}
+            queuedOperations={queuedOperationByTransactionId}
+            onRetryQueue={retryQueuedOperation}
+            onDiscardQueue={(operation) => { setConflictTarget(operation); setConflictError(null); }}
           />
         )}
       </main>
@@ -932,6 +942,7 @@ export default function TransactionsPage() {
           saving={saving}
           error={formError}
           merchantInputRef={merchantInputRef}
+          onScan={() => setScanDerived(true)}
           onClose={closeModal}
           onSubmit={handleSave}
         />
@@ -988,7 +999,7 @@ function PrintReport({ report, filterSummary }: { report: FinancialReport; filte
   );
 }
 
-function TransactionResults({ transactions, accountNames, accountCurrencies, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId }: {
+function TransactionResults({ transactions, accountNames, accountCurrencies, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId, queuedOperations, onRetryQueue, onDiscardQueue }: {
   transactions: Transaction[];
   accountNames: ReadonlyMap<string, string>;
   accountCurrencies: ReadonlyMap<string, string>;
@@ -1000,6 +1011,9 @@ function TransactionResults({ transactions, accountNames, accountCurrencies, dat
   deletingId: string | null;
   restoringId: string | null;
   approvingId: string | null;
+  queuedOperations: ReadonlyMap<string, QueuedTransactionOperation>;
+  onRetryQueue: (operation: QueuedTransactionOperation) => Promise<void>;
+  onDiscardQueue: (operation: QueuedTransactionOperation) => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -1044,7 +1058,7 @@ function TransactionResults({ transactions, accountNames, accountCurrencies, dat
                   </td>
                   <td className="px-5 py-4">
                     <StatusBadge status={transaction.status} />
-                    {transaction.syncPending && <p aria-live="polite" className="mt-1.5 text-[11px] font-medium text-sky-700">{t("Sinkronisasi tertunda")}</p>}
+                    <QueueOperationStatus operation={queuedOperations.get(transaction.id)} onRetry={onRetryQueue} onDiscard={onDiscardQueue} />
                     <p className="mt-1.5 text-[11px] font-medium text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</p>
                   </td>
                   <td className="px-5 py-4">
@@ -1078,7 +1092,7 @@ function TransactionResults({ transactions, accountNames, accountCurrencies, dat
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge status={transaction.status} />
-                  {transaction.syncPending && <span aria-live="polite" className="text-[11px] font-semibold text-sky-700">{t("Sinkronisasi tertunda")}</span>}
+                  <QueueOperationStatus operation={queuedOperations.get(transaction.id)} onRetry={onRetryQueue} onDiscard={onDiscardQueue} compact />
                   <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
                 </div>
               </div>
@@ -1089,6 +1103,31 @@ function TransactionResults({ transactions, accountNames, accountCurrencies, dat
         ))}
       </div>
     </>
+  );
+}
+
+function QueueOperationStatus({ operation, onRetry, onDiscard, compact = false }: {
+  operation?: QueuedTransactionOperation;
+  onRetry: (operation: QueuedTransactionOperation) => Promise<void>;
+  onDiscard: (operation: QueuedTransactionOperation) => void;
+  compact?: boolean;
+}) {
+  const { t } = useLanguage();
+  if (!operation) return null;
+  if (operation.state === "conflict") {
+    return (
+      <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-rose-700">
+        {t("Konflik sinkronisasi")}
+        <Button variant="ghost" size="compact" className="min-h-7 px-1.5 text-[11px]" onClick={() => void onRetry(operation)}>{t("Coba ulang")}</Button>
+        <Button variant="ghost" size="compact" className="min-h-7 px-1.5 text-[11px]" onClick={() => onDiscard(operation)}>{t("Buang")}</Button>
+      </span>
+    );
+  }
+  return (
+    <span aria-live="polite" className="text-[11px] font-semibold text-sky-700">
+      {t("Sinkronisasi tertunda")}{operation.attempts > 0 ? ` · ${t("Percobaan")} ${operation.attempts}` : ""}
+      {!compact && operation.lastError ? ` · ${operation.lastError}` : ""}
+    </span>
   );
 }
 
@@ -1168,7 +1207,7 @@ function StatusBadge({ status }: { status: Transaction["status"] }) {
   return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold", tones[status])}>{t(getTransactionStatusLabel(status))}</span>;
 }
 
-function TransactionDialog({ form, setForm, accounts, categories, categoryOptions, transaction, isEditMode, saving, error, merchantInputRef, onClose, onSubmit }: {
+function TransactionDialog({ form, setForm, accounts, categories, categoryOptions, transaction, isEditMode, saving, error, merchantInputRef, onScan, onClose, onSubmit }: {
   form: TransactionFormState;
   setForm: Dispatch<SetStateAction<TransactionFormState>>;
   accounts: FinancialAccount[];
@@ -1179,13 +1218,16 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
   saving: boolean;
   error: string | null;
   merchantInputRef: RefObject<HTMLInputElement | null>;
+  onScan: () => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const { t } = useLanguage();
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [receiptNotice, setReceiptNotice] = useState<string | null>(null);
+  const [scanHistory, setScanHistory] = useState<string[]>([]);
   const changeType = (type: CategoryType) => {
     const options = buildTransactionCategoryOptions(categories, type);
     setForm((current) => ({ ...current, type, category: options.includes(current.category) ? current.category : options[0] ?? "" }));
@@ -1218,8 +1260,15 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
       setForm((current) => applyReceiptExtractionToTransactionForm(
         current,
         result.extraction!,
-        buildTransactionCategoryOptions(categories, current.type),
+        buildTransactionCategoryOptions(categories, result.extraction?.type ?? current.type),
       ));
+      onScan();
+      const summary = [
+        result.extraction.type === "income" ? t("Pemasukan") : result.extraction.type === "expense" ? t("Pengeluaran") : null,
+        result.extraction.merchant,
+        result.extraction.amount === null ? null : String(result.extraction.amount),
+      ].filter(Boolean).join(" · ");
+      if (summary) setScanHistory((current) => [summary, ...current].slice(0, 3));
       setReceiptNotice(t("Data struk berhasil diekstrak otomatis. Periksa kembali sebelum menyimpan."));
     } catch (error) {
       setReceiptNotice(error instanceof Error ? error.message : t("AI belum bisa menganalisis struk. Silakan isi form manual."));
@@ -1257,6 +1306,16 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
                 ref={receiptInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void scanReceipt(file);
+                }}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
                 capture="environment"
                 className="sr-only"
                 onChange={(event) => {
@@ -1264,11 +1323,23 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
                   if (file) void scanReceipt(file);
                 }}
               />
-              <Button type="button" variant="secondary" size="compact" onClick={() => receiptInputRef.current?.click()} loading={scanningReceipt} disabled={scanningReceipt}>
-                <Camera className="h-4 w-4" /> {t("Scan struk")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" size="compact" onClick={() => cameraInputRef.current?.click()} loading={scanningReceipt} disabled={scanningReceipt}>
+                  <Camera className="h-4 w-4" /> {t("Ambil foto")}
+                </Button>
+                <Button type="button" variant="secondary" size="compact" onClick={() => receiptInputRef.current?.click()} disabled={scanningReceipt}>
+                  <ReceiptText className="h-4 w-4" /> {t("Pilih gambar")}
+                </Button>
+              </div>
               <p className="mt-2 text-xs leading-5 text-slate-500">{t("Pilih gambar untuk mengisi form otomatis. Gambar tidak disimpan.")}</p>
               {receiptNotice && <p role="status" className="mt-2 text-xs leading-5 text-emerald-800">{receiptNotice}</p>}
+              {scanHistory.length > 0 && (
+                <div className="mt-3 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-xs text-slate-600">
+                  <p className="font-bold text-emerald-800">{t("Hasil scan sesi ini")}</p>
+                  <ul className="mt-1 space-y-1">{scanHistory.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
+                  <p className="mt-2 text-amber-800">{t("Transaksi hasil scan akan perlu ditinjau sebelum mengubah saldo.")}</p>
+                </div>
+              )}
             </div>
           )}
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label={t("Tipe transaksi")}>

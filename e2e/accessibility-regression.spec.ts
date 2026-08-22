@@ -234,8 +234,9 @@ test.describe("keyboard and confirmation regressions @critical", () => {
     await mockSupabase(page, true);
     await page.goto("/dashboard");
 
-    await page.keyboard.press("Tab");
     const skipLink = page.getByRole("link", { name: "Lewati ke konten" });
+    await expect(skipLink).toHaveAttribute("data-ready", "true");
+    await page.keyboard.press("Tab");
     await expect(skipLink).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();

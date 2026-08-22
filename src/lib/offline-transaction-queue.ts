@@ -17,7 +17,7 @@ export type OfflineTransactionPayload = {
   note?: string | null;
   account_id?: string;
   source?: "manual";
-  status?: Extract<TransactionStatus, "deleted">;
+  status?: Extract<TransactionStatus, "deleted" | "needs_review">;
 };
 
 export type QueuedTransactionOperation = {

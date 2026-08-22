@@ -35,17 +35,20 @@ export function validateTransactionForm(form: { accountId: string; amount: strin
 
 export function applyReceiptExtractionToTransactionForm<T extends {
   date: string;
+  type?: "income" | "expense";
   merchant: string;
   category: string;
   amount: string;
   note: string;
 }>(form: T, extraction: ReceiptExtraction, categoryOptions: readonly string[]): T {
+  const type = extraction.type ?? form.type;
   const category = extraction.categoryHint
     ? categoryOptions.find((option) => option.toLocaleLowerCase() === extraction.categoryHint?.toLocaleLowerCase()) ?? form.category
     : form.category;
 
   return {
     ...form,
+    type,
     date: extraction.date ?? form.date,
     merchant: extraction.merchant ?? form.merchant,
     category,
@@ -54,8 +57,8 @@ export function applyReceiptExtractionToTransactionForm<T extends {
   };
 }
 
-export function getTransactionSaveStatus(existingStatus?: TransactionStatus) {
-  return existingStatus ?? "confirmed";
+export function getTransactionSaveStatus(existingStatus?: TransactionStatus, scanned = false) {
+  return existingStatus ?? (scanned ? "needs_review" : "confirmed");
 }
 
 export function canApproveTransaction(status: TransactionStatus) {

@@ -13,6 +13,8 @@ const sampleValidPayload = {
   merchant: "Indomaret Point",
   amount: 45000,
   categoryHint: "Belanja",
+  type: "expense",
+  proofKind: "receipt",
   note: "Kopi dan roti",
   rawText: "INDOMARET POINT TOTAL 45.000",
   confidence: 0.95,
@@ -24,12 +26,23 @@ describe("receiptExtractionSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts transfer proof with income direction", () => {
+    expect(receiptExtractionSchema.safeParse({
+      ...sampleValidPayload,
+      merchant: "Transfer masuk",
+      type: "income",
+      proofKind: "transfer",
+    }).success).toBe(true);
+  });
+
   it("accepts nullable fields as long as at least one core field exists", () => {
     const partial = {
       date: null,
       merchant: "Warung Kopi",
       amount: null,
       categoryHint: null,
+      type: null,
+      proofKind: null,
       note: null,
       rawText: null,
       confidence: null,
@@ -43,6 +56,8 @@ describe("receiptExtractionSchema", () => {
       merchant: null,
       amount: null,
       categoryHint: null,
+      type: null,
+      proofKind: null,
       note: null,
       rawText: "teks tidak jelas",
       confidence: 0.1,

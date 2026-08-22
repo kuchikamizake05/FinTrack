@@ -5,6 +5,7 @@ import AppBoundary from "@/components/AppBoundary";
 import OnboardingBoundary from "@/components/OnboardingBoundary";
 import PWARegister from "@/components/PWARegister";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import SkipLink from "@/components/SkipLink";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -56,7 +57,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col bg-[var(--canvas)] font-sans text-slate-900">
         <LanguageProvider>
           <PWARegister />
-          <a className="skip-link" href="#main-content">Lewati ke konten utama</a>
+          <SkipLink />
           <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
         </LanguageProvider>
       </body>

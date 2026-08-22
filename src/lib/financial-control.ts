@@ -65,9 +65,54 @@ export function parseTransactionCsv(csv: string) {
   });
 }
 
+export type ImportedTransaction = ReturnType<typeof parseTransactionCsv>[number];
+
+type MatchableTransaction = Omit<Pick<ImportedTransaction, "date" | "type" | "merchant" | "category" | "amount">, "merchant"> & { merchant: string | null };
+
+function normalizeMatchText(value: string | null | undefined) {
+  return (value ?? "").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function transactionMatchKey(transaction: MatchableTransaction) {
+  return [
+    transaction.date,
+    transaction.type,
+    Number(transaction.amount),
+    normalizeMatchText(transaction.merchant),
+    normalizeMatchText(transaction.category),
+  ].join("|");
+}
+
+export function buildImportMatchPreview<T extends MatchableTransaction>(
+  imported: readonly T[],
+  existing: readonly MatchableTransaction[],
+) {
+  const existingKeys = new Set(existing.map(transactionMatchKey));
+  const batchKeys = new Set<string>();
+
+  return imported.map((record, index) => {
+    const key = transactionMatchKey(record);
+    const duplicateOfExisting = existingKeys.has(key);
+    const duplicateOfBatch = batchKeys.has(key);
+    batchKeys.add(key);
+    return { index, record, duplicateOfExisting, duplicateOfBatch, isDuplicate: duplicateOfExisting || duplicateOfBatch };
+  });
+}
+
 export function buildReconciliation({ expectedBalance, statementBalance }: { expectedBalance: number; statementBalance: number }) {
   const difference = statementBalance - expectedBalance;
   return { difference, isMatched: difference === 0 };
+}
+
+export function buildReconciliationReviewSummary<T extends Pick<FinanceTransaction, "amount" | "status" | "type">>(transactions: readonly T[]) {
+  const reviewTransactions = transactions.filter((transaction) => transaction.status === "needs_review" || transaction.status === "pending_approval");
+  const expenseAmount = reviewTransactions
+    .filter((transaction) => transaction.type === "expense")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const incomeAmount = reviewTransactions
+    .filter((transaction) => transaction.type === "income")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  return { count: reviewTransactions.length, expenseAmount, incomeAmount, netAmount: incomeAmount - expenseAmount };
 }
 
 export function buildFinancialAlerts({ budgets, transactions, accountFreshness, today }: { budgets: readonly Budget[]; transactions: readonly ControlTransaction[]; accountFreshness: readonly { accountName: string; lastUpdatedAt: string | null }[]; today: string }) {

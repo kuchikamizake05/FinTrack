@@ -8,6 +8,8 @@ export const receiptExtractionSchema = z.object({
   merchant: z.string().trim().min(1).max(120).nullable(),
   amount: z.number().finite().positive().max(1_000_000_000_000).nullable(),
   categoryHint: z.string().trim().min(1).max(80).nullable(),
+  type: z.enum(["income", "expense"]).nullable(),
+  proofKind: z.enum(["receipt", "transfer"]).nullable(),
   note: z.string().trim().min(1).max(300).nullable(),
   rawText: z.string().trim().min(1).max(2_000).nullable(),
   confidence: z.number().finite().min(0).max(1).nullable(),
@@ -17,6 +19,7 @@ export const receiptExtractionSchema = z.object({
   || data.amount !== null
   || data.categoryHint !== null
   || data.note !== null
+  || data.type !== null
 ), { message: "AI tidak menemukan data transaksi yang valid." });
 
 export type ReceiptExtraction = z.infer<typeof receiptExtractionSchema>;
@@ -41,7 +44,19 @@ export const receiptGenerationResponseSchema = {
     },
     categoryHint: {
       type: "string",
-      description: "Perkiraan kategori pengeluaran dalam bahasa Indonesia atau null.",
+      description: "Perkiraan kategori transaksi dalam bahasa Indonesia atau null.",
+      nullable: true,
+    },
+    type: {
+      type: "string",
+      enum: ["income", "expense"],
+      description: "income untuk dana masuk, expense untuk pembayaran atau dana keluar, atau null jika tidak jelas.",
+      nullable: true,
+    },
+    proofKind: {
+      type: "string",
+      enum: ["receipt", "transfer"],
+      description: "transfer untuk bukti transfer bank/e-wallet, receipt untuk struk pembayaran, atau null jika tidak jelas.",
       nullable: true,
     },
     note: {
@@ -60,7 +75,7 @@ export const receiptGenerationResponseSchema = {
       nullable: true,
     },
   },
-  required: ["date", "merchant", "amount", "categoryHint", "note", "rawText", "confidence"],
+  required: ["date", "merchant", "amount", "categoryHint", "type", "proofKind", "note", "rawText", "confidence"],
 } as const;
 
 export function buildGeminiReceiptRequest({
@@ -81,9 +96,11 @@ export function buildGeminiReceiptRequest({
               "Panduan:",
               "- date: Format YYYY-MM-DD. Jika hanya tanggal dan bulan, gunakan tahun saat ini jika masuk akal.",
               "- merchant: Nama merchant atau penerima transfer.",
-              "- amount: Nominal total akhir pengeluaran (angka murni positif).",
-              "- categoryHint: Rekomendasi kategori pengeluaran (contoh: Makanan & Minuman, Belanja, Transportasi, Tagihan).",
-              "- note: Rangkuman ringkas 1-2 baris item yang dibeli.",
+              "- amount: Nominal total transaksi (angka murni positif).",
+              "- type: expense untuk pembayaran/dana keluar, income untuk dana masuk, atau null jika tidak jelas.",
+              "- proofKind: transfer untuk bukti transfer bank/e-wallet, receipt untuk struk pembayaran, atau null jika tidak jelas.",
+              "- categoryHint: Rekomendasi kategori transaksi dalam bahasa Indonesia atau null.",
+              "- note: Rangkuman ringkas transaksi atau tujuan transfer.",
               "- rawText: Teks utama yang terbaca di struk.",
               "- confidence: Angka keyakinan 0.0 sampai 1.0.",
               "Jika ada informasi yang tidak terbaca, gunakan nilai null.",

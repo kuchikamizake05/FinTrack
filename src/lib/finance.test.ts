@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCategoryTotals,
+  buildEmergencyFundRunwayByCurrency,
+  calculateEmergencyFundRunway,
   calculateSummary,
   filterTransactions,
   groupTransactionAmountsByCurrency,
@@ -47,5 +49,22 @@ describe("finance helpers", () => {
       { ...transactions[2], account_id: "account-idr" },
       { ...transactions[2], id: "5", amount: 20, status: "needs_review" as const, account_id: "account-usd" },
     ], currencyByAccount, ["pending_approval", "needs_review"])).toEqual({ IDR: 15_000, USD: 20 });
+  });
+
+  it("calculates runway from liquid balances and confirmed same-currency expenses only", () => {
+    expect(calculateEmergencyFundRunway({ liquidBalance: 600_000, averageMonthlyExpense: 200_000 })).toBe(3);
+    expect(calculateEmergencyFundRunway({ liquidBalance: 600_000, averageMonthlyExpense: 0 })).toBeNull();
+    expect(buildEmergencyFundRunwayByCurrency([
+      { id: "idr-bank", currency: "IDR", current_balance: 600_000, kind: "bank", is_active: true },
+      { id: "usd-wallet", currency: "USD", current_balance: 100, kind: "ewallet", is_active: true },
+      { id: "investment", currency: "IDR", current_balance: 1_000_000, kind: "investment", is_active: true },
+    ], [
+      { ...transactions[0], account_id: "idr-bank" },
+      { ...transactions[2], account_id: "idr-bank" },
+      { ...transactions[0], id: "usd", amount: 20, account_id: "usd-wallet" },
+    ])).toEqual([
+      { currency: "IDR", liquidBalance: 600_000, averageMonthlyExpense: 25_000, runwayMonths: 24 },
+      { currency: "USD", liquidBalance: 100, averageMonthlyExpense: 20, runwayMonths: 5 },
+    ]);
   });
 });

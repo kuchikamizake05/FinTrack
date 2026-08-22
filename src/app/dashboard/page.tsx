@@ -83,11 +83,10 @@ type FinancialGoal = {
   name: string;
   target_amount: number;
   current_amount: number;
+  currency: string;
   color: string | null;
   due_date: string | null;
 };
-
-const formatIdr = (amount: number) => `Rp${Math.abs(amount).toLocaleString("id-ID")}`;
 
 function withTimeout<T>(promise: PromiseLike<T>, milliseconds: number) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -190,11 +189,11 @@ export default function DashboardPage() {
             .order("name"),
           supabase
             .from("financial_goals")
-            .select("id, name, target_amount, current_amount, color, due_date")
+            .select("id, name, target_amount, current_amount, currency, color, due_date")
             .eq("user_id", user.id)
             .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .limit(1),
+            .order("due_date", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: false }),
         ]);
 
         if (txResult.error) throw txResult.error;
@@ -276,9 +275,6 @@ export default function DashboardPage() {
   const pendingTotals = Object.entries(pendingByCurrency);
   const cashFlowUnavailable = transactions.length > 0 && !cashFlowCurrency;
   const primaryGoal = goals[0];
-  const goalProgress = primaryGoal
-    ? calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount))
-    : null;
   const attentionAccount = accounts.find((account) =>
     (account.institution || account.name).toLowerCase().includes("gopay"),
   ) || accounts.find((account) => account.kind === "ewallet") || accounts[0];
@@ -653,15 +649,14 @@ export default function DashboardPage() {
                 <AttentionRow
                   icon={Goal}
                   title={primaryGoal ? primaryGoal.name : "Buat target keuangan"}
-                  detail={primaryGoal ? `${goalProgress?.percentage || 0}% dari target ${formatIdr(Number(primaryGoal.target_amount))}.` : "Mulai dari dana darurat atau tabungan tujuan."}
-                  href="/accounts"
+                  detail={primaryGoal ? `${calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount)).percentage}% dari target ${formatCurrency(Number(primaryGoal.target_amount), primaryGoal.currency)}${goals.length > 1 ? ` · +${goals.length - 1} target` : ""}.` : "Mulai dari dana darurat atau tabungan tujuan."}
+                  href="/planning"
                   tone="emerald"
                 >
-                  {goalProgress && (
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-emerald-100">
-                      <div className="h-full rounded-full bg-emerald-600" style={{ width: `${goalProgress.percentage}%` }} />
-                    </div>
-                  )}
+                  {goals.map((goal) => {
+                    const progress = calculateGoalProgress(Number(goal.current_amount), Number(goal.target_amount));
+                    return <div key={goal.id} className="mt-3"><div className="flex justify-between gap-2 text-[11px] font-semibold text-slate-500"><span className="truncate">{goal.name}</span><span>{progress.percentage}%</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${progress.percentage}%`, backgroundColor: goal.color ?? undefined }} /></div></div>;
+                  })}
                 </AttentionRow>
               </div>
 

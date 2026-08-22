@@ -108,6 +108,8 @@ describe("transaction presentation helpers", () => {
       merchant: "Kedai Kopi",
       amount: 25000,
       categoryHint: "Makanan",
+      type: "expense",
+      proofKind: "receipt",
       note: "Kopi susu",
       rawText: "private receipt text",
       confidence: 0.9,
@@ -134,6 +136,8 @@ describe("transaction presentation helpers", () => {
       merchant: null,
       amount: null,
       categoryHint: "Tidak ada",
+      type: null,
+      proofKind: null,
       note: null,
       rawText: null,
       confidence: null,
@@ -143,6 +147,39 @@ describe("transaction presentation helpers", () => {
       category: "Transportasi",
       amount: "10000",
       note: "Catatan",
+    });
+  });
+
+  it("marks scanned creates for review while normal creates stay confirmed", () => {
+    expect(getTransactionSaveStatus(undefined, true)).toBe("needs_review");
+    expect(getTransactionSaveStatus()).toBe("confirmed");
+  });
+
+  it("suggests transfer direction without changing unrelated fields", () => {
+    expect(applyReceiptExtractionToTransactionForm({
+      date: "2026-08-22",
+      type: "expense" as const,
+      merchant: "Manual",
+      category: "Transfer",
+      amount: "10000",
+      note: "",
+    }, {
+      date: null,
+      merchant: "Transfer masuk",
+      amount: 50000,
+      categoryHint: null,
+      type: "income",
+      proofKind: "transfer",
+      note: null,
+      rawText: null,
+      confidence: null,
+    }, [])).toEqual({
+      date: "2026-08-22",
+      type: "income",
+      merchant: "Transfer masuk",
+      category: "Transfer",
+      amount: "50000",
+      note: "",
     });
   });
 

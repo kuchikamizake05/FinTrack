@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSyncExternalStore } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, Download, FileUp, Loader2, PiggyBank, RefreshCw, Scale, Upload, WifiOff } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Download, FileUp, Goal, Loader2, PiggyBank, RefreshCw, Scale, Upload, WifiOff } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
@@ -12,17 +12,20 @@ import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
-import { buildBudgetProgress, buildFinancialAlerts, buildReconciliation, getIdrBudgetScope, parseTransactionCsv, serializeTransactionsCsv } from "@/lib/financial-control";
+import { buildBudgetProgress, buildFinancialAlerts, buildImportMatchPreview, buildReconciliation, buildReconciliationReviewSummary, getIdrBudgetScope, parseTransactionCsv, serializeTransactionsCsv, type ImportedTransaction } from "@/lib/financial-control";
+import { buildEmergencyFundRunwayByCurrency } from "@/lib/finance";
+import { calculateGoalProgress } from "@/lib/home";
 import { getNetworkSnapshot, getServerNetworkSnapshot, offlineWriteMessage, subscribeToNetworkStatus } from "@/lib/pwa";
 import { formatLocalDate, getPlanningDateContext } from "@/lib/planning";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 
-type Account = { id: string; name: string; currency: string; current_balance: number; updated_at: string; is_active: boolean };
+type Account = { id: string; name: string; currency: string; current_balance: number; updated_at: string; is_active: boolean; kind: "bank" | "ewallet" | "investment" | "trading" | "liability" };
 type Transaction = { id: string; date: string; type: "income" | "expense"; merchant: string | null; category: string; amount: number; note: string | null; status: "confirmed" | "pending_approval" | "needs_review" | "deleted"; account_id: string | null };
 type Budget = { id: string; category: string; month: string; limit_amount: number };
+type FinancialGoal = { id: string; name: string; target_amount: number; current_amount: number; currency: string; color: string | null; due_date: string | null; is_active: boolean };
 type Recurring = { id: string; merchant: string; category: string; amount: number; type: "income" | "expense"; interval: "weekly" | "monthly" | "yearly"; next_run_date: string; is_active: boolean; account_id: string };
 type Reconciliation = { id: string; account_id: string; statement_balance: number; ledger_balance: number; reconciled_at: string; note: string | null };
-type SavingAction = "budget" | "recurring" | "reconcile" | "import" | `run:${string}` | `pause:${string}` | `delete:${string}` | null;
+type SavingAction = "budget" | "goal" | "recurring" | "reconcile" | "import" | `run:${string}` | `pause:${string}` | `delete:${string}` | null;
 
 const idr = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
@@ -32,6 +35,8 @@ export default function PlanningPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [goalForm, setGoalForm] = useState({ name: "", targetAmount: "", currentAmount: "0", currency: "IDR", dueDate: "" });
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
@@ -44,6 +49,8 @@ export default function PlanningPage() {
   const [recurringForm, setRecurringForm] = useState<{ accountId: string; merchant: string; category: string; amount: string; type: "income" | "expense"; interval: "weekly" | "monthly" | "yearly"; nextRunDate: string }>({ accountId: "", merchant: "", category: "", amount: "", type: "expense", interval: "monthly", nextRunDate: "" });
   const [reconcileForm, setReconcileForm] = useState({ accountId: "", statementBalance: "", note: "" });
   const [importAccountId, setImportAccountId] = useState("");
+  const [importPreview, setImportPreview] = useState<ImportedTransaction[] | null>(null);
+  const [selectedImportRows, setSelectedImportRows] = useState<Set<number>>(() => new Set());
   const importRef = useRef<HTMLInputElement>(null);
   const requestIdRef = useRef(0);
   const online = useSyncExternalStore(subscribeToNetworkStatus, getNetworkSnapshot, getServerNetworkSnapshot);
@@ -69,19 +76,21 @@ export default function PlanningPage() {
         if (requestId === requestIdRef.current) setLoading(false);
         return;
       }
-      const [accountsResult, txResult, budgetsResult, recurringResult, reconciliationsResult] = await Promise.all([
-        supabase.from("financial_accounts").select("id,name,currency,current_balance,updated_at,is_active").eq("user_id", user.id).order("is_active", { ascending: false }).order("name"),
+      const [accountsResult, txResult, budgetsResult, goalsResult, recurringResult, reconciliationsResult] = await Promise.all([
+        supabase.from("financial_accounts").select("id,name,currency,current_balance,updated_at,is_active,kind").eq("user_id", user.id).order("is_active", { ascending: false }).order("name"),
         supabase.from("transactions").select("id,date,type,merchant,category,amount,note,status,account_id").eq("user_id", user.id).gte("date", dateContext.month).lt("date", dateContext.nextMonth).order("date", { ascending: false }),
         supabase.from("financial_budgets").select("id,category,month,limit_amount").eq("user_id", user.id).eq("month", dateContext.month),
+        supabase.from("financial_goals").select("id,name,target_amount,current_amount,currency,color,due_date,is_active").eq("user_id", user.id).eq("is_active", true).order("due_date", { ascending: true, nullsFirst: false }),
         supabase.from("recurring_transactions").select("id,merchant,category,amount,type,interval,next_run_date,is_active,account_id").eq("user_id", user.id).order("is_active", { ascending: false }).order("next_run_date"),
         supabase.from("account_reconciliations").select("id,account_id,statement_balance,ledger_balance,reconciled_at,note").eq("user_id", user.id).order("reconciled_at", { ascending: false }).limit(12),
       ]);
-      const error = accountsResult.error || txResult.error || budgetsResult.error || recurringResult.error || reconciliationsResult.error;
+      const error = accountsResult.error || txResult.error || budgetsResult.error || goalsResult.error || recurringResult.error || reconciliationsResult.error;
       if (error) throw error;
       if (requestId !== requestIdRef.current) return;
       setAccounts((accountsResult.data ?? []) as Account[]);
       setTransactions((txResult.data ?? []) as Transaction[]);
       setBudgets((budgetsResult.data ?? []) as Budget[]);
+      setGoals((goalsResult.data ?? []) as FinancialGoal[]);
       setRecurring((recurringResult.data ?? []) as Recurring[]);
       setReconciliations((reconciliationsResult.data ?? []) as Reconciliation[]);
     } catch (error) {
@@ -106,6 +115,14 @@ export default function PlanningPage() {
   const idrBudgetScope = useMemo(() => getIdrBudgetScope(transactions, accountCurrencies), [accountCurrencies, transactions]);
   const alerts = useMemo(() => buildFinancialAlerts({ budgets: budgets.map((b) => ({ category: b.category, limitAmount: Number(b.limit_amount), month: b.month.slice(0, 7) })), transactions: idrBudgetScope.idrTransactions, accountFreshness: accounts.map((a) => ({ accountName: a.name, lastUpdatedAt: a.updated_at })), today: dateContext.today }), [accounts, budgets, idrBudgetScope.idrTransactions, dateContext.today]);
   const categories = useMemo(() => [...new Set(idrBudgetScope.idrTransactions.filter((tx) => tx.type === "expense").map((tx) => tx.category))], [idrBudgetScope.idrTransactions]);
+  const runwayByCurrency = useMemo(() => buildEmergencyFundRunwayByCurrency(accounts, transactions), [accounts, transactions]);
+  const importMatches = useMemo(() => importPreview ? buildImportMatchPreview(
+    importPreview,
+    transactions.filter((transaction) => transaction.account_id === importAccountId),
+  ) : [], [importAccountId, importPreview, transactions]);
+  const reconciliationReview = useMemo(() => reconcileForm.accountId
+    ? buildReconciliationReviewSummary(transactions.filter((transaction) => transaction.account_id === reconcileForm.accountId))
+    : null, [reconcileForm.accountId, transactions]);
   const writeDisabled = !online || saving !== null;
   const guardWrite = () => {
     if (online) return true;
@@ -124,6 +141,47 @@ export default function PlanningPage() {
       if (error) throw error;
       setBudgetForm({ category: "", month: dateContext.month, limitAmount: "" }); setMessage(t("Budget tersimpan.")); await load();
     } catch (error) { reportHandledError("Planning budget save failed", error, "Budget belum tersimpan."); setMessage(t("Budget belum tersimpan. Inputmu tetap aman, coba lagi.")); }
+    finally { setSaving(null); }
+  }
+
+  async function saveGoal(event: FormEvent) {
+    event.preventDefault();
+    if (!guardWrite()) return;
+    const targetAmount = Number(goalForm.targetAmount);
+    const currentAmount = Number(goalForm.currentAmount);
+    if (!goalForm.name.trim() || !Number.isFinite(targetAmount) || targetAmount <= 0 || !Number.isFinite(currentAmount) || currentAmount < 0 || !/^[A-Z]{3}$/.test(goalForm.currency)) {
+      setMessage(t("Isi target keuangan dengan nominal dan mata uang yang valid."));
+      return;
+    }
+    setSaving("goal"); setMessage(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw authError ?? new Error("Session unavailable");
+      const { error } = await supabase.from("financial_goals").insert({
+        user_id: user.id,
+        name: goalForm.name.trim(),
+        target_amount: targetAmount,
+        current_amount: currentAmount,
+        currency: goalForm.currency,
+        due_date: goalForm.dueDate || null,
+      });
+      if (error) throw error;
+      setGoalForm({ name: "", targetAmount: "", currentAmount: "0", currency: "IDR", dueDate: "" });
+      setMessage(t("Target keuangan tersimpan.")); await load();
+    } catch (error) { reportHandledError("Planning goal save failed", error, "Target keuangan belum tersimpan."); setMessage(t("Target keuangan belum tersimpan. Coba lagi.")); }
+    finally { setSaving(null); }
+  }
+
+  async function archiveGoal(goal: FinancialGoal) {
+    if (!guardWrite()) return;
+    setSaving(`delete:${goal.id}`); setMessage(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw authError ?? new Error("Session unavailable");
+      const { error } = await supabase.from("financial_goals").update({ is_active: false }).eq("id", goal.id).eq("user_id", user.id);
+      if (error) throw error;
+      setMessage(t("Target diarsipkan.")); await load();
+    } catch (error) { reportHandledError("Planning goal archive failed", error, "Target belum diarsipkan."); setMessage(t("Target belum diarsipkan. Coba lagi.")); }
     finally { setSaving(null); }
   }
 
@@ -207,18 +265,30 @@ export default function PlanningPage() {
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `fintrack-${formatLocalDate(new Date())}.csv`; link.click(); URL.revokeObjectURL(link.href);
   }
 
-  async function importCsv(file: File) {
+  async function previewImportCsv(file: File) {
     if (!guardWrite()) return;
     if (!importAccountId) { setMessage(t("Pilih akun tujuan sebelum impor CSV.")); return; }
-    setSaving("import"); setMessage(null);
     try {
       const records = parseTransactionCsv(await file.text());
+      setImportPreview(records);
+      setSelectedImportRows(new Set(records.map((_, index) => index)));
+      setMessage(null);
+    } catch (error) { reportHandledError("Planning CSV preview failed", error, "CSV tidak dapat dibaca."); setMessage(t("CSV tidak dapat dibaca. Gunakan format ekspor FinTrack.")); }
+  }
+
+  async function confirmImportCsv() {
+    if (!guardWrite() || !importPreview) return;
+    const records = importPreview.filter((_, index) => selectedImportRows.has(index));
+    if (!records.length) { setMessage(t("Pilih minimal satu transaksi untuk diimpor.")); return; }
+    setSaving("import"); setMessage(null);
+    try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw authError ?? new Error("Session unavailable");
       const { error } = await supabase.from("transactions").insert(records.map((row) => ({ ...row, user_id: user.id, account_id: importAccountId, source: "manual", status: "needs_review" })));
       if (error) throw error;
+      setImportPreview(null); setSelectedImportRows(new Set());
       setMessage(t("{count} transaksi diimpor sebagai Perlu ditinjau.", { count: records.length })); await load();
-    } catch (error) { reportHandledError("Planning CSV import failed", error, "CSV tidak dapat diimpor."); setMessage(t("CSV tidak dapat diimpor. Gunakan format ekspor FinTrack.")); }
+    } catch (error) { reportHandledError("Planning CSV import failed", error, "CSV tidak dapat diimpor."); setMessage(t("CSV tidak dapat diimpor. Coba lagi.")); }
     finally { setSaving(null); }
   }
 
@@ -307,6 +377,24 @@ export default function PlanningPage() {
           </div>
           <div className="grid gap-6 lg:grid-cols-2">
             <Surface className="p-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><Goal className="h-5 w-5 text-emerald-700" /> {t("Target keuangan")}</h2>
+              <form onSubmit={saveGoal} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input aria-label={t("Nama target keuangan")} required maxLength={120} placeholder={t("Contoh: Dana darurat")} value={goalForm.name} onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })} className={fieldControlStyles} />
+                <input aria-label={t("Nominal target")} required min="1" inputMode="decimal" type="number" placeholder={t("Target")} value={goalForm.targetAmount} onChange={(e) => setGoalForm({ ...goalForm, targetAmount: e.target.value })} className={fieldControlStyles} />
+                <input aria-label={t("Nominal terkumpul")} required min="0" inputMode="decimal" type="number" placeholder={t("Terkumpul")} value={goalForm.currentAmount} onChange={(e) => setGoalForm({ ...goalForm, currentAmount: e.target.value })} className={fieldControlStyles} />
+                <input aria-label={t("Mata uang target")} required pattern="[A-Z]{3}" maxLength={3} placeholder="IDR" value={goalForm.currency} onChange={(e) => setGoalForm({ ...goalForm, currency: e.target.value.toUpperCase() })} className={fieldControlStyles} />
+                <input aria-label={t("Target selesai")} type="date" value={goalForm.dueDate} onChange={(e) => setGoalForm({ ...goalForm, dueDate: e.target.value })} className={fieldControlStyles} />
+                <Button disabled={writeDisabled} loading={saving === "goal"}>{t("Simpan target")}</Button>
+              </form>
+              <div className="mt-5 space-y-3">
+                {goals.length === 0 ? <p className="text-sm text-slate-500">{t("Belum ada target aktif.")}</p> : goals.map((goal) => {
+                  const progress = calculateGoalProgress(Number(goal.current_amount), Number(goal.target_amount));
+                  return <div key={goal.id} className="rounded-xl bg-slate-50 px-3 py-3 text-sm"><div className="flex items-start justify-between gap-3"><span><strong>{goal.name}</strong><span className="block text-xs text-slate-500">{formatMoney(Number(goal.current_amount), goal.currency)} / {formatMoney(Number(goal.target_amount), goal.currency)}{goal.due_date ? ` · ${goal.due_date}` : ""}</span></span><Button size="compact" variant="ghost" disabled={writeDisabled} loading={saving === `delete:${goal.id}`} onClick={() => void archiveGoal(goal)}>{t("Arsipkan")}</Button></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100" role="progressbar" aria-label={goal.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percentage}><div className="h-full rounded-full bg-emerald-600" style={{ width: `${progress.percentage}%`, backgroundColor: goal.color ?? undefined }} /></div><p className="mt-1 text-xs text-slate-500">{progress.percentage}% · {t("Sisa")} {formatMoney(progress.remaining, goal.currency)}</p></div>;
+                })}
+              </div>
+              <div className="mt-5 border-t border-slate-100 pt-4"><h3 className="font-bold">{t("Cadangan dana")}</h3><p className="mt-1 text-sm text-slate-500">{t("Saldo bank dan e-wallet dibanding pengeluaran terkonfirmasi bulan ini. Tidak ada konversi mata uang.")}</p><div className="mt-3 space-y-2 text-sm">{runwayByCurrency.length === 0 ? <p className="text-slate-500">{t("Belum ada saldo likuid aktif.")}</p> : runwayByCurrency.map((runway) => <p key={runway.currency} className="rounded-lg bg-slate-50 px-3 py-2"><strong>{runway.currency}</strong> · {runway.runwayMonths === null ? t("Belum ada pengeluaran terkonfirmasi untuk menghitung durasi.") : t("{months} bulan cadangan", { months: runway.runwayMonths.toFixed(1) })}</p>)}</div></div>
+            </Surface>
+            <Surface className="p-5">
               <h2 className="flex items-center gap-2 text-lg font-bold"><Scale className="h-5 w-5 text-emerald-700" /> {t("Rekonsiliasi saldo")}</h2>
               <form onSubmit={reconcile} className="mt-4 space-y-3">
                 <select aria-label={t("Akun untuk rekonsiliasi saldo")} required value={reconcileForm.accountId} onChange={(e) => setReconcileForm({ ...reconcileForm, accountId: e.target.value })} className={fieldControlStyles}>
@@ -324,6 +412,7 @@ export default function PlanningPage() {
                     {buildReconciliation({ expectedBalance: Number(accounts.find((a) => a.id === reconcileForm.accountId)?.current_balance), statementBalance: Number(reconcileForm.statementBalance) }).isMatched ? t("Saldo cocok.") : t("Ada selisih yang perlu dicek.")}
                   </p>
                 )}
+                {reconciliationReview && reconciliationReview.count > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{t("{count} transaksi review belum masuk saldo: pemasukan {income}, pengeluaran {expense}.", { count: reconciliationReview.count, income: formatMoney(reconciliationReview.incomeAmount, accounts.find((a) => a.id === reconcileForm.accountId)?.currency ?? "IDR"), expense: formatMoney(reconciliationReview.expenseAmount, accounts.find((a) => a.id === reconcileForm.accountId)?.currency ?? "IDR") })}</p>}
                 <Button disabled={writeDisabled} loading={saving === "reconcile"}><CheckCircle2 className="h-4 w-4" /> {t("Simpan rekonsiliasi")}</Button>
               </form>
               {reconciliations.length > 0 && <div className="mt-5 border-t border-slate-100 pt-4"><h3 className="font-bold">{t("Riwayat rekonsiliasi")}</h3><ul className="mt-2 space-y-2 text-sm text-slate-600">{reconciliations.map((item) => { const account = accounts.find((candidate) => candidate.id === item.account_id); const money = (value: number) => formatMoney(Number(value), account?.currency ?? "IDR"); return <li key={item.id} className="rounded-lg bg-slate-50 px-3 py-2"><span className="font-bold text-slate-800">{account?.name ?? t("Akun tidak tersedia")}</span> · {item.reconciled_at}<br />{t("Statement {statement}; ledger {ledger}; selisih {difference}", { statement: money(item.statement_balance), ledger: money(item.ledger_balance), difference: money(Number(item.statement_balance) - Number(item.ledger_balance)) })}{item.note && <><br />{item.note}</>}</li>; })}</ul></div>}
@@ -335,8 +424,9 @@ export default function PlanningPage() {
                 <option value="">{t("Akun tujuan")}</option>
                 {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-              <input ref={importRef} aria-label={t("Pilih file CSV untuk diimpor")} className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) void importCsv(file); e.currentTarget.value = ""; }} />
+              <input ref={importRef} aria-label={t("Pilih file CSV untuk diimpor")} className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) void previewImportCsv(file); e.currentTarget.value = ""; }} />
               <Button variant="secondary" className="mt-3" disabled={writeDisabled} loading={saving === "import"} onClick={() => importRef.current?.click()}><Upload className="h-4 w-4" /> {t("Pilih file CSV")}</Button>
+              {importPreview && <div className="mt-4 space-y-3 rounded-xl border border-slate-200 p-3"><p className="text-sm font-bold">{t("Tinjau impor")}</p><p className="text-xs text-slate-500">{t("Duplikat dicocokkan dari tanggal, jenis, nominal, merchant, dan kategori. Pilih baris sebelum impor.")}</p><ul className="max-h-56 space-y-2 overflow-y-auto text-sm">{importMatches.map((item) => <li key={item.index} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2 py-2"><input aria-label={t("Impor transaksi {index}", { index: item.index + 1 })} type="checkbox" checked={selectedImportRows.has(item.index)} onChange={() => setSelectedImportRows((current) => { const next = new Set(current); if (next.has(item.index)) next.delete(item.index); else next.add(item.index); return next; })} /><span className="min-w-0 flex-1">{item.record.date} · {item.record.merchant || item.record.category} · {formatMoney(item.record.amount, accounts.find((account) => account.id === importAccountId)?.currency ?? "IDR")}{item.isDuplicate && <span className="ml-1 font-semibold text-amber-700">· {t(item.duplicateOfExisting ? "Kemungkinan sudah ada" : "Duplikat di file")}</span>}</span></li>)}</ul><div className="flex flex-wrap gap-2"><Button disabled={writeDisabled} loading={saving === "import"} onClick={() => void confirmImportCsv()}>{t("Impor {count} transaksi", { count: selectedImportRows.size })}</Button><Button variant="ghost" disabled={saving === "import"} onClick={() => { setImportPreview(null); setSelectedImportRows(new Set()); }}>{t("Batal")}</Button></div></div>}
             </Surface>
           </div>
           {!loading && accounts.length === 0 && <Surface><EmptyState icon={RefreshCw} title={t("Buat akun dulu")} description={t("Budget dan transaksi berulang membutuhkan akun tujuan untuk menjaga saldo tetap akurat.")} /></Surface>}

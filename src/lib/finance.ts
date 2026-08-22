@@ -49,6 +49,47 @@ export function buildCategoryTotals(transactions: readonly FinanceTransaction[])
   }, {});
 }
 
+export function calculateEmergencyFundRunway({
+  liquidBalance,
+  averageMonthlyExpense,
+}: {
+  liquidBalance: number;
+  averageMonthlyExpense: number;
+}) {
+  if (!Number.isFinite(liquidBalance) || !Number.isFinite(averageMonthlyExpense) || liquidBalance < 0 || averageMonthlyExpense <= 0) {
+    return null;
+  }
+  return liquidBalance / averageMonthlyExpense;
+}
+
+export function buildEmergencyFundRunwayByCurrency<
+  TAccount extends { id: string; currency: string; current_balance: number; kind: string; is_active: boolean },
+  TTransaction extends Pick<FinanceTransaction, "amount" | "status" | "type"> & { account_id: string | null },
+>(accounts: readonly TAccount[], transactions: readonly TTransaction[]) {
+  const accountCurrencyById = new Map(accounts.map((account) => [account.id, account.currency]));
+  const liquidBalanceByCurrency = new Map<string, number>();
+
+  for (const account of accounts) {
+    if (!account.is_active || (account.kind !== "bank" && account.kind !== "ewallet")) continue;
+    const amount = Number(account.current_balance);
+    if (!Number.isFinite(amount) || amount < 0) continue;
+    liquidBalanceByCurrency.set(account.currency, (liquidBalanceByCurrency.get(account.currency) ?? 0) + amount);
+  }
+
+  const monthlyExpenseByCurrency = new Map<string, number>();
+  for (const transaction of transactions) {
+    const currency = transaction.account_id ? accountCurrencyById.get(transaction.account_id) : undefined;
+    const amount = Number(transaction.amount);
+    if (transaction.status !== "confirmed" || transaction.type !== "expense" || !currency || !Number.isFinite(amount) || amount < 0) continue;
+    monthlyExpenseByCurrency.set(currency, (monthlyExpenseByCurrency.get(currency) ?? 0) + amount);
+  }
+
+  return [...liquidBalanceByCurrency.entries()].map(([currency, liquidBalance]) => {
+    const averageMonthlyExpense = monthlyExpenseByCurrency.get(currency) ?? 0;
+    return { currency, liquidBalance, averageMonthlyExpense, runwayMonths: calculateEmergencyFundRunway({ liquidBalance, averageMonthlyExpense }) };
+  });
+}
+
 export function groupTransactionAmountsByCurrency<T extends Pick<FinanceTransaction, "amount" | "status"> & { account_id: string | null }>(
   transactions: readonly T[],
   accountCurrencies: ReadonlyMap<string, string>,

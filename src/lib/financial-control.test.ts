@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildBudgetProgress,
   buildFinancialAlerts,
+  buildImportMatchPreview,
   buildReconciliation,
+  buildReconciliationReviewSummary,
   getIdrBudgetScope,
   buildRecurringTransactionDraft,
   parseTransactionCsv,
@@ -42,5 +44,17 @@ describe("financial control helpers", () => {
   it("flags an account balance difference and ledger work requiring attention", () => {
     expect(buildReconciliation({ expectedBalance: 1_000_000, statementBalance: 950_000 })).toEqual({ difference: -50_000, isMatched: false });
     expect(buildFinancialAlerts({ budgets: [{ category: "Makan", limitAmount: 100_000, month: "2026-08" }], transactions, accountFreshness: [{ accountName: "BCA", lastUpdatedAt: "2026-07-01" }], today: "2026-08-17" }).map((alert) => alert.kind)).toEqual(["budget", "review", "balance_freshness"]);
+  });
+
+  it("flags existing and in-file CSV duplicates without blocking review import", () => {
+    const imported = parseTransactionCsv("date,type,merchant,category,amount,note\n2026-08-02,expense,Warung,Makan,80000,\n2026-08-02,expense,  warung  , Makan ,80000,");
+    expect(buildImportMatchPreview(imported, [transactions[0]])).toMatchObject([
+      { index: 0, duplicateOfExisting: true, duplicateOfBatch: false, isDuplicate: true },
+      { index: 1, duplicateOfExisting: true, duplicateOfBatch: true, isDuplicate: true },
+    ]);
+  });
+
+  it("summarizes review transactions without treating them as confirmed", () => {
+    expect(buildReconciliationReviewSummary(transactions)).toEqual({ count: 1, incomeAmount: 0, expenseAmount: 15_000, netAmount: -15_000 });
   });
 });
