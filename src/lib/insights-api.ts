@@ -78,22 +78,7 @@ export type GeneratedInsightEnvelope = z.infer<typeof generatedInsightEnvelopeSc
 const JWT_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const maxRequestBytes = 20_000;
 
-export function createInsightRateLimiter({ maxRequests, windowMs }: { maxRequests: number; windowMs: number }) {
-  const buckets = new Map<string, number[]>();
-  return {
-    consume(key: string, now = Date.now()) {
-      const active = (buckets.get(key) ?? []).filter((timestamp) => now - timestamp < windowMs);
-      if (active.length >= maxRequests) {
-        const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - active[0])) / 1_000));
-        buckets.set(key, active);
-        return { allowed: false, retryAfterSeconds } as const;
-      }
-      active.push(now);
-      buckets.set(key, active);
-      return { allowed: true, retryAfterSeconds: 0 } as const;
-    },
-  };
-}
+export { createRateLimiter as createInsightRateLimiter } from "./rate-limit";
 
 export function validateInsightRequestSecurity({
   contentType,

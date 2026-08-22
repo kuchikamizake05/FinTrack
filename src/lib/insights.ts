@@ -114,7 +114,7 @@ function groupTransactionsByCurrency(
   }, new Map());
 }
 
-function convertTransactionsToIdr(
+export function convertInsightTransactionsToIdr(
   transactions: readonly InsightTransaction[],
   accountCurrencies: ReadonlyMap<string, string>,
   rates: ReadonlyMap<string, number>,
@@ -123,7 +123,7 @@ function convertTransactionsToIdr(
     const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined;
     const rate = currency ? rates.get(currency) : undefined;
     return rate === undefined ? null : { ...transaction, amount: Number(transaction.amount) * rate };
-  });
+  }).filter((transaction): transaction is InsightTransaction => transaction !== null);
 }
 
 function buildCurrencyInsightGroups(
@@ -170,8 +170,8 @@ export function buildInsightSnapshot({
   const usesCurrencyData = accountCurrencies.size > 0;
   const currencies = new Set(allTransactions.map((transaction) => transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined));
   const canConvert = !usesCurrencyData || (currencies.size > 0 && [...currencies].every((currency) => currency !== undefined && Number.isFinite(rates.get(currency)) && Number(rates.get(currency)) > 0));
-  const currentForMetrics = canConvert && usesCurrencyData ? convertTransactionsToIdr(current, accountCurrencies, rates).filter((transaction): transaction is InsightTransaction => transaction !== null) : current;
-  const previousForMetrics = canConvert && usesCurrencyData ? convertTransactionsToIdr(previous, accountCurrencies, rates).filter((transaction): transaction is InsightTransaction => transaction !== null) : previous;
+  const currentForMetrics = canConvert && usesCurrencyData ? convertInsightTransactionsToIdr(current, accountCurrencies, rates) : current;
+  const previousForMetrics = canConvert && usesCurrencyData ? convertInsightTransactionsToIdr(previous, accountCurrencies, rates) : previous;
   const currentMetrics = summarize(currentForMetrics);
   const previousMetrics = summarize(previousForMetrics);
   const currentCategories = categoryTotals(currentForMetrics);

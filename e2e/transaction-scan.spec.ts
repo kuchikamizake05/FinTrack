@@ -46,7 +46,7 @@ async function fulfillRows(route: Route, rows: unknown[]) {
   });
 }
 
-async function mockTransactionScanPage(page: Page) {
+async function mockTransactionScanPage(page: Page, options: { parserStatus?: number } = {}) {
   const transactions: Transaction[] = [];
   const transactionPayloads: unknown[] = [];
   let parserRequests = 0;
@@ -56,6 +56,10 @@ async function mockTransactionScanPage(page: Page) {
     parserRequests += 1;
     expect(route.request().method()).toBe("POST");
     expect(route.request().headers()["content-type"]).toContain("multipart/form-data");
+    if (options.parserStatus) {
+      await route.fulfill({ status: options.parserStatus, json: { error: "AI belum bisa menganalisis struk. Silakan isi form manual." } });
+      return;
+    }
     await route.fulfill({
       status: 200,
       json: {
@@ -122,10 +126,29 @@ async function mockTransactionScanPage(page: Page) {
 }
 
 test.describe("receipt scan review flow @critical", () => {
+  test.describe("English parse error", () => {
+    test.use({ allowedConsoleErrors: ["Failed to load resource: the server responded with a status of 422"] });
+
+    test("uses English receipt copy and exposes parse errors as alerts", async ({ page }) => {
+      const state = await mockTransactionScanPage(page, { parserStatus: 422 });
+      await page.addInitScript(() => window.localStorage.setItem("fintrack-language", "en"));
+      await page.goto("/transactions");
+      await page.getByLabel("Aksi halaman").getByRole("button", { name: "Add" }).click();
+
+      await expect(page.getByText("Scan receipt", { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Choose image" })).toBeVisible();
+      await page.locator('input[type="file"]').nth(0).setInputFiles({ name: "broken.png", mimeType: "image/png", buffer: Buffer.from("fake image") });
+
+      await expect(page.getByText("AI cannot analyze the receipt yet. Please fill the form manually.", { exact: true })).toHaveAttribute("role", "alert");
+      expect(state.getParserRequests()).toBe(1);
+    });
+  });
+
   test("parses image, keeps proof data out of ledger payload, then requires approval", async ({ page }) => {
     const state = await mockTransactionScanPage(page);
     await page.goto("/transactions");
-    await page.getByRole("button", { name: "Catat" }).click();
+    await page.getByLabel("Aksi halaman").getByRole("button", { name: "Catat" }).click();
 
     const inputs = page.locator('input[type="file"]');
     await expect(inputs).toHaveCount(2);

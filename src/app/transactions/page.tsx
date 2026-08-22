@@ -1226,24 +1226,37 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [scanningReceipt, setScanningReceipt] = useState(false);
-  const [receiptNotice, setReceiptNotice] = useState<string | null>(null);
+  const [selectedReceiptName, setSelectedReceiptName] = useState<string | null>(null);
+  const [receiptSuccess, setReceiptSuccess] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const [scanHistory, setScanHistory] = useState<string[]>([]);
   const changeType = (type: CategoryType) => {
     const options = buildTransactionCategoryOptions(categories, type);
     setForm((current) => ({ ...current, type, category: options.includes(current.category) ? current.category : options[0] ?? "" }));
   };
+  const clearReceiptSelection = () => {
+    if (receiptInputRef.current) receiptInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    setSelectedReceiptName(null);
+    setReceiptSuccess(null);
+    setReceiptError(null);
+  };
   const scanReceipt = async (file: File) => {
     const validationError = validateSharedReceiptFile(file);
     if (validationError) {
-      setReceiptNotice(validationError);
+      setReceiptSuccess(null);
+      setReceiptError(t(validationError));
       return;
     }
     if (!canWriteOnline()) {
-      setReceiptNotice(t(offlineWriteMessage));
+      setReceiptSuccess(null);
+      setReceiptError(t(offlineWriteMessage));
       return;
     }
+    setSelectedReceiptName(file.name);
     setScanningReceipt(true);
-    setReceiptNotice(null);
+    setReceiptSuccess(null);
+    setReceiptError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sesi login tidak ditemukan.");
@@ -1269,11 +1282,12 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
         result.extraction.amount === null ? null : String(result.extraction.amount),
       ].filter(Boolean).join(" · ");
       if (summary) setScanHistory((current) => [summary, ...current].slice(0, 3));
-      setReceiptNotice(t("Data struk berhasil diekstrak otomatis. Periksa kembali sebelum menyimpan."));
+      setReceiptSuccess(t("Data struk berhasil diekstrak otomatis. Periksa kembali sebelum menyimpan."));
     } catch (error) {
-      setReceiptNotice(error instanceof Error ? error.message : t("AI belum bisa menganalisis struk. Silakan isi form manual."));
+      setReceiptError(t(error instanceof Error ? error.message : "AI belum bisa menganalisis struk. Silakan isi form manual."));
     } finally {
       if (receiptInputRef.current) receiptInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
       setScanningReceipt(false);
     }
   };
@@ -1301,7 +1315,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
 
         <div className="space-y-5 px-5 py-5 sm:px-6">
           {!isEditMode && (
-            <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3">
+            <section aria-labelledby="receipt-scan-title" className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5">
               <input
                 ref={receiptInputRef}
                 type="file"
@@ -1323,16 +1337,25 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
                   if (file) void scanReceipt(file);
                 }}
               />
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" size="compact" onClick={() => cameraInputRef.current?.click()} loading={scanningReceipt} disabled={scanningReceipt}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p id="receipt-scan-title" className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-800">{t("Scan struk")}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{t("Pilih gambar untuk mengisi form otomatis. Gambar tidak disimpan.")}</p>
+                </div>
+                {selectedReceiptName && !scanningReceipt && <button type="button" onClick={clearReceiptSelection} className="shrink-0 text-xs font-bold text-slate-500 underline underline-offset-2 hover:text-slate-700">{t("Hapus pilihan")}</button>}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" size="compact" onClick={() => cameraInputRef.current?.click()} disabled={scanningReceipt}>
                   <Camera className="h-4 w-4" /> {t("Ambil foto")}
                 </Button>
                 <Button type="button" variant="secondary" size="compact" onClick={() => receiptInputRef.current?.click()} disabled={scanningReceipt}>
                   <ReceiptText className="h-4 w-4" /> {t("Pilih gambar")}
                 </Button>
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-500">{t("Pilih gambar untuk mengisi form otomatis. Gambar tidak disimpan.")}</p>
-              {receiptNotice && <p role="status" className="mt-2 text-xs leading-5 text-emerald-800">{receiptNotice}</p>}
+              {selectedReceiptName && <p className="mt-3 truncate rounded-lg bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600">{t("Struk terpilih: {name}", { name: selectedReceiptName })}</p>}
+              {scanningReceipt && <p role="status" className="mt-3 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800"><Loader2 className="h-4 w-4 animate-spin" /> {t("Memproses struk...")}</p>}
+              {receiptError && <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-800">{receiptError}</p>}
+              {receiptSuccess && <p role="status" className="mt-3 rounded-lg border border-emerald-200 bg-white/80 px-3 py-2 text-xs leading-5 text-emerald-800">{receiptSuccess}</p>}
               {scanHistory.length > 0 && (
                 <div className="mt-3 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-xs text-slate-600">
                   <p className="font-bold text-emerald-800">{t("Hasil scan sesi ini")}</p>
@@ -1340,7 +1363,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
                   <p className="mt-2 text-amber-800">{t("Transaksi hasil scan akan perlu ditinjau sebelum mengubah saldo.")}</p>
                 </div>
               )}
-            </div>
+            </section>
           )}
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label={t("Tipe transaksi")}>
             <button

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { addMonths, endOfMonth, format, parse, startOfMonth } from "date-fns";
+import { addMonths, endOfMonth, format, getDaysInMonth, parse, startOfMonth } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
 import {
   AlertCircle,
@@ -29,12 +29,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
-import { getCachedIdrRate } from "@/lib/fx";
+import { getIdrRates } from "@/lib/fx";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
+import { buildCumulativeCashFlowSeries } from "@/lib/home";
 import {
   buildDeterministicInsight,
   buildInsightSnapshot,
   buildPrivateInsightPayload,
+  convertInsightTransactionsToIdr,
   type DeterministicInsight,
   type InsightAction,
   type InsightSnapshot,
@@ -46,12 +48,30 @@ import {
 } from "@/lib/insights-api";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
+import {
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 type InsightView = Omit<DeterministicInsight, "actions"> & {
   actions: InsightAction[];
   generatedAt?: string;
   model?: string;
 };
+
+type InsightAnalytics = {
+  cashFlow: ReturnType<typeof buildCumulativeCashFlowSeries>;
+};
+
+const CATEGORY_COLORS = ["#047857", "#0284c7", "#7c3aed", "#ea580c", "#db2777", "#ca8a04"];
 
 const moneyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -95,8 +115,10 @@ export default function InsightsPage() {
   const [loadingAi, setLoadingAi] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<InsightAnalytics | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const requestRef = useRef<AbortController | null>(null);
+  const forceFxRefreshRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMonth(format(new Date(), "yyyy-MM")), 0);
@@ -106,6 +128,8 @@ export default function InsightsPage() {
   const loadInsights = useCallback(async () => {
     if (!month) return;
     void refreshKey;
+    const forceFxRefresh = forceFxRefreshRef.current;
+    forceFxRefreshRef.current = false;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -150,10 +174,12 @@ export default function InsightsPage() {
         const currency = transaction.account_id ? accountCurrencies.get(transaction.account_id) : null;
         return currency ? [currency] : [];
       });
-      const rates = new Map([...new Set(transactionCurrencies)].map((currency) => [currency, getCachedIdrRate(currency)] as const));
+      const rates = await getIdrRates(transactionCurrencies, { allowStale: true, forceRefresh: forceFxRefresh });
+      if (controller.signal.aborted) return;
       const rateValues = new Map([...rates].flatMap(([currency, rate]) => rate.rate === null ? [] : [[currency, rate.rate] as const]));
+      const currentTransactions = (currentResult.data ?? []) as InsightTransaction[];
       const nextSnapshot = buildInsightSnapshot({
-        current: (currentResult.data ?? []) as InsightTransaction[],
+        current: currentTransactions,
         previous: (previousResult.data ?? []) as InsightTransaction[],
         periodLabel: bounds.periodLabel,
         previousPeriodLabel: bounds.previousPeriodLabel,
@@ -164,7 +190,21 @@ export default function InsightsPage() {
       });
       calculatedSnapshot = nextSnapshot;
       const fallback = buildDeterministicInsight(nextSnapshot);
+      const convertedCurrent = nextSnapshot.fxState === "converted"
+        ? convertInsightTransactionsToIdr(currentTransactions, accountCurrencies, rateValues)
+        : [];
+      const daysInMonth = getDaysInMonth(bounds.selected);
+      const sampleDays = [...new Set([1, 7, 13, 19, 25, daysInMonth])].filter((day) => day <= daysInMonth);
       setSnapshot(nextSnapshot);
+      setAnalytics(nextSnapshot.fxState === "converted" ? {
+        cashFlow: buildCumulativeCashFlowSeries(
+          convertedCurrent
+            .filter((transaction) => transaction.status === "confirmed")
+            .map(({ date, type, amount }) => ({ date, type, amount: Number(amount) })),
+          sampleDays,
+          format(bounds.selected, "MMM", { locale: dateLocale }),
+        ),
+      } : null);
       setInsight(fallback);
       setLoadingData(false);
 
@@ -222,6 +262,10 @@ export default function InsightsPage() {
   }, [loadInsights]);
 
   const displayInsight = useMemo(() => insight ?? (snapshot ? buildDeterministicInsight(snapshot) : null), [insight, snapshot]);
+  const refreshInsights = (forceFxRefresh = false) => {
+    forceFxRefreshRef.current = forceFxRefresh;
+    setRefreshKey((value) => value + 1);
+  };
 
   return (
     <div className="app-page">
@@ -234,11 +278,11 @@ export default function InsightsPage() {
           actions={<>
             <label htmlFor="insight-month" className="sr-only">{t("Periode insight")}</label>
             <input id="insight-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="min-h-11 rounded-xl border border-emerald-100 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-100" />
-            <Button variant="secondary" disabled={!month || loadingData || loadingAi} onClick={() => setRefreshKey((value) => value + 1)}><RefreshCw className={cn("h-4 w-4", (loadingData || loadingAi) && "animate-spin")} /> {t("Perbarui")}</Button>
+            <Button variant="secondary" disabled={!month || loadingData || loadingAi} onClick={() => refreshInsights(true)}><RefreshCw className={cn("h-4 w-4", (loadingData || loadingAi) && "animate-spin")} /> {t("Perbarui")}</Button>
           </>}
         />
 
-        {dataError && <div role="alert" className="mt-6 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{dataError}</span><Button variant="secondary" size="compact" onClick={() => setRefreshKey((value) => value + 1)}>{t("Coba lagi")}</Button></div>}
+        {dataError && <div role="alert" className="mt-6 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{dataError}</span><Button variant="secondary" size="compact" onClick={() => refreshInsights(true)}>{t("Coba lagi")}</Button></div>}
 
         {loadingData || !month ? <InsightsSkeleton /> : snapshot && snapshot.current.confirmedCount === 0 ? (
           <Surface className="mt-7"><EmptyState icon={BrainCircuit} title={t("Belum ada data terverifikasi di {period}", { period: snapshot.periodLabel })} description={t("Catat atau konfirmasi setidaknya satu pemasukan atau pengeluaran agar FinTrack bisa menyusun review yang berguna.")} action={<Link href="/transactions" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">{t("Buka transaksi")} <ArrowRight className="h-4 w-4" /></Link>} /></Surface>
@@ -247,8 +291,9 @@ export default function InsightsPage() {
             <Pulse snapshot={snapshot} />
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-6">
-                <AiNarrative insight={displayInsight} loading={loadingAi} error={aiError} onRetry={() => setRefreshKey((value) => value + 1)} />
-                {snapshot.fxState === "converted" ? <Patterns snapshot={snapshot} observations={displayInsight.observations} /> : <CurrencyPulse snapshot={snapshot} />}
+                {snapshot.fxState === "converted" && analytics ? <Analytics snapshot={snapshot} analytics={analytics} /> : <CurrencyPulse snapshot={snapshot} />}
+                <AiNarrative insight={displayInsight} loading={loadingAi} error={aiError} onRetry={() => refreshInsights()} />
+                {snapshot.fxState === "converted" && <Patterns snapshot={snapshot} observations={displayInsight.observations} />}
               </div>
               <aside className="space-y-6 lg:sticky lg:top-24">
                 <PriorityActions actions={displayInsight.actions} />
@@ -333,6 +378,76 @@ function CurrencyPulse({ snapshot }: { snapshot: InsightSnapshot }) {
         ))}
       </div>
     </Surface>
+  );
+}
+
+function Analytics({ snapshot, analytics }: { snapshot: InsightSnapshot; analytics: InsightAnalytics }) {
+  const { t } = useLanguage();
+  const categories = snapshot.topCategories.slice(0, 6);
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Surface className="min-w-0 p-5 sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{t("Tren arus kas")}</p>
+        <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Akumulasi pemasukan dan pengeluaran")}</h2>
+        <ul aria-label={t("Legenda arus kas")} className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-slate-600">
+          <li className="flex items-center gap-2"><span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-emerald-700" />{t("Pemasukan")}</li>
+          <li className="flex items-center gap-2"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-rose-500" />{t("Pengeluaran")}</li>
+        </ul>
+        <figure aria-labelledby="insight-cash-flow-caption" className="mt-4">
+          <figcaption id="insight-cash-flow-caption" className="sr-only">{t("Grafik akumulasi pemasukan dan pengeluaran terverifikasi dalam IDR.")}</figcaption>
+          <div className="h-52 w-full" aria-hidden="true">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={analytics.cashFlow} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
+                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} />
+                <Tooltip cursor={{ stroke: "#d1fae5", strokeWidth: 1 }} contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0))} />
+                <Line type="monotone" dataKey="income" name={t("Pemasukan")} stroke="#047857" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#047857", stroke: "#fff", strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="expense" name={t("Pengeluaran")} stroke="#f43f5e" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </figure>
+        <details className="group mt-4 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+          <summary className="cursor-pointer text-xs font-semibold text-emerald-700 marker:text-emerald-700">{t("Lihat data tabel arus kas")}</summary>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[360px] text-left text-xs">
+              <caption className="sr-only">{t("Data akumulasi pemasukan dan pengeluaran terverifikasi dalam IDR.")}</caption>
+              <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Tanggal")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Pemasukan")}</th><th scope="col" className="pb-2 text-right">{t("Pengeluaran")}</th></tr></thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">{analytics.cashFlow.map((point) => <tr key={point.day}><th scope="row" className="py-2 pr-4 font-semibold">{point.label}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(point.income)}</td><td className="py-2 text-right font-medium">{formatMoney(point.expense)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </details>
+      </Surface>
+
+      <Surface className="min-w-0 p-5 sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-sky-700">{t("Komposisi pengeluaran")}</p>
+        <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Kategori terbesar bulan ini")}</h2>
+        {categories.length ? <>
+          <figure aria-labelledby="insight-category-chart-caption" className="mt-4">
+            <figcaption id="insight-category-chart-caption" className="sr-only">{t("Diagram kategori pengeluaran terverifikasi dalam IDR.")}</figcaption>
+            <div className="h-52 w-full" aria-hidden="true">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categories} dataKey="amount" nameKey="name" innerRadius="56%" outerRadius="82%" paddingAngle={3} stroke="none">
+                    {categories.map((category, index) => <Cell key={category.name} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #dbeafe", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0))} />
+                  <Legend formatter={(value) => t(String(value))} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </figure>
+          <ul className="mt-3 space-y-2 text-xs text-slate-600">
+            {categories.map((category, index) => <li key={category.name} className="flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} /><span className="truncate font-semibold">{t(category.name)}</span></span><span className="shrink-0 font-mono">{formatMoney(category.amount)} · {category.share}%</span></li>)}
+          </ul>
+          <details className="group mt-4 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
+            <summary className="cursor-pointer text-xs font-semibold text-sky-700 marker:text-sky-700">{t("Lihat data tabel kategori")}</summary>
+            <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[300px] text-left text-xs"><caption className="sr-only">{t("Data kategori pengeluaran terverifikasi dalam IDR.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Kategori")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Nominal")}</th><th scope="col" className="pb-2 text-right">{t("Porsi")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{categories.map((category) => <tr key={category.name}><th scope="row" className="py-2 pr-4 font-semibold">{t(category.name)}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(category.amount)}</td><td className="py-2 text-right font-medium">{category.share}%</td></tr>)}</tbody></table></div>
+          </details>
+        </> : <p className="mt-5 text-sm text-slate-500">{t("Belum ada pengeluaran terverifikasi.")}</p>}
+      </Surface>
+    </div>
   );
 }
 

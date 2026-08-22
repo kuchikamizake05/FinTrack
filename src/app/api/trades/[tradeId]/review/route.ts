@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 import { createTimeoutSignal } from "@/lib/async";
 import { authenticateSupabaseAccessToken } from "@/infrastructure/supabase/server-client";
 import { buildTradeReviewDispatch, parseTradeReviewRequest } from "@/lib/trade-review";
+import { consumeRouteRateLimit, createRateLimiter } from "@/lib/rate-limit";
+
+const limiter = createRateLimiter({ maxRequests: 3, windowMs: 60_000 });
 import { noStoreJson as json } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,14 @@ export async function POST(
     );
   }
   const { client, user } = authentication;
+  const rateLimit = await consumeRouteRateLimit({ route: "trades:review", userId: user.id, maxRequests: 3, windowMs: 60_000, fallback: limiter });
+  if (!rateLimit.allowed) {
+    return json(
+      { error: "Terlalu banyak permintaan review AI. Coba lagi sebentar." },
+      429,
+      { "Retry-After": String(rateLimit.retryAfterSeconds) },
+    );
+  }
 
   const { data: trade, error: tradeError } = await client
     .from("forex_trades")

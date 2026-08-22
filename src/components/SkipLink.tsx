@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 export default function SkipLink() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setReady(true);
-  }, []);
-
   return (
     <a
       className="skip-link"
-      data-ready={ready || undefined}
+      ref={(node) => {
+        if (node) node.dataset.ready = "true";
+      }}
       href="#main-content"
       onClick={() => {
         document.getElementById("main-content")?.focus();

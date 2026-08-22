@@ -46,7 +46,6 @@ import {
   getMissingForeignAccounts,
   summarizeAccounts,
   validateAccountForm,
-  validateBalanceForm,
   validateTransferForm,
   type AccountFilter,
   type AccountOverviewRecord,
@@ -506,9 +505,9 @@ export default function AccountsPage() {
       return;
     }
     if (!balanceAccount) return;
-    const validation = validateBalanceForm({ ...balanceForm, currency: balanceAccount.currency });
-    if (!validation.valid) {
-      setFormErrors(validation.errors as Record<string, string>);
+    const reportingBalanceIdr = balanceForm.reportingBalanceIdr.trim() ? Number(balanceForm.reportingBalanceIdr) : null;
+    if (balanceAccount.currency !== "IDR" && reportingBalanceIdr !== null && (!Number.isFinite(reportingBalanceIdr) || reportingBalanceIdr < 0)) {
+      setFormErrors({ reportingBalanceIdr: "Nilai setara IDR harus nol atau lebih." });
       return;
     }
     setSaving(true);
@@ -516,13 +515,9 @@ export default function AccountsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sesi login tidak ditemukan.");
-      const reportingBalanceIdr = balanceForm.reportingBalanceIdr.trim() ? Number(balanceForm.reportingBalanceIdr) : null;
       const { error } = await supabase
         .from("financial_accounts")
-        .update({
-          current_balance: Number(balanceForm.currentBalance),
-          reporting_balance_idr: balanceAccount.currency === "IDR" ? null : reportingBalanceIdr,
-        })
+        .update({ reporting_balance_idr: balanceAccount.currency === "IDR" ? null : reportingBalanceIdr })
         .eq("id", balanceAccount.id)
         .eq("user_id", user.id);
       if (error) throw error;
@@ -830,7 +825,7 @@ function AccountRow({ account, onUpdateBalance, onEdit, onToggleActive, onDelete
       <AccountIdentity account={account} dateLocale={dateLocale} />
       <div><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))} · {account.currency}</span></div>
       <AccountBalance account={account} />
-      <div className="flex w-72 justify-end gap-1"><Button variant="ghost" size="compact" onClick={() => onEdit(account)}>{t("Edit")}</Button>{account.is_active && <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)}>{t("Perbarui saldo")}</Button>}<Button variant="ghost" size="compact" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button><Button variant="ghost" size="compact" onClick={() => onDelete(account)}>{t("Hapus")}</Button></div>
+      <div className="flex w-72 justify-end gap-1"><Button variant="ghost" size="compact" onClick={() => onEdit(account)}>{t("Edit")}</Button>{account.is_active && account.currency !== "IDR" && <Button variant="ghost" size="compact" onClick={() => onUpdateBalance(account)}>{t("Perbarui nilai IDR")}</Button>}<Button variant="ghost" size="compact" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button><Button variant="ghost" size="compact" onClick={() => onDelete(account)}>{t("Hapus")}</Button></div>
     </article>
   );
 }
@@ -844,7 +839,7 @@ function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, onDelet
         <AccountBalance account={account} align="left" />
         <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))}</span>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui saldo")}</Button>}<Button variant="ghost" onClick={() => onDelete(account)} className="col-span-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800">{t("Hapus permanen")}</Button></div>
+      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && account.currency !== "IDR" && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui nilai IDR")}</Button>}<Button variant="ghost" onClick={() => onDelete(account)} className="col-span-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800">{t("Hapus permanen")}</Button></div>
     </article>
   );
 }
@@ -1059,16 +1054,18 @@ function BalanceDialog({ account, form, setForm, errors, error, saving, balanceI
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const { t } = useLanguage();
-  const validation = validateBalanceForm({ ...form, currency: account.currency });
+  const reportingBalanceIdr = form.reportingBalanceIdr.trim() ? Number(form.reportingBalanceIdr) : null;
+  const validReportingBalance = reportingBalanceIdr === null || (Number.isFinite(reportingBalanceIdr) && reportingBalanceIdr >= 0);
   return (
-    <AccountDialogFrame title={t("Perbarui {name}", { name: account.name })} eyebrow={t("Snapshot saldo")} description={t("Gunakan angka terbaru dari bank atau platform. Riwayat transaksi tetap tercatat terpisah.")} saving={saving} error={error} initialFocusRef={balanceInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t("Simpan saldo")} submitDisabled={!validation.valid}>
+    <AccountDialogFrame title={t("Perbarui {name}", { name: account.name })} eyebrow={t("Nilai laporan")} description={t("Saldo ledger berubah dari transaksi terkonfirmasi, transfer, atau penyesuaian. Form ini hanya menyimpan nilai setara IDR untuk akun asing.")} saving={saving} error={error} initialFocusRef={balanceInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t("Simpan nilai laporan")} submitDisabled={account.currency === "IDR" || !validReportingBalance}>
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4">
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-emerald-700">{t("Saldo saat ini")}</p>
         <p className="mt-2 font-mono text-xl font-bold text-slate-900">{formatMoney(Number(account.current_balance), account.currency)}</p>
       </div>
-      <Field label={t("Saldo terbaru ({currency})", { currency: account.currency })} htmlFor="balance-current" error={errors.currentBalance ? t(errors.currentBalance) : undefined}>
-        <input ref={balanceInputRef} id="balance-current" type="number" step="any" inputMode="decimal" value={form.currentBalance} onChange={(event) => setForm((current) => ({ ...current, currentBalance: event.target.value }))} className={cn(fieldControlStyles, "font-mono text-base font-bold")} />
+      <Field label={t("Saldo ledger ({currency})", { currency: account.currency })} htmlFor="balance-current">
+        <input ref={balanceInputRef} id="balance-current" type="number" value={form.currentBalance} readOnly aria-readonly="true" className={cn(fieldControlStyles, "cursor-not-allowed bg-slate-50 font-mono text-base font-bold text-slate-500")} />
       </Field>
+      {account.currency === "IDR" && <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">{t("Saldo akun IDR diperbarui lewat transaksi terkonfirmasi, transfer, atau penyesuaian rekening.")}</p>}
       {account.currency !== "IDR" && (
         <Field label={t("Nilai setara IDR")} htmlFor="balance-reporting" error={errors.reportingBalanceIdr ? t(errors.reportingBalanceIdr) : undefined} hint={t("Kosongkan jika belum ingin memasukkan akun ini ke total IDR.")}>
           <input id="balance-reporting" type="number" min="0" step="any" inputMode="decimal" value={form.reportingBalanceIdr} onChange={(event) => setForm((current) => ({ ...current, reportingBalanceIdr: event.target.value }))} placeholder="0" className={fieldControlStyles} />

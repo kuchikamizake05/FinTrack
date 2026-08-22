@@ -1,4 +1,5 @@
 import { z } from "zod";
+export { createRateLimiter as createReceiptRateLimiter } from "./rate-limit";
 
 const datePattern = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 const jwtPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
@@ -150,29 +151,6 @@ export function parseGeminiReceiptResponse(value: unknown): ReceiptExtraction {
     }
     throw new Error("Gagal membaca hasil analisis bukti pembayaran.");
   }
-}
-
-export function createReceiptRateLimiter({
-  maxRequests,
-  windowMs,
-}: {
-  maxRequests: number;
-  windowMs: number;
-}) {
-  const buckets = new Map<string, number[]>();
-  return {
-    consume(key: string, now = Date.now()) {
-      const active = (buckets.get(key) ?? []).filter((timestamp) => now - timestamp < windowMs);
-      if (active.length >= maxRequests) {
-        const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - active[0])) / 1_000));
-        buckets.set(key, active);
-        return { allowed: false, retryAfterSeconds } as const;
-      }
-      active.push(now);
-      buckets.set(key, active);
-      return { allowed: true, retryAfterSeconds: 0 } as const;
-    },
-  };
 }
 
 export function validateReceiptParseSecurity({

@@ -99,6 +99,15 @@ export function buildImportMatchPreview<T extends MatchableTransaction>(
   });
 }
 
+export function selectUniqueImportRecords<T extends MatchableTransaction>(
+  imported: readonly T[],
+  existing: readonly MatchableTransaction[],
+) {
+  return buildImportMatchPreview(imported, existing)
+    .filter((item) => !item.isDuplicate)
+    .map((item) => item.record);
+}
+
 export function buildReconciliation({ expectedBalance, statementBalance }: { expectedBalance: number; statementBalance: number }) {
   const difference = statementBalance - expectedBalance;
   return { difference, isMatched: difference === 0 };

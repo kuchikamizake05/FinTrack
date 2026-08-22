@@ -12,7 +12,7 @@ import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
-import { buildBudgetProgress, buildFinancialAlerts, buildImportMatchPreview, buildReconciliation, buildReconciliationReviewSummary, getIdrBudgetScope, parseTransactionCsv, serializeTransactionsCsv, type ImportedTransaction } from "@/lib/financial-control";
+import { buildBudgetProgress, buildFinancialAlerts, buildImportMatchPreview, buildReconciliation, buildReconciliationReviewSummary, getIdrBudgetScope, parseTransactionCsv, selectUniqueImportRecords, serializeTransactionsCsv, type ImportedTransaction } from "@/lib/financial-control";
 import { buildEmergencyFundRunwayByCurrency } from "@/lib/finance";
 import { calculateGoalProgress } from "@/lib/home";
 import { getNetworkSnapshot, getServerNetworkSnapshot, offlineWriteMessage, subscribeToNetworkStatus } from "@/lib/pwa";
@@ -278,8 +278,12 @@ export default function PlanningPage() {
 
   async function confirmImportCsv() {
     if (!guardWrite() || !importPreview) return;
-    const records = importPreview.filter((_, index) => selectedImportRows.has(index));
-    if (!records.length) { setMessage(t("Pilih minimal satu transaksi untuk diimpor.")); return; }
+    const selectedRecords = importPreview.filter((_, index) => selectedImportRows.has(index));
+    const records = selectUniqueImportRecords(
+      selectedRecords,
+      transactions.filter((transaction) => transaction.account_id === importAccountId),
+    );
+    if (!records.length) { setMessage(t("Tidak ada transaksi unik untuk diimpor.")); return; }
     setSaving("import"); setMessage(null);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();

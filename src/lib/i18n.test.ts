@@ -25,6 +25,13 @@ describe("i18n", () => {
     expect(getTranslation("en", "Sembunyikan kata sandi")).toBe("Hide password");
   });
 
+  it("translates receipt scan states", () => {
+    expect(getTranslation("en", "Ambil foto")).toBe("Take photo");
+    expect(getTranslation("en", "Memproses struk...")).toBe("Processing receipt...");
+    expect(getTranslation("en", "AI belum bisa menganalisis struk. Silakan isi form manual.")).toBe("AI cannot analyze the receipt yet. Please fill the form manually.");
+    expect(getTranslation("en", "Struk terpilih: {name}", { name: "transfer.png" })).toBe("Selected receipt: transfer.png");
+  });
+
   it("falls back to the Indonesian source when a translation is missing", () => {
     expect(getTranslation("en", "Teks baru")).toBe("Teks baru");
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildInsightSnapshot,
   buildPrivateInsightPayload,
+  convertInsightTransactionsToIdr,
   buildDeterministicInsight,
   calculateSavingsRate,
   type InsightTransaction,
@@ -101,6 +102,19 @@ describe("smart insight privacy and fallback", () => {
       { currency: "USD", current: { income: 0, expense: 100 } },
     ]);
     expect(buildPrivateInsightPayload(snapshot)).toBeNull();
+  });
+
+  it("converts confirmed analytics records to IDR and omits unmapped records", () => {
+    const converted = convertInsightTransactionsToIdr([
+      { id: "idr", date: "2026-07-01", type: "income", category: "Gaji", amount: 1_000_000, status: "confirmed", account_id: "idr-account" },
+      { id: "usd", date: "2026-07-02", type: "expense", category: "Makan", amount: 100, status: "confirmed", account_id: "usd-account" },
+      { id: "unknown", date: "2026-07-03", type: "expense", category: "Lain", amount: 100, status: "confirmed", account_id: "missing-account" },
+    ], new Map([["idr-account", "IDR"], ["usd-account", "USD"]]), new Map([["IDR", 1], ["USD", 16_000]]));
+
+    expect(converted).toEqual([
+      expect.objectContaining({ id: "idr", amount: 1_000_000 }),
+      expect.objectContaining({ id: "usd", amount: 1_600_000 }),
+    ]);
   });
 
   it("converts every currency before aggregate insight metrics", () => {

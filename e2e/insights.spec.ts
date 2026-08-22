@@ -67,15 +67,44 @@ async function mockInsights(page: Page, options: { empty?: boolean; aiStatus?: n
 }
 
 test.describe("Smart Insights @critical", () => {
+  test.describe("incomplete FX", () => {
+    test.use({ allowedConsoleErrors: ["Failed to load resource: the server responded with a status of 503"] });
+
+    test("keeps chart and AI unavailable when FX conversion is incomplete", async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    let insightCalls = 0;
+    await page.route("https://e2e-project.supabase.co/**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === "/auth/v1/user") return route.fulfill({ status: 200, json: user });
+      if (url.pathname === "/rest/v1/transactions") return fulfillRows(route, [{ id: "usd-1", date: "2026-07-02", type: "expense", category: "Makan", amount: 100, status: "confirmed", account_id: "usd-account" }]);
+      if (url.pathname === "/rest/v1/financial_accounts") return fulfillRows(route, [{ id: "usd-account", currency: "USD", reporting_balance_idr: 1_600_000, is_active: true }]);
+      return route.fulfill({ status: 404, json: {} });
+    });
+    await page.route("https://api.frankfurter.dev/**", (route) => route.fulfill({ status: 503, json: {} }));
+    await page.route("**/api/insights/generate", async (route) => {
+      insightCalls += 1;
+      await route.fulfill({ status: 200, json: {} });
+    });
+
+    await page.goto("/insights");
+    await expect(page.getByText("Ringkasan per mata uang")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Akumulasi pemasukan dan pengeluaran" })).toHaveCount(0);
+    expect(insightCalls).toBe(0);
+    });
+  });
+
   test("renders verified metrics before a validated AI explanation", async ({ page }) => {
     const payloads = await mockInsights(page);
     await page.goto("/insights");
     await expect(page.getByRole("heading", { name: "Smart Insights" })).toBeVisible();
-    await expect(page.getByText(/Rp\s*10\.000\.000/)).toBeVisible();
-    await expect(page.getByText(/Rp\s*4\.000\.000/)).toBeVisible();
+    await expect(page.getByText(/Rp\s*10\.000\.000/).first()).toBeVisible();
+    await expect(page.getByText(/Rp\s*4\.000\.000/).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Arus kas bulan ini tetap sehat" })).toBeVisible();
     await expect(page.getByText("Dibantu AI")).toBeVisible();
     await expect(page.getByText("Hunian menjadi kategori pengeluaran terbesar.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Akumulasi pemasukan dan pengeluaran" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Kategori terbesar bulan ini" })).toBeVisible();
+    await expect(page.getByText("Hunian", { exact: true }).first()).toBeVisible();
     expect(payloads).toHaveLength(1);
     const serialized = JSON.stringify(payloads[0]);
     expect(serialized).not.toContain("merchant");

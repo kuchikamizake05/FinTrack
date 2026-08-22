@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createTimeoutSignal } from "@/lib/async";
 import { authenticateSupabaseAccessToken } from "@/infrastructure/supabase/server-client";
 import { noStoreJson as json } from "@/server/http";
+import { consumeRouteRateLimit } from "@/lib/rate-limit";
 import { validateSharedReceiptFile } from "@/lib/shared-receipt";
 import {
   buildGeminiReceiptRequest,
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
   const { user } = authentication;
 
-  const rateLimit = limiter.consume(user.id);
+  const rateLimit = await consumeRouteRateLimit({ route: "receipts:parse", userId: user.id, maxRequests: 5, windowMs: 60_000, fallback: limiter });
   if (!rateLimit.allowed) {
     return json(
       { error: "Terlalu banyak permintaan pembacaan struk. Coba lagi sebentar." },

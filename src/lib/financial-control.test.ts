@@ -8,6 +8,7 @@ import {
   getIdrBudgetScope,
   buildRecurringTransactionDraft,
   parseTransactionCsv,
+  selectUniqueImportRecords,
   serializeTransactionsCsv,
 } from "./financial-control";
 
@@ -51,6 +52,14 @@ describe("financial control helpers", () => {
     expect(buildImportMatchPreview(imported, [transactions[0]])).toMatchObject([
       { index: 0, duplicateOfExisting: true, duplicateOfBatch: false, isDuplicate: true },
       { index: 1, duplicateOfExisting: true, duplicateOfBatch: true, isDuplicate: true },
+    ]);
+  });
+
+  it("omits selected CSV duplicates before bulk insertion", () => {
+    const imported = parseTransactionCsv("date,type,merchant,category,amount,note\n2026-08-02,expense,Warung,Makan,80000,\n2026-08-04,expense,Parkir,Transportasi,5000,Mal\n2026-08-04,expense, parkir , Transportasi ,5000,");
+
+    expect(selectUniqueImportRecords(imported, [transactions[0]])).toEqual([
+      { date: "2026-08-04", type: "expense", merchant: "Parkir", category: "Transportasi", amount: 5000, note: "Mal" },
     ]);
   });
 
