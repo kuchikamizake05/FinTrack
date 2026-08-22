@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyReceiptExtractionToTransactionForm,
   canApproveTransaction,
   getTransactionSaveStatus,
   getTransactionSourceLabel,
@@ -91,6 +92,58 @@ describe("transaction presentation helpers", () => {
     expect(getTransactionSourceLabel("recurring")).toBe("Jadwal berulang");
     expect(getTransactionStatusLabel("pending_approval")).toBe("Perlu persetujuan");
     expect(getTransactionStatusLabel("needs_review")).toBe("Perlu ditinjau");
+  });
+
+  it("prefills only receipt fields and preserves account and type", () => {
+    expect(applyReceiptExtractionToTransactionForm({
+      date: "2026-08-22",
+      merchant: "",
+      category: "Lainnya",
+      amount: "0",
+      note: "",
+      accountId: "account-1",
+      type: "expense" as const,
+    }, {
+      date: "2026-08-20",
+      merchant: "Kedai Kopi",
+      amount: 25000,
+      categoryHint: "Makanan",
+      note: "Kopi susu",
+      rawText: "private receipt text",
+      confidence: 0.9,
+    }, ["Makanan", "Transportasi"])).toEqual({
+      date: "2026-08-20",
+      merchant: "Kedai Kopi",
+      category: "Makanan",
+      amount: "25000",
+      note: "Kopi susu",
+      accountId: "account-1",
+      type: "expense",
+    });
+  });
+
+  it("keeps existing form values when receipt fields are absent or unmatched", () => {
+    expect(applyReceiptExtractionToTransactionForm({
+      date: "2026-08-22",
+      merchant: "Manual",
+      category: "Transportasi",
+      amount: "10000",
+      note: "Catatan",
+    }, {
+      date: null,
+      merchant: null,
+      amount: null,
+      categoryHint: "Tidak ada",
+      note: null,
+      rawText: null,
+      confidence: null,
+    }, ["Makanan", "Transportasi"])).toEqual({
+      date: "2026-08-22",
+      merchant: "Manual",
+      category: "Transportasi",
+      amount: "10000",
+      note: "Catatan",
+    });
   });
 
   it("preserves review status until explicit approval", () => {

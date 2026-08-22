@@ -171,7 +171,7 @@ export default function SettingsPage() {
             <h2 className="text-sm font-bold">{t("Bahasa tampilan")}</h2>
             <p className="mt-1 text-xs text-slate-500">{t("Pilih bahasa yang digunakan di seluruh aplikasi.")}</p>
           </div>
-          <LanguageSwitcher />
+          <LanguageSwitcher detailed />
         </Surface>
 
         <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">

@@ -1,4 +1,5 @@
 import type { FinanceTransaction, TransactionFilters, TransactionStatus } from "./finance";
+import type { ReceiptExtraction } from "./receipt-vision";
 
 export function summarizeTransactionList(transactions: readonly FinanceTransaction[]) {
   return transactions.reduce(
@@ -30,6 +31,27 @@ export function validateTransactionForm(form: { accountId: string; amount: strin
     return "Pilih akun dan masukkan nominal lebih dari nol.";
   }
   return null;
+}
+
+export function applyReceiptExtractionToTransactionForm<T extends {
+  date: string;
+  merchant: string;
+  category: string;
+  amount: string;
+  note: string;
+}>(form: T, extraction: ReceiptExtraction, categoryOptions: readonly string[]): T {
+  const category = extraction.categoryHint
+    ? categoryOptions.find((option) => option.toLocaleLowerCase() === extraction.categoryHint?.toLocaleLowerCase()) ?? form.category
+    : form.category;
+
+  return {
+    ...form,
+    date: extraction.date ?? form.date,
+    merchant: extraction.merchant ?? form.merchant,
+    category,
+    amount: extraction.amount === null ? form.amount : String(extraction.amount),
+    note: extraction.note ?? form.note,
+  };
 }
 
 export function getTransactionSaveStatus(existingStatus?: TransactionStatus) {

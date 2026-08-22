@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
-import { BrainCircuit, Camera, CheckCircle2, Loader2, Plus, Search, Target, TrendingDown, TrendingUp, X } from "lucide-react";
+import { BrainCircuit, CheckCircle2, History, Loader2, Plus, Search, Target, TrendingDown, TrendingUp, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { PortfolioTabs } from "@/components/PortfolioTabs";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -219,7 +219,7 @@ export default function TradingPage() {
           {activeTab === "journal" && (
             <div role="group" aria-label={t("Aksi trading")} className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
               <Button variant="secondary" onClick={openSnapshotForm} disabled={!activeAccounts.length} className="w-full sm:w-auto">
-                <Camera className="h-4 w-4" /> {t("Update equity")}
+                <History className="h-4 w-4" /> {t("Update equity")}
               </Button>
               <Button onClick={openTradeForm} disabled={!activeAccounts.length} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4" /> {t("Catat trade")}
@@ -252,7 +252,7 @@ export default function TradingPage() {
 
             <Surface className="overflow-hidden">
               <div className="border-b border-emerald-100 px-4 py-4 sm:px-5"><h2 className="text-base font-bold">{t("Riwayat equity")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Koreksi snapshot bila nilai atau waktu tercatat keliru.")}</p></div>
-              {loading ? <TradeSkeleton /> : currencySnapshots.length === 0 ? <EmptyState icon={Camera} title={t("Belum ada snapshot")} description={t("Catat equity pertama untuk menyimpan riwayat trading.")} action={activeAccounts.length ? <Button variant="secondary" onClick={openSnapshotForm}><Camera className="h-4 w-4" /> {t("Update equity")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{[...currencySnapshots].reverse().map((snapshot) => <article key={snapshot.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="text-sm font-bold">{formatSignedMoney(snapshot.equity, snapshot.currency).slice(1)}</p><p className="mt-1 text-xs text-slate-500">{format(parseISO(snapshot.recorded_at), "dd MMM yyyy, HH:mm", { locale: dateLocale })} · {accountNames.get(snapshot.account_id) ?? t("Akun trading")}</p>{snapshot.note && <p className="mt-1 text-xs leading-5 text-slate-600">{snapshot.note}</p>}</div><div className="flex gap-2"><Button variant="secondary" size="compact" onClick={() => editSnapshot(snapshot)}>{t("Edit")}</Button><Button variant="destructive" size="compact" onClick={() => { setFormError(null); setRecordAction({ kind: "snapshot", id: snapshot.id, action: "delete" }); }}>{t("Hapus")}</Button></div></article>)}</div>}
+              {loading ? <TradeSkeleton /> : currencySnapshots.length === 0 ? <EmptyState icon={History} title={t("Belum ada snapshot")} description={t("Catat equity pertama untuk menyimpan riwayat trading.")} action={activeAccounts.length ? <Button variant="secondary" onClick={openSnapshotForm}><History className="h-4 w-4" /> {t("Update equity")}</Button> : undefined} /> : <div className="divide-y divide-slate-100">{[...currencySnapshots].reverse().map((snapshot) => <article key={snapshot.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div><p className="text-sm font-bold">{formatSignedMoney(snapshot.equity, snapshot.currency).slice(1)}</p><p className="mt-1 text-xs text-slate-500">{format(parseISO(snapshot.recorded_at), "dd MMM yyyy, HH:mm", { locale: dateLocale })} · {accountNames.get(snapshot.account_id) ?? t("Akun trading")}</p>{snapshot.note && <p className="mt-1 text-xs leading-5 text-slate-600">{snapshot.note}</p>}</div><div className="flex gap-2"><Button variant="secondary" size="compact" onClick={() => editSnapshot(snapshot)}>{t("Edit")}</Button><Button variant="destructive" size="compact" onClick={() => { setFormError(null); setRecordAction({ kind: "snapshot", id: snapshot.id, action: "delete" }); }}>{t("Hapus")}</Button></div></article>)}</div>}
             </Surface>
           </div>
         )}

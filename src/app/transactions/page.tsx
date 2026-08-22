@@ -17,6 +17,7 @@ import { format, parseISO } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
 import {
   CalendarDays,
+  Camera,
   ChevronDown,
   Download,
   Edit3,
@@ -54,9 +55,11 @@ import {
   type CategoryType,
 } from "@/lib/categories";
 import { filterTransactions, type TransactionFilters } from "@/lib/finance";
-import { getPrivateReceiptObjectPath } from "@/lib/shared-receipt";
+import { getPrivateReceiptObjectPath, validateSharedReceiptFile } from "@/lib/shared-receipt";
+import type { ReceiptExtraction } from "@/lib/receipt-vision";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import {
+  applyReceiptExtractionToTransactionForm,
   canApproveTransaction,
   getTransactionSaveStatus,
   getTransactionSourceLabel,
@@ -648,6 +651,18 @@ export default function TransactionsPage() {
           eyebrow={t("Ledger keuangan")}
           title={t("Transaksi")}
           description={t("{shown} dari {total} transaksi ditampilkan. Cari, tinjau, dan catat arus uang tanpa kehilangan konteks.", { shown: filteredTx.length, total: transactions.length })}
+          titleAction={(
+            <Button
+              variant="secondary"
+              size="compact"
+              onClick={() => void syncQueuedOperations()}
+              loading={syncingQueue}
+              disabled={pendingQueuedOperations.length === 0}
+              data-print-hide
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> {t("Sinkronkan")}
+            </Button>
+          )}
           actions={(
             <>
               <details className="group relative sm:hidden" data-print-hide>
@@ -677,15 +692,6 @@ export default function TransactionsPage() {
                   <Printer className="h-4 w-4" /> {t("Cetak laporan")}
                 </Button>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => void syncQueuedOperations()}
-                loading={syncingQueue}
-                disabled={pendingQueuedOperations.length === 0}
-                data-print-hide
-              >
-                <RotateCcw className="h-4 w-4" /> <span className="sm:hidden">{t("Sinkronkan")}</span><span className="hidden sm:inline">{t("Sinkronkan sekarang")}</span>
-              </Button>
               <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "sm:hidden")} aria-label={t("Kategori")} data-print-hide>
                 <Tags className="h-4 w-4" />
               </Link>
@@ -1177,9 +1183,50 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const { t } = useLanguage();
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [receiptNotice, setReceiptNotice] = useState<string | null>(null);
   const changeType = (type: CategoryType) => {
     const options = buildTransactionCategoryOptions(categories, type);
     setForm((current) => ({ ...current, type, category: options.includes(current.category) ? current.category : options[0] ?? "" }));
+  };
+  const scanReceipt = async (file: File) => {
+    const validationError = validateSharedReceiptFile(file);
+    if (validationError) {
+      setReceiptNotice(validationError);
+      return;
+    }
+    if (!canWriteOnline()) {
+      setReceiptNotice(t(offlineWriteMessage));
+      return;
+    }
+    setScanningReceipt(true);
+    setReceiptNotice(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sesi login tidak ditemukan.");
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/receipts/parse", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body,
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({})) as { extraction?: ReceiptExtraction; error?: string };
+      if (!response.ok || !result.extraction) throw new Error(result.error || "AI belum bisa menganalisis struk. Silakan isi form manual.");
+      setForm((current) => applyReceiptExtractionToTransactionForm(
+        current,
+        result.extraction!,
+        buildTransactionCategoryOptions(categories, current.type),
+      ));
+      setReceiptNotice(t("Data struk berhasil diekstrak otomatis. Periksa kembali sebelum menyimpan."));
+    } catch (error) {
+      setReceiptNotice(error instanceof Error ? error.message : t("AI belum bisa menganalisis struk. Silakan isi form manual."));
+    } finally {
+      if (receiptInputRef.current) receiptInputRef.current.value = "";
+      setScanningReceipt(false);
+    }
   };
   return (
     <DialogFrame
@@ -1204,6 +1251,26 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
         </div>
 
         <div className="space-y-5 px-5 py-5 sm:px-6">
+          {!isEditMode && (
+            <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3">
+              <input
+                ref={receiptInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void scanReceipt(file);
+                }}
+              />
+              <Button type="button" variant="secondary" size="compact" onClick={() => receiptInputRef.current?.click()} loading={scanningReceipt} disabled={scanningReceipt}>
+                <Camera className="h-4 w-4" /> {t("Scan struk")}
+              </Button>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{t("Pilih gambar untuk mengisi form otomatis. Gambar tidak disimpan.")}</p>
+              {receiptNotice && <p role="status" className="mt-2 text-xs leading-5 text-emerald-800">{receiptNotice}</p>}
+            </div>
+          )}
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label={t("Tipe transaksi")}>
             <button
               type="button"
