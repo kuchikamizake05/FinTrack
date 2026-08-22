@@ -87,7 +87,9 @@ test.describe("Smart Insights @critical", () => {
     });
 
     await page.goto("/insights");
-    await expect(page.getByText("Ringkasan per mata uang")).toBeVisible();
+    await expect(page.getByText("Analitik IDR ditunda")).toBeVisible();
+    await expect(page.getByText("USD", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Kurs IDR belum tersedia untuk USD.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Akumulasi pemasukan dan pengeluaran" })).toHaveCount(0);
     expect(insightCalls).toBe(0);
     });

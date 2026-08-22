@@ -102,6 +102,8 @@ describe("smart insight privacy and fallback", () => {
       { currency: "USD", current: { income: 0, expense: 100 } },
     ]);
     expect(buildPrivateInsightPayload(snapshot)).toBeNull();
+    expect(buildDeterministicInsight(snapshot).headline).toBe("Arus kas dipisahkan per mata uang");
+    expect(buildDeterministicInsight(snapshot).observations).toEqual([]);
   });
 
   it("converts confirmed analytics records to IDR and omits unmapped records", () => {

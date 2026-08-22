@@ -32,6 +32,15 @@ describe("i18n", () => {
     expect(getTranslation("en", "Struk terpilih: {name}", { name: "transfer.png" })).toBe("Selected receipt: transfer.png");
   });
 
+  it("translates Insight FX fallback copy", () => {
+    expect(getTranslation("en", "Tingkat tabungan")).toBe("Savings rate");
+    expect(getTranslation("en", "Kurs IDR belum tersedia untuk {currencies}.", { currencies: "USD" })).toBe("IDR rate unavailable for USD.");
+    expect(getTranslation("en", "Arus kas dipisahkan per mata uang")).toBe("Cash flow separated by currency");
+    expect(getTranslation("en", "Analitik IDR ditunda")).toBe("IDR analytics paused");
+    expect(getTranslation("en", "Perbarui kurs untuk {currencies}; grafik IDR dan AI tetap dinonaktifkan agar nilai tidak tercampur.", { currencies: "USD" })).toBe("Refresh rates for USD; IDR charts and AI remain disabled to prevent mixed values.");
+    expect(getTranslation("en", "{count} transaksi masih menunggu peninjauan.", { count: 2 })).toBe("2 transaction(s) still need review.");
+  });
+
   it("falls back to the Indonesian source when a translation is missing", () => {
     expect(getTranslation("en", "Teks baru")).toBe("Teks baru");
   });

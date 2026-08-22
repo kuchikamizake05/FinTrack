@@ -29,7 +29,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { reportHandledError } from "@/lib/errors";
-import { getIdrRates } from "@/lib/fx";
+import { getIdrRates, type FxRateResult } from "@/lib/fx";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import { buildCumulativeCashFlowSeries } from "@/lib/home";
 import {
@@ -71,23 +71,38 @@ type InsightAnalytics = {
   cashFlow: ReturnType<typeof buildCumulativeCashFlowSeries>;
 };
 
-const CATEGORY_COLORS = ["#047857", "#0284c7", "#7c3aed", "#ea580c", "#db2777", "#ca8a04"];
+type Translator = ReturnType<typeof useLanguage>["t"];
 
-const moneyFormatter = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
-});
-
-function formatMoney(value: number) {
-  return moneyFormatter.format(value);
+function translateInsightText(t: Translator, text: string) {
+  const categoryTitle = /^Tinjau kategori (.+)$/.exec(text);
+  if (categoryTitle) return t("Tinjau kategori {category}", { category: t(categoryTitle[1]) });
+  const pending = /^(\d+) transaksi (belum masuk ke perhitungan terverifikasi|masih menunggu peninjauan)\.$/.exec(text);
+  if (pending) return t(pending[2] === "masih menunggu peninjauan" ? "{count} transaksi masih menunggu peninjauan." : "{count} transaksi belum masuk ke perhitungan terverifikasi.", { count: pending[1] });
+  const account = /^(\d+) akun belum memiliki nilai pelaporan IDR\.$/.exec(text);
+  if (account) return t("{count} akun belum memiliki nilai pelaporan IDR.", { count: account[1] });
+  const categoryShare = /^(.+) mencakup (.+)% dari pengeluaran\.$/.exec(text);
+  if (categoryShare) return t("{category} mencakup {share}% dari pengeluaran.", { category: t(categoryShare[1]), share: categoryShare[2] });
+  const expenseChange = /^Pengeluaran (naik|turun) (.+)% dibanding (.+)\.$/.exec(text);
+  if (expenseChange) return t("Pengeluaran {direction} {change}% dibanding {period}.", { direction: t(expenseChange[1]), change: expenseChange[2], period: expenseChange[3] });
+  return t(text);
 }
 
-function formatCurrency(value: number, currency: string) {
+const CATEGORY_COLORS = ["#047857", "#0284c7", "#7c3aed", "#ea580c", "#db2777", "#ca8a04"];
+
+function formatMoney(value: number, language = "id") {
+  return new Intl.NumberFormat(language === "en" ? "en-ID" : "id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatCurrency(value: number, currency: string, language = "id") {
+  const locale = language === "en" ? "en-ID" : "id-ID";
   try {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: currency === "IDR" ? 0 : 2 }).format(value);
+    return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: currency === "IDR" ? 0 : 2 }).format(value);
   } catch {
-    return `${currency} ${value.toLocaleString("id-ID")}`;
+    return `${currency} ${value.toLocaleString(locale)}`;
   }
 }
 
@@ -116,6 +131,7 @@ export default function InsightsPage() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<InsightAnalytics | null>(null);
+  const [fxRates, setFxRates] = useState<ReadonlyMap<string, FxRateResult>>(new Map());
   const [refreshKey, setRefreshKey] = useState(0);
   const requestRef = useRef<AbortController | null>(null);
   const forceFxRefreshRef = useRef(false);
@@ -196,6 +212,7 @@ export default function InsightsPage() {
       const daysInMonth = getDaysInMonth(bounds.selected);
       const sampleDays = [...new Set([1, 7, 13, 19, 25, daysInMonth])].filter((day) => day <= daysInMonth);
       setSnapshot(nextSnapshot);
+      setFxRates(rates);
       setAnalytics(nextSnapshot.fxState === "converted" ? {
         cashFlow: buildCumulativeCashFlowSeries(
           convertedCurrent
@@ -287,15 +304,15 @@ export default function InsightsPage() {
         {loadingData || !month ? <InsightsSkeleton /> : snapshot && snapshot.current.confirmedCount === 0 ? (
           <Surface className="mt-7"><EmptyState icon={BrainCircuit} title={t("Belum ada data terverifikasi di {period}", { period: snapshot.periodLabel })} description={t("Catat atau konfirmasi setidaknya satu pemasukan atau pengeluaran agar FinTrack bisa menyusun review yang berguna.")} action={<Link href="/transactions" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">{t("Buka transaksi")} <ArrowRight className="h-4 w-4" /></Link>} /></Surface>
         ) : snapshot && displayInsight ? (
-          <div className="mt-7 space-y-6">
-            <Pulse snapshot={snapshot} />
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="space-y-6">
-                {snapshot.fxState === "converted" && analytics ? <Analytics snapshot={snapshot} analytics={analytics} /> : <CurrencyPulse snapshot={snapshot} />}
+          <div className="mt-7 space-y-4">
+            <Pulse snapshot={snapshot} fxRates={fxRates} language={language} />
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="space-y-4">
+                {snapshot.fxState === "converted" && analytics ? <Analytics snapshot={snapshot} analytics={analytics} language={language} /> : <CurrencyPulse snapshot={snapshot} fxRates={fxRates} />}
                 <AiNarrative insight={displayInsight} loading={loadingAi} error={aiError} onRetry={() => refreshInsights()} />
                 {snapshot.fxState === "converted" && <Patterns snapshot={snapshot} observations={displayInsight.observations} />}
               </div>
-              <aside className="space-y-6 lg:sticky lg:top-24">
+              <aside className="space-y-4 lg:sticky lg:top-24">
                 <PriorityActions actions={displayInsight.actions} />
                 <PrivacyDisclosure />
               </aside>
@@ -323,71 +340,69 @@ function mapGeneratedInsight(generated: GeneratedInsightEnvelope, candidates: In
   };
 }
 
-function Pulse({ snapshot }: { snapshot: InsightSnapshot }) {
+function Pulse({ snapshot, fxRates, language }: { snapshot: InsightSnapshot; fxRates: ReadonlyMap<string, FxRateResult>; language: "id" | "en" }) {
   const { t } = useLanguage();
-  if (snapshot.fxState === "separate") {
-    return (
-      <Surface className="overflow-hidden">
-        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-amber-700">{t("Financial pulse")}</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{snapshot.periodLabel}</h2>
-          <p className="mt-2 text-sm text-amber-800">{t("Kurs IDR belum tersedia untuk semua transaksi. Nilai tidak digabung.")}</p>
-        </div>
-      </Surface>
-    );
-  }
   const metrics = [
-    { label: t("Pemasukan"), value: formatMoney(snapshot.current.income), detail: snapshot.incomeChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.incomeChange > 0 ? "+" : ""}${snapshot.incomeChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowUpRight, tone: "text-emerald-700 bg-emerald-50" },
-    { label: t("Pengeluaran"), value: formatMoney(snapshot.current.expense), detail: snapshot.expenseChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.expenseChange > 0 ? "+" : ""}${snapshot.expenseChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50" },
-    { label: t("Arus kas bersih"), value: formatMoney(snapshot.current.netCashFlow), detail: t("{count} transaksi terverifikasi", { count: snapshot.current.confirmedCount }), icon: CircleDollarSign, tone: snapshot.current.netCashFlow >= 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-600 bg-rose-50" },
-    { label: t("Savings rate"), value: snapshot.savingsRate === null ? t("Belum tersedia") : `${snapshot.savingsRate}%`, detail: snapshot.savingsRate === null ? t("Perlu data pemasukan") : t("Dari pemasukan periode ini"), icon: WalletCards, tone: "text-sky-700 bg-sky-50" },
+    { label: t("Pemasukan"), value: formatMoney(snapshot.current.income, language), detail: snapshot.incomeChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.incomeChange > 0 ? "+" : ""}${snapshot.incomeChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowUpRight, tone: "text-emerald-700 bg-emerald-50" },
+    { label: t("Pengeluaran"), value: formatMoney(snapshot.current.expense, language), detail: snapshot.expenseChange === null ? t("Belum ada pembanding") : t("{change}% vs {period}", { change: `${snapshot.expenseChange > 0 ? "+" : ""}${snapshot.expenseChange}`, period: snapshot.previousPeriodLabel }), icon: ArrowDownRight, tone: "text-rose-600 bg-rose-50" },
+    { label: t("Arus kas bersih"), value: formatMoney(snapshot.current.netCashFlow, language), detail: t("{count} transaksi terverifikasi", { count: snapshot.current.confirmedCount }), icon: CircleDollarSign, tone: snapshot.current.netCashFlow >= 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-600 bg-rose-50" },
+    { label: t("Tingkat tabungan"), value: snapshot.savingsRate === null ? t("Belum tersedia") : `${snapshot.savingsRate}%`, detail: snapshot.savingsRate === null ? t("Perlu data pemasukan") : t("Dari pemasukan periode ini"), icon: WalletCards, tone: "text-sky-700 bg-sky-50" },
   ];
+  const missingCurrencies = snapshot.currencyGroups.filter((group) => fxRates.get(group.currency)?.state === "missing").map((group) => group.currency);
   return (
     <Surface className="overflow-hidden">
-      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
-        <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{t("Financial pulse")}</p>
-        <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{snapshot.periodLabel}</h2>
+      <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+        <p className={cn("text-xs font-bold uppercase tracking-[0.1em]", snapshot.fxState === "converted" ? "text-emerald-700" : "text-amber-700")}>{t("Ringkasan arus kas")}</p>
+        <h2 className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">{snapshot.periodLabel}</h2>
+        {snapshot.fxState === "separate" && <p className="mt-1 text-xs leading-5 text-amber-800">{t("Nilai hanya dijumlahkan dalam mata uang yang sama.")} {missingCurrencies.length ? t("Kurs IDR belum tersedia untuk {currencies}.", { currencies: missingCurrencies.join(", ") }) : t("Kurs IDR belum tersedia. Nilai tidak digabung.")}</p>}
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4">
-        {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
-          <div key={label} className="border-b border-slate-100 p-5 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
-            <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl", tone)}><Icon className="h-4 w-4" /></span>
-            <p className="mt-4 text-xs font-semibold text-slate-500">{label}</p>
-            <p className="mt-1 font-mono text-xl font-bold tracking-tight text-slate-900">{value}</p>
-            <p className="mt-1 text-[11px] leading-5 text-slate-400">{detail}</p>
-          </div>
-        ))}
-      </div>
+      {snapshot.fxState === "converted" ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4">
+          {metrics.map(({ label, value, detail, icon: Icon, tone }) => (
+            <div key={label} className="border-b border-slate-100 px-4 py-3 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
+              <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", tone)}><Icon className="h-4 w-4" /></span>
+              <p className="mt-2 text-xs font-semibold text-slate-500">{label}</p>
+              <p className="mt-0.5 font-mono text-lg font-bold tracking-tight text-slate-900">{value}</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-400">{detail}</p>
+            </div>
+          ))}
+        </div>
+      ) : <CurrencyMetrics snapshot={snapshot} fxRates={fxRates} language={language} />}
     </Surface>
   );
 }
 
-function CurrencyPulse({ snapshot }: { snapshot: InsightSnapshot }) {
+function CurrencyMetrics({ snapshot, fxRates, language }: { snapshot: InsightSnapshot; fxRates: ReadonlyMap<string, FxRateResult>; language: "id" | "en" }) {
   const { t } = useLanguage();
+  return <div className="grid sm:grid-cols-2 lg:grid-cols-3">{snapshot.currencyGroups.map((group) => {
+    const rate = fxRates.get(group.currency);
+    return <div key={group.currency} className="border-b border-slate-100 px-4 py-3 last:border-b-0 sm:border-r sm:last:border-r-0 lg:border-b-0">
+      <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{group.currency}</p>{rate?.state && <span className={cn("text-[10px] font-bold uppercase", rate.state === "missing" || rate.state === "stale" ? "text-amber-700" : "text-emerald-700")}>{t(rate.state === "missing" ? "Kurs tidak tersedia" : rate.state === "stale" ? "Kurs tersimpan" : "Kurs tersedia")}</span>}</div>
+      <p className={cn("mt-1 text-lg font-bold tracking-[-0.03em]", group.current.netCashFlow >= 0 ? "text-emerald-700" : "text-rose-600")}>{formatCurrency(group.current.netCashFlow, group.currency, language)}</p>
+      <p className="mt-0.5 text-[11px] text-slate-500">{t("Masuk")} {formatCurrency(group.current.income, group.currency, language)} · {t("Keluar")} {formatCurrency(group.current.expense, group.currency, language)}</p>
+    </div>;
+  })}</div>;
+}
+
+function CurrencyPulse({ snapshot, fxRates }: { snapshot: InsightSnapshot; fxRates: ReadonlyMap<string, FxRateResult> }) {
+  const { t } = useLanguage();
+  const missingCurrencies = snapshot.currencyGroups.filter((group) => fxRates.get(group.currency)?.state === "missing").map((group) => group.currency);
   return (
-    <Surface className="p-5 sm:p-7">
-      <p className="text-xs font-bold uppercase tracking-[0.1em] text-sky-700">{t("Ringkasan per mata uang")}</p>
-      <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Nilai hanya dijumlahkan dalam mata uang yang sama.")}</h2>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {snapshot.currencyGroups.map((group) => (
-          <div key={group.currency} className="rounded-xl border border-slate-100 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{group.currency}</p>
-            <p className={cn("mt-2 text-lg font-bold", group.current.netCashFlow >= 0 ? "text-emerald-700" : "text-rose-600")}>{formatCurrency(group.current.netCashFlow, group.currency)}</p>
-            <p className="mt-1 text-xs text-slate-500">{t("Pemasukan")} {formatCurrency(group.current.income, group.currency)} · {t("Pengeluaran")} {formatCurrency(group.current.expense, group.currency)}</p>
-          </div>
-        ))}
-      </div>
+    <Surface className="p-4 sm:p-5">
+      <p className="text-xs font-bold uppercase tracking-[0.1em] text-sky-700">{t("Analitik IDR ditunda")}</p>
+      <h2 className="mt-0.5 text-base font-bold tracking-tight text-slate-900">{t("Menunggu kurs sebelum nilai lintas mata uang dibandingkan.")}</h2>
+      <p className="mt-2 text-xs leading-5 text-slate-600">{missingCurrencies.length ? t("Perbarui kurs untuk {currencies}; grafik IDR dan AI tetap dinonaktifkan agar nilai tidak tercampur.", { currencies: missingCurrencies.join(", ") }) : t("Grafik IDR dan AI tetap dinonaktifkan agar nilai lintas mata uang tidak tercampur.")}</p>
     </Surface>
   );
 }
 
-function Analytics({ snapshot, analytics }: { snapshot: InsightSnapshot; analytics: InsightAnalytics }) {
+function Analytics({ snapshot, analytics, language }: { snapshot: InsightSnapshot; analytics: InsightAnalytics; language: "id" | "en" }) {
   const { t } = useLanguage();
   const categories = snapshot.topCategories.slice(0, 6);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
-      <Surface className="min-w-0 p-5 sm:p-6">
+    <div className="grid gap-4 xl:grid-cols-2">
+      <Surface className="min-w-0 p-4 sm:p-5">
         <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{t("Tren arus kas")}</p>
         <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Akumulasi pemasukan dan pengeluaran")}</h2>
         <ul aria-label={t("Legenda arus kas")} className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-slate-600">
@@ -396,12 +411,12 @@ function Analytics({ snapshot, analytics }: { snapshot: InsightSnapshot; analyti
         </ul>
         <figure aria-labelledby="insight-cash-flow-caption" className="mt-4">
           <figcaption id="insight-cash-flow-caption" className="sr-only">{t("Grafik akumulasi pemasukan dan pengeluaran terverifikasi dalam IDR.")}</figcaption>
-          <div className="h-52 w-full" aria-hidden="true">
+          <div className="h-44 w-full" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.cashFlow} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
-                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} />
-                <Tooltip cursor={{ stroke: "#d1fae5", strokeWidth: 1 }} contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0))} />
+                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => new Intl.NumberFormat(language === "en" ? "en-ID" : "id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} />
+                <Tooltip cursor={{ stroke: "#d1fae5", strokeWidth: 1 }} contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0), language)} />
                 <Line type="monotone" dataKey="income" name={t("Pemasukan")} stroke="#047857" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#047857", stroke: "#fff", strokeWidth: 2 }} />
                 <Line type="monotone" dataKey="expense" name={t("Pengeluaran")} stroke="#f43f5e" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#f43f5e", stroke: "#fff", strokeWidth: 2 }} />
               </LineChart>
@@ -414,36 +429,36 @@ function Analytics({ snapshot, analytics }: { snapshot: InsightSnapshot; analyti
             <table className="w-full min-w-[360px] text-left text-xs">
               <caption className="sr-only">{t("Data akumulasi pemasukan dan pengeluaran terverifikasi dalam IDR.")}</caption>
               <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Tanggal")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Pemasukan")}</th><th scope="col" className="pb-2 text-right">{t("Pengeluaran")}</th></tr></thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">{analytics.cashFlow.map((point) => <tr key={point.day}><th scope="row" className="py-2 pr-4 font-semibold">{point.label}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(point.income)}</td><td className="py-2 text-right font-medium">{formatMoney(point.expense)}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100 text-slate-700">{analytics.cashFlow.map((point) => <tr key={point.day}><th scope="row" className="py-2 pr-4 font-semibold">{point.label}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(point.income, language)}</td><td className="py-2 text-right font-medium">{formatMoney(point.expense, language)}</td></tr>)}</tbody>
             </table>
           </div>
         </details>
       </Surface>
 
-      <Surface className="min-w-0 p-5 sm:p-6">
+      <Surface className="min-w-0 p-4 sm:p-5">
         <p className="text-xs font-bold uppercase tracking-[0.1em] text-sky-700">{t("Komposisi pengeluaran")}</p>
         <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{t("Kategori terbesar bulan ini")}</h2>
         {categories.length ? <>
           <figure aria-labelledby="insight-category-chart-caption" className="mt-4">
             <figcaption id="insight-category-chart-caption" className="sr-only">{t("Diagram kategori pengeluaran terverifikasi dalam IDR.")}</figcaption>
-            <div className="h-52 w-full" aria-hidden="true">
+            <div className="h-44 w-full" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={categories} dataKey="amount" nameKey="name" innerRadius="56%" outerRadius="82%" paddingAngle={3} stroke="none">
                     {categories.map((category, index) => <Cell key={category.name} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #dbeafe", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0))} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #dbeafe", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }} formatter={(value) => formatMoney(Number(value || 0), language)} />
                   <Legend formatter={(value) => t(String(value))} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </figure>
           <ul className="mt-3 space-y-2 text-xs text-slate-600">
-            {categories.map((category, index) => <li key={category.name} className="flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} /><span className="truncate font-semibold">{t(category.name)}</span></span><span className="shrink-0 font-mono">{formatMoney(category.amount)} · {category.share}%</span></li>)}
+            {categories.map((category, index) => <li key={category.name} className="flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} /><span className="truncate font-semibold">{t(category.name)}</span></span><span className="shrink-0 font-mono">{formatMoney(category.amount, language)} · {category.share}%</span></li>)}
           </ul>
           <details className="group mt-4 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
             <summary className="cursor-pointer text-xs font-semibold text-sky-700 marker:text-sky-700">{t("Lihat data tabel kategori")}</summary>
-            <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[300px] text-left text-xs"><caption className="sr-only">{t("Data kategori pengeluaran terverifikasi dalam IDR.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Kategori")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Nominal")}</th><th scope="col" className="pb-2 text-right">{t("Porsi")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{categories.map((category) => <tr key={category.name}><th scope="row" className="py-2 pr-4 font-semibold">{t(category.name)}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(category.amount)}</td><td className="py-2 text-right font-medium">{category.share}%</td></tr>)}</tbody></table></div>
+            <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[300px] text-left text-xs"><caption className="sr-only">{t("Data kategori pengeluaran terverifikasi dalam IDR.")}</caption><thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500"><tr><th scope="col" className="pb-2 pr-4">{t("Kategori")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Nominal")}</th><th scope="col" className="pb-2 text-right">{t("Porsi")}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{categories.map((category) => <tr key={category.name}><th scope="row" className="py-2 pr-4 font-semibold">{t(category.name)}</th><td className="py-2 pr-4 text-right font-medium">{formatMoney(category.amount, language)}</td><td className="py-2 text-right font-medium">{category.share}%</td></tr>)}</tbody></table></div>
           </details>
         </> : <p className="mt-5 text-sm text-slate-500">{t("Belum ada pengeluaran terverifikasi.")}</p>}
       </Surface>
@@ -465,8 +480,8 @@ function AiNarrative({ insight, loading, error, onRetry }: { insight: InsightVie
         </div>
         {loading && <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> {t("Menyusun")}</span>}
       </div>
-      <h2 className={cn("mt-6 text-2xl font-bold tracking-[-0.035em]", insight.tone === "attention" ? "text-rose-700" : "text-slate-900")}>{insight.headline}</h2>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">{insight.summary}</p>
+      <h2 className={cn("mt-4 text-xl font-bold tracking-[-0.03em]", insight.tone === "attention" ? "text-rose-700" : "text-slate-900")}>{translateInsightText(t, insight.headline)}</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{translateInsightText(t, insight.summary)}</p>
       {error && (
         <div className="mt-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
           <span>{error}</span>
@@ -490,9 +505,9 @@ function PriorityActions({ actions }: { actions: InsightAction[] }) {
               <span>
                 <span className="flex items-center gap-2">
                   <span className={cn("h-2 w-2 rounded-full", action.impact === "high" ? "bg-rose-500" : action.impact === "medium" ? "bg-amber-500" : "bg-emerald-500")} />
-                  <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-800">{t(action.title)}</span>
+                  <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-800">{translateInsightText(t, action.title)}</span>
                 </span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">{t(action.reason)}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">{translateInsightText(t, action.reason)}</span>
               </span>
               <ChevronRight className="mt-1 h-4 w-4 text-slate-300 group-hover:text-emerald-600" />
             </Link>
@@ -552,7 +567,7 @@ function Patterns({ snapshot, observations }: { snapshot: InsightSnapshot; obser
               observations.map((observation, index) => (
                 <li key={`${observation}-${index}`} className="flex gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                  {t(observation)}
+                  {translateInsightText(t, observation)}
                 </li>
               ))
             ) : (
