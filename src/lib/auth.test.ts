@@ -26,6 +26,11 @@ describe("public route policy", () => {
     expect(isProtectedRoute("/onboarding")).toBe(true);
     expect(isProtectedRoute("/onboarding/step")).toBe(true);
   });
+
+  it("treats monthly reports as an authenticated application route", () => {
+    expect(isProtectedRoute("/reports")).toBe(true);
+    expect(isProtectedRoute("/reports/archive")).toBe(true);
+  });
 });
 
 describe("getAuthGateState", () => {

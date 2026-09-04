@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BrainCircuit, CalendarClock, ChevronDown, LogOut, Plus, Settings, Tags, User, WalletCards, X } from "lucide-react";
+import { BrainCircuit, CalendarClock, ChevronDown, FileClock, LogOut, Plus, Settings, Tags, User, WalletCards, X } from "lucide-react";
 import { isNavigationActive, primaryNavigation } from "@/lib/navigation";
 import { reportHandledError } from "@/lib/errors";
 import { clearPasskeyDeviceState } from "@/lib/passkeys";
@@ -17,6 +17,7 @@ const profileItems = [
   { name: "Kategori", href: "/categories", icon: Tags },
   { name: "Smart Insights", href: "/insights", icon: BrainCircuit },
   { name: "Rencana & kontrol", href: "/planning", icon: CalendarClock },
+  { name: "Laporan bulanan", href: "/reports", icon: FileClock },
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
 

@@ -140,6 +140,7 @@ The application is designed as a self-hosted personal workspace rather than a ba
 | `/insights` | Verified metrics and optional AI explanations |
 | `/planning` | Budgets, recurring transactions, reconciliation, and CSV portability |
 | `/settings` | Session, language, environment, and integration guidance |
+| `/reports` | Opt-in monthly report schedule, immutable archives, and private CSV downloads |
 | `/offline` | PWA offline fallback |
 
 ## Architecture
@@ -179,7 +180,7 @@ See [the architecture guide](docs/architecture.md) for dependency rules and the 
 | Charts | Recharts |
 | Authentication and database | Supabase Auth, Postgres, RLS |
 | AI insights | Groq API (optional) |
-| Automation | n8n, Telegram Bot API, Gemini API (optional) |
+| Automation | Go monthly report worker, GitHub Actions, n8n, Telegram Bot API, Gemini API (optional) |
 | Unit testing | Vitest |
 | End-to-end testing | Playwright |
 | CI | GitHub Actions |
@@ -243,7 +244,7 @@ FinTrack uses Supabase for both identity and data ownership. A configured Supaba
 5. Confirm that RLS is enabled for the created tables.
 6. Copy the project URL and anon key from **Project Settings > API** into `.env.local`.
 
-The schema and migrations create the financial ledger, account transfers, goals, investment executions, forex journal, equity snapshots, and AI trade review storage. Ownership policies are based on the authenticated user's `auth.uid()`.
+The schema and migrations create the financial ledger, account transfers, goals, investment executions, forex journal, equity snapshots, AI trade review storage, and opt-in monthly report archives. Ownership policies are based on the authenticated user's `auth.uid()`.
 
 > [!IMPORTANT]
 > Do not edit a migration after it has been applied. Add a new dated migration for subsequent database changes.
@@ -251,6 +252,14 @@ The schema and migrations create the financial ledger, account transfers, goals,
 ### Storage for receipt automation
 
 If the Telegram receipt workflow is enabled, create a private Supabase Storage bucket named `receipts-temp`. Apply a narrow policy appropriate for the n8n service role and your retention requirements. Receipt images and temporary OCR data must not be public by default.
+
+### Monthly report automation
+
+Migration `20260904000000_add_monthly_financial_reports.sql` creates opt-in schedules, immutable report metadata, and private `financial-reports` Storage policies. Users manage schedules and download only their own archives at `/reports`; the CSV is the sole transaction-level snapshot.
+
+[`monthly-reports.yml`](.github/workflows/monthly-reports.yml) runs daily at 01:17 UTC and processes the latest completed UTC month. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as GitHub Actions repository secrets, then use `workflow_dispatch` for an initial or recovery run. Never expose the service-role key to browser code or logs.
+
+The Go worker lives in [`worker/`](worker/) and uses only the standard library. Each user-period is idempotent; retries do not replace an existing CSV or report row. Frankfurter FX lookup failure leaves original-currency totals intact and records missing conversion metadata.
 
 ## Authentication setup
 
@@ -295,6 +304,8 @@ The canonical template is [`.env.example`](.env.example).
 | `GEMINI_RECEIPT_MODEL` | No | Server only | Gemini model ID; defaults to `gemini-1.5-flash` |
 | `N8N_TRADE_REVIEW_WEBHOOK_URL` | For trade review | Server only | n8n webhook receiving authenticated review jobs |
 | `N8N_TRADE_REVIEW_SHARED_SECRET` | For trade review | Server only | Shared secret sent to and verified by n8n |
+| `SUPABASE_URL` | Monthly report workflow | Server only | Supabase project HTTPS URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Monthly report workflow | Server only | Privileged worker access; GitHub Actions secret only |
 
 Variables prefixed with `NEXT_PUBLIC_` are included in the browser bundle by design. Provider keys, service-role keys, webhook secrets, and OAuth client secrets must never use that prefix.
 
@@ -368,6 +379,8 @@ GitHub Actions runs three jobs on pull requests and pushes to `main`:
 - **Quality:** lint, typecheck, unit tests, and production build
 - **Security:** production dependency audit
 - **E2E:** Playwright tests against a production build on desktop and mobile Chromium
+
+The separate **Monthly financial reports** workflow runs the Go worker on its UTC schedule or manual dispatch.
 
 Playwright reports are uploaded as CI artifacts even when E2E tests fail.
 
