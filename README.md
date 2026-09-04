@@ -257,7 +257,7 @@ If the Telegram receipt workflow is enabled, create a private Supabase Storage b
 
 Migration `20260904000000_add_monthly_financial_reports.sql` creates opt-in schedules, immutable report metadata, and private `financial-reports` Storage policies. Users manage schedules and download only their own archives at `/reports`; the CSV is the sole transaction-level snapshot.
 
-[`monthly-reports.yml`](.github/workflows/monthly-reports.yml) runs daily at 01:17 UTC and processes the latest completed UTC month. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as GitHub Actions repository secrets, then use `workflow_dispatch` for an initial or recovery run. Never expose the service-role key to browser code or logs.
+[`monthly-reports.yml`](.github/workflows/monthly-reports.yml) runs daily at 01:17 UTC and processes the latest completed UTC month. Its schedule lookup also keeps the Supabase database active without a separate keepalive job. GitHub can disable scheduled workflows after roughly 60 days of public-repository inactivity; a commit, push, or manual `workflow_dispatch` restores the schedule. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as GitHub Actions repository secrets, then use `workflow_dispatch` for an initial or recovery run. Never expose the service-role key to browser code or logs.
 
 The Go worker lives in [`worker/`](worker/) and uses only the standard library. Each user-period is idempotent; retries do not replace an existing CSV or report row. Frankfurter FX lookup failure leaves original-currency totals intact and records missing conversion metadata.
 
