@@ -21,6 +21,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: worker/go.mod
+          cache: false
 
       - name: Generate monthly reports
         working-directory: worker
