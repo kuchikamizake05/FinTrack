@@ -15,6 +15,11 @@ describe("sanitizeNextPath", () => {
 });
 
 describe("public route policy", () => {
+  it("requires authentication for Journey and preserves the login destination", () => {
+    expect(isProtectedRoute("/journey")).toBe(true);
+    expect(sanitizeNextPath("/journey")).toBe("/journey");
+    expect(getAuthGateState({ pathname: "/journey", configured: true, resolved: true, hasSession: false, online: true })).toBe("redirect-login");
+  });
   it("allows only the explicit public application routes", () => {
     expect(isPublicRoute("/login")).toBe(true);
     expect(isPublicRoute("/offline")).toBe(true);

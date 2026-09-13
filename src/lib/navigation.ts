@@ -8,6 +8,7 @@ export const primaryNavigation = [
 ] as const;
 
 export function isNavigationActive(itemHref: string, pathname: string): boolean {
+  if (itemHref === "/dashboard" && pathname === "/journey") return true;
   if (itemHref === "/investments") {
     return (
       pathname === "/investments"
@@ -18,4 +19,3 @@ export function isNavigationActive(itemHref: string, pathname: string): boolean 
   }
   return pathname === itemHref || pathname.startsWith(`${itemHref}/`);
 }
-

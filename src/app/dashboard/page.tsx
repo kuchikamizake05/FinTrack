@@ -35,6 +35,8 @@ import {
   YAxis,
 } from "recharts";
 import Navbar from "@/components/Navbar";
+import { useFinancialJourney } from "@/components/FinancialJourney";
+import JourneySummary from "@/components/JourneySummary";
 import { useOnboarding } from "@/components/OnboardingBoundary";
 import { Button } from "@/components/ui/Button";
 import { calculatePercentageChange } from "@/lib/analytics";
@@ -100,6 +102,7 @@ function withTimeout<T>(promise: PromiseLike<T>, milliseconds: number) {
 }
 
 export default function DashboardPage() {
+  const journey = useFinancialJourney();
   const { language, t } = useLanguage();
   const dateLocale = language === "en" ? enUS : id;
   const router = useRouter();
@@ -396,6 +399,7 @@ export default function DashboardPage() {
               </section>
             )}
 
+            <JourneySummary journey={journey} />
             <section aria-labelledby="mobile-quick-actions-title" className="mt-5">
               <div className="flex items-center justify-between">
                 <h2 id="mobile-quick-actions-title" className="text-sm font-extrabold tracking-[-0.02em] text-slate-900">{t("Aksi cepat")}</h2>
@@ -582,6 +586,7 @@ export default function DashboardPage() {
                 </div>
               </section>
 
+              <JourneySummary journey={journey} />
               <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_8px_28px_rgba(22,101,52,0.05)]">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
                   <div>
