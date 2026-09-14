@@ -105,6 +105,10 @@ async function mockOnboardingSupabase(page: Page, initial: Partial<MockState> = 
     if (url.pathname === "/rest/v1/rpc/get_financial_journey") {
       await route.fulfill({ status: 200, json: {
         week: "2026-09-07", totalXp: 0, completed: [], completeWeeks: 0, goalAchieved: false,
+        streak: {
+          current: 0, longest: 0, completedToday: false,
+          days: ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"].map((date) => ({ date, completed: false })),
+        },
       } });
       return;
     }

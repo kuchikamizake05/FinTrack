@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { Award, Check, Circle, Sprout } from "lucide-react";
+import { Award, Check, Circle, Flame, Sprout } from "lucide-react";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { useLanguage } from "@/components/LanguageProvider";
 import { JOURNEY_MISSIONS, journeyLevel, parseJourney, type JourneyMission, type JourneyState } from "@/lib/journey";
@@ -12,6 +12,7 @@ export function useFinancialJourney() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<JourneyMission | null>(null);
+  const [dailySaving, setDailySaving] = useState(false);
   const [confirming, setConfirming] = useState<JourneyMission | null>(null);
   const [notice, setNotice] = useState(false);
   const busy = useRef(false);
@@ -52,6 +53,7 @@ export function useFinancialJourney() {
         busy.current = false;
         setData(null);
         setSaving(null);
+        setDailySaving(false);
         setConfirming(null);
         setNotice(false);
         if (nextOwner) window.setTimeout(onFocus, 0);
@@ -90,7 +92,30 @@ export function useFinancialJourney() {
       }
     }
   };
-  return { data, error, loading, saving, confirming, setConfirming, notice, refresh, complete };
+  const completeDailyReview = async () => {
+    if (busy.current || !data || error || data.streak.completedToday) return;
+    busy.current = true;
+    const request = ++generation.current;
+    setDailySaving(true);
+    setNotice(false);
+    try {
+      const result = await supabase.rpc("complete_financial_journey_daily_review").abortSignal(AbortSignal.timeout(12_000));
+      if (result.error) throw result.error;
+      const next = parseJourney(result.data);
+      if (request !== generation.current) return;
+      setData(next);
+      setNotice(true);
+    } catch {
+      if (request === generation.current) setError(true);
+    } finally {
+      if (request === generation.current) {
+        busy.current = false;
+        setDailySaving(false);
+        setLoading(false);
+      }
+    }
+  };
+  return { data, error, loading, saving, dailySaving, confirming, setConfirming, notice, refresh, complete, completeDailyReview };
 }
 
 export default function FinancialJourney({ journey }: { journey: ReturnType<typeof useFinancialJourney> }) {
@@ -98,7 +123,7 @@ export default function FinancialJourney({ journey }: { journey: ReturnType<type
   const en = language === "en";
   const copy = (id: string, english: string) => en ? english : id;
   const titleId = useId();
-  const { data, error, loading, saving, confirming, setConfirming, notice, refresh, complete } = journey;
+  const { data, error, loading, saving, dailySaving, confirming, setConfirming, notice, refresh, complete, completeDailyReview } = journey;
   const { level, progress } = journeyLevel(data?.totalXp ?? 0);
   const badges = [
     { name: copy("Review pertama", "First review"), earned: (data?.totalXp ?? 0) > 0 },
@@ -118,6 +143,15 @@ export default function FinancialJourney({ journey }: { journey: ReturnType<type
       <div className="mt-5 flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-bold text-slate-800">Level {level} · {level >= 3 ? copy("Makin konsisten", "Growing steadily") : level >= 2 ? copy("Mulai teratur", "Finding your rhythm") : copy("Langkah awal", "First steps")}</p><p className="text-xs font-medium text-slate-600">{progress} / 300 XP</p></div>
       <div role="progressbar" aria-label={copy("Progres ke level berikutnya", "Progress to next level")} aria-valuemin={0} aria-valuemax={300} aria-valuenow={progress} className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600 motion-safe:transition-all" style={{ width: `${progress / 3}%` }} /></div>
       <p className="mt-2 text-xs leading-5 text-slate-500">{data.totalXp} {copy("XP terkumpul · Levelmu tidak direset.", "lifetime XP · Your level never resets.")}</p>
+      <section aria-label={copy("Streak review harian", "Daily review streak")} className="mt-5 rounded-xl border border-orange-100 bg-orange-50/70 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><Flame aria-hidden="true" className="h-5 w-5 text-orange-600" /><div><h3 className="text-sm font-bold text-slate-800">{copy("Jaga ritmemu", "Keep your rhythm")}</h3><p className="mt-0.5 text-xs text-slate-600">{data.streak.current} {copy("hari berturut-turut", "days in a row")}</p></div></div><p className="text-xs font-medium text-slate-600">{copy("Rekor terbaik", "Best")}: {data.streak.longest} {copy("hari", "days")}</p></div>
+        <div aria-label={copy("Riwayat tujuh hari terakhir", "Last seven days")} className="mt-4 grid grid-cols-7 gap-1.5">{data.streak.days.map((day) => {
+          const label = new Intl.DateTimeFormat(en ? "en-GB" : "id-ID", { weekday: "short", timeZone: "Asia/Jakarta" }).format(new Date(`${day.date}T00:00:00+07:00`));
+          const status = day.completed ? copy("review selesai", "review complete") : copy("belum direview", "not reviewed");
+          return <div key={day.date} aria-label={`${label}: ${status}`} className="min-w-0 text-center"><p className="truncate text-[10px] font-medium text-slate-500">{label}</p><span aria-hidden="true" className={`mx-auto mt-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${day.completed ? "bg-orange-500 text-white" : "bg-white text-slate-400"}`}>{day.completed ? "✓" : "·"}</span></div>;
+        })}</div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-slate-600">{data.streak.completedToday ? copy("Review hari ini sudah tercatat.", "Today's review is saved.") : copy("Selesaikan satu review hari ini untuk lanjut.", "Finish one review today to continue.")}</p><button type="button" disabled={dailySaving || data.streak.completedToday || error || loading} onClick={() => void completeDailyReview()} className="min-h-11 rounded-lg bg-orange-600 px-3 text-xs font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60">{dailySaving ? copy("Menyimpan…", "Saving…") : data.streak.completedToday ? copy("Review hari ini selesai", "Today's review is complete") : copy("Sudah review hari ini", "I've reviewed today")}</button></div>
+      </section>
       <div className="mt-5 flex flex-wrap justify-between gap-2 text-xs text-slate-600"><p className="font-semibold">{copy("Minggu ini", "This week")} · {data.completed.length}/3 {copy("selesai", "complete")}</p><p>{copy("Mulai", "From")} {new Intl.DateTimeFormat(en ? "en-GB" : "id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(`${data.week}T00:00:00+07:00`))} · WIB</p></div>
       <ul className="mt-2 grid divide-y divide-slate-100 md:grid-cols-3 md:gap-5 md:divide-y-0">{JOURNEY_MISSIONS.map((mission) => {
         const done = data.completed.includes(mission.id);

@@ -8,6 +8,19 @@ export const JOURNEY_MISSIONS = [
 
 export type JourneyMission = typeof JOURNEY_MISSIONS[number]["id"];
 
+const streakDaySchema = z.object({
+  date: z.iso.date(),
+  completed: z.boolean(),
+});
+
+const streakSchema = z.object({
+  current: z.number().int().nonnegative(),
+  longest: z.number().int().nonnegative(),
+  completedToday: z.boolean(),
+  days: z.array(streakDaySchema).length(7)
+    .refine((days) => new Set(days.map((day) => day.date)).size === days.length),
+});
+
 const journeySchema = z.object({
   week: z.iso.date(),
   totalXp: z.number().int().nonnegative(),
@@ -15,8 +28,10 @@ const journeySchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length),
   completeWeeks: z.number().int().nonnegative(),
   goalAchieved: z.boolean(),
+  streak: streakSchema,
 });
 
 export type JourneyState = z.infer<typeof journeySchema>;
+export type JourneyStreakDay = z.infer<typeof streakDaySchema>;
 export const parseJourney = (value: unknown): JourneyState => journeySchema.parse(value);
 export const journeyLevel = (totalXp: number) => ({ level: Math.floor(totalXp / 300) + 1, progress: totalXp % 300 });

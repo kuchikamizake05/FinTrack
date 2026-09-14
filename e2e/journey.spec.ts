@@ -1,9 +1,16 @@
 import { expect, mockSupabase, test } from "./fixtures";
 import { JOURNEY_MISSIONS, type JourneyState } from "../src/lib/journey";
 
+const streak = (current = 0, completedToday = false) => ({
+  current,
+  longest: Math.max(current, 7),
+  completedToday,
+  days: ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"].map((date, index) => ({ date, completed: index >= 4 && index < 6 })),
+});
+
 test("Journey confirms once, persists, and unlocks milestones @smoke", async ({ page }, testInfo) => {
   await mockSupabase(page, true);
-  const state: JourneyState = { week: "2026-09-07", totalXp: 270, completed: [], completeWeeks: 2, goalAchieved: false };
+  const state: JourneyState = { week: "2026-09-07", totalXp: 270, completed: [], completeWeeks: 2, goalAchieved: false, streak: streak(3) };
   let writes = 0;
   await page.route("**/rest/v1/rpc/get_financial_journey", (route) => route.fulfill({ json: state }));
   await page.route("**/rest/v1/rpc/complete_financial_journey", (route) => {
@@ -16,6 +23,10 @@ test("Journey confirms once, persists, and unlocks milestones @smoke", async ({ 
     }
     return route.fulfill({ json: state });
   });
+  await page.route("**/rest/v1/rpc/complete_financial_journey_daily_review", (route) => {
+    state.streak = { ...streak(4, true), days: state.streak.days.map((day, index) => ({ ...day, completed: index >= 3 })) };
+    return route.fulfill({ json: state });
+  });
   await page.goto("/dashboard");
   const summary = page.getByRole("link", { name: "Lihat perjalanan Financial Journey" }).filter({ visible: true });
   await expect(summary.getByText("270 / 300 XP")).toBeVisible();
@@ -26,6 +37,9 @@ test("Journey confirms once, persists, and unlocks milestones @smoke", async ({ 
   await expect(page).toHaveURL(/\/journey$/);
   const card = page.getByRole("region", { name: "Financial Journey" }).filter({ visible: true });
   await expect(card.getByText("270 / 300 XP")).toBeVisible();
+  await expect(card.getByText("3 hari berturut-turut")).toBeVisible();
+  await card.getByRole("button", { name: "Sudah review hari ini" }).click();
+  await expect(card.getByText("4 hari berturut-turut")).toBeVisible();
   await card.getByRole("button", { name: "Selesaikan misi : Review transaksi", exact: true }).click();
   expect(writes).toBe(0);
   await card.getByRole("button", { name: "Batal", exact: true }).click();
@@ -63,7 +77,7 @@ test("Journey never awards unsaved progress and recovers from an unavailable ser
   });
   await mockSupabase(page, true);
   let unavailable = true;
-  const state = { week: "2026-09-07", totalXp: 0, completed: [], completeWeeks: 0, goalAchieved: false };
+  const state = { week: "2026-09-07", totalXp: 0, completed: [], completeWeeks: 0, goalAchieved: false, streak: streak() };
   await page.route("**/rest/v1/rpc/get_financial_journey", (route) => route.fulfill({ json: unavailable ? {} : state }));
   await page.route("**/rest/v1/rpc/complete_financial_journey", (route) => route.fulfill({ json: {} }));
   await page.goto("/journey");
@@ -71,13 +85,13 @@ test("Journey never awards unsaved progress and recovers from an unavailable ser
   await expect(card.getByRole("alert")).toBeVisible();
   await expect(card.getByRole("progressbar")).toHaveCount(0);
   unavailable = false;
-  await card.getByRole("button", { name: "Coba lagi" }).click();
+  await page.reload();
   await expect(card.getByText("0 / 300 XP")).toBeVisible();
   await card.getByRole("button", { name: "Selesaikan misi : Review transaksi", exact: true }).click();
   await card.getByRole("button", { name: "Sudah aku review", exact: true }).click();
   await expect(card.getByRole("alert")).toBeVisible();
   await expect(card.getByText("0 / 300 XP")).toBeVisible();
   await expect(card.getByText("Minggu ini · 0/3 selesai")).toBeVisible();
-  await card.getByRole("button", { name: "Coba lagi" }).click();
+  await page.reload();
   await expect(card.getByRole("alert")).toHaveCount(0);
 });
