@@ -56,6 +56,11 @@ test("Journey confirms once, persists, and unlocks milestones @smoke", async ({ 
 });
 
 test("Journey never awards unsaved progress and recovers from an unavailable service", async ({ page }) => {
+  // Isolate manual retries: focus-triggered refresh can otherwise recover between
+  // switching the mock online and clicking Retry, removing the button mid-test.
+  await page.addInitScript(() => {
+    window.addEventListener("focus", (event) => event.stopImmediatePropagation(), true);
+  });
   await mockSupabase(page, true);
   let unavailable = true;
   const state = { week: "2026-09-07", totalXp: 0, completed: [], completeWeeks: 0, goalAchieved: false };

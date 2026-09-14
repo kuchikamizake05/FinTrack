@@ -102,6 +102,13 @@ async function mockOnboardingSupabase(page: Page, initial: Partial<MockState> = 
       return;
     }
 
+    if (url.pathname === "/rest/v1/rpc/get_financial_journey") {
+      await route.fulfill({ status: 200, json: {
+        week: "2026-09-07", totalXp: 0, completed: [], completeWeeks: 0, goalAchieved: false,
+      } });
+      return;
+    }
+
     if (url.pathname === "/rest/v1/financial_goals") {
       await fulfillRows(route, []);
       return;
