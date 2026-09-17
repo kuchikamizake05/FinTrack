@@ -28,14 +28,18 @@ export default function BrandLockup({
         className,
       )}
     >
-      <span className={cn(
-        "grid shrink-0 place-items-center overflow-hidden rounded-full transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-[1.04]",
-        compact ? "h-[38px] w-[38px]" : "h-[42px] w-[42px] max-[520px]:h-[38px] max-[520px]:w-[38px]",
-      )}>
+      <span
+        className={cn(
+          "grid shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--brand-ink)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-[1.04]",
+          compact
+            ? "h-[38px] w-[38px]"
+            : "h-[42px] w-[42px] max-[520px]:h-[38px] max-[520px]:w-[38px]",
+        )}
+      >
         <BrandLogo
           size={logoSize}
           priority={priority}
-          className="rounded-full object-cover"
+          className="brightness-0 invert"
         />
       </span>
       <span
