@@ -197,38 +197,19 @@ export default function LoginPage() {
         : "Masuk menggunakan email dan kata sandi atau akun Google.";
 
   return (
-    <div className={`${styles.page} min-h-[100svh] overflow-x-hidden bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#e9f8ee_0%,#dff5e7_55%,#c8efd5_100%)] bg-[length:24px_24px,auto] text-[var(--brand-ink)]`}>
-      <header className="mx-auto flex h-[68px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between border-b border-[color:rgba(18,53,36,0.14)] sm:h-[72px] sm:w-[calc(100%-3rem)]">
+    <div className={`${styles.page} fixed inset-0 min-h-[100svh] w-dvw overflow-x-hidden overflow-y-auto bg-[url('/auth/fintrack-login-hero.png')] bg-[position:center_top] bg-cover bg-no-repeat text-[var(--brand-ink)] sm:bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#eefaf2_0%,#ddf5e6_55%,#c6edd3_100%)] sm:bg-[length:24px_24px,auto]`}>
+      <header className="relative z-10 mx-auto flex h-[76px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between border-b border-white/35 sm:h-[72px] sm:w-[calc(100%-3rem)] sm:border-[color:rgba(18,53,36,0.14)]">
         <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
       </header>
 
-      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex min-h-[calc(100svh-68px)] w-full items-center justify-center px-4 py-3 sm:min-h-[calc(100svh-72px)] sm:px-6`}>
-        <section className={`${styles.card} mx-auto w-full max-w-[400px] rounded-[24px] border border-[color:rgba(18,53,36,0.14)] bg-white/95 p-4 shadow-[0_24px_70px_rgba(18,53,36,0.12)] backdrop-blur-sm sm:p-5`} aria-labelledby="login-title">
-          <div className={`${styles.cardHeader} mb-3`}>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
-            <h2 id="login-title" className={`${styles.cardTitle} mt-2.5 text-2xl font-black tracking-[-0.045em] text-[var(--brand-ink)] sm:text-[26px]`}>{title}</h2>
-            <p className="mt-1.5 text-[13px] leading-5 text-slate-500">{t(description)}</p>
+      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex min-h-[calc(100svh-76px)] w-full items-start justify-center px-0 pb-0 pt-[184px] sm:min-h-[calc(100svh-72px)] sm:px-6 sm:pb-8 sm:pt-14 lg:items-center lg:py-8`}>
+        <section className={`${styles.card} mx-auto w-full max-w-[420px] rounded-t-[32px] bg-white px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-7 shadow-[0_-16px_42px_rgba(18,53,36,0.18)] sm:rounded-[28px] sm:border sm:border-white/85 sm:bg-white/[0.97] sm:p-6 sm:shadow-[0_24px_65px_rgba(18,53,36,0.14)] sm:ring-1 sm:ring-emerald-950/[0.06] sm:backdrop-blur-sm`} aria-labelledby="login-title">
+          <div className={`${styles.cardHeader} mb-6 text-center sm:mb-5 sm:text-left`}>
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
+            <h2 id="login-title" className={`${styles.cardTitle} mt-4 text-[30px] font-black leading-[1.06] tracking-[-0.055em] text-[var(--brand-ink)] sm:mt-3 sm:text-[30px]`}>{title}</h2>
+            <p className="mt-2.5 text-[14px] leading-5 text-slate-500 sm:mt-2 sm:text-[13px]">{t(description)}</p>
           </div>
-
-          {!isUpdate && mode !== "reset" && (
-            <div className={`${styles.modeTabs} mb-2 grid grid-cols-2 rounded-xl bg-slate-100 p-1`} role="group" aria-label="Pilih mode autentikasi">
-              {(["login", "signup"] as const).map((item) => (
-                <button key={item} type="button" aria-pressed={mode === item} onClick={() => changeMode(item)} disabled={busy} className={`min-h-9 rounded-lg px-3 text-sm font-bold transition ${mode === item ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500"}`}>
-                  {t(item === "login" ? "Masuk" : "Daftar")}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {!isUpdate && mode !== "reset" && (
-            <>
-              <button type="button" onClick={handleGoogle} disabled={busy || !isSupabaseConfigured} className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-[var(--brand-mint)] disabled:cursor-not-allowed disabled:opacity-50">
-                <GoogleMark /> {t(loading === "oauth" ? "Menghubungkan..." : "Masuk dengan Google")}
-              </button>
-              <div className={`${styles.divider} my-3 flex items-center gap-3 text-[11px] font-bold text-slate-400`}><span className="h-px flex-1 bg-slate-100" /><span>{t("atau dengan email")}</span><span className="h-px flex-1 bg-slate-100" /></div>
-            </>
-          )}
 
           <form onSubmit={isUpdate ? handlePasswordUpdate : handleCredentials} className="space-y-2">
             {!isSupabaseConfigured && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">Konfigurasi Supabase belum valid. Lengkapi <code className="font-bold">.env.local</code> sebelum masuk.</p>}
@@ -237,11 +218,29 @@ export default function LoginPage() {
             {mode !== "reset" && <PasswordField id="password" label="Kata sandi" value={password} onChange={setPassword} disabled={busy} autoComplete={mode === "login" ? "current-password" : "new-password"} onForgotPassword={mode === "login" ? () => changeMode("reset") : undefined} />}
             {(mode === "signup" || isUpdate) && <PasswordField id="password-confirmation" label="Konfirmasi kata sandi" value={confirmation} onChange={setConfirmation} disabled={busy} autoComplete="new-password" />}
 
-            <button type="submit" disabled={busy || !isSupabaseConfigured || (!isUpdate && !email)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-black text-white shadow-[0_8px_20px_rgba(21,128,61,0.18)] transition hover:bg-[var(--brand-ink)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+            <button type="submit" disabled={busy || !isSupabaseConfigured || (!isUpdate && !email)} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-ink)] px-4 py-2.5 text-sm font-black text-white shadow-[0_10px_22px_rgba(18,53,36,0.18)] transition hover:bg-[var(--brand-primary)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
               {busy && loading !== "oauth" ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : isUpdate ? <KeyRound className="h-4.5 w-4.5" /> : null}
               {loading && loading !== "oauth" ? t("Memproses...") : isUpdate ? t("Simpan kata sandi baru") : mode === "reset" ? t("Kirim tautan pemulihan") : mode === "signup" ? t("Buat akun") : <><span>{t("Masuk ke FinTrack")}</span><ArrowRight className="h-4.5 w-4.5" /></>}
             </button>
           </form>
+
+          {!isUpdate && mode !== "reset" && (
+            <>
+              <div className={`${styles.divider} my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400`}><span className="h-px flex-1 bg-slate-100" /><span>{t("atau lanjut dengan")}</span><span className="h-px flex-1 bg-slate-100" /></div>
+              <button type="button" onClick={handleGoogle} disabled={busy || !isSupabaseConfigured} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-emerald-200 hover:bg-[var(--brand-mint)] disabled:cursor-not-allowed disabled:opacity-50">
+                <GoogleMark /> {t(loading === "oauth" ? "Menghubungkan..." : mode === "signup" ? "Daftar dengan Google" : "Masuk dengan Google")}
+              </button>
+            </>
+          )}
+
+          {!isUpdate && mode !== "reset" && (
+            <p className="mt-6 text-center text-xs text-slate-500">
+              {t(mode === "signup" ? "Sudah punya akun?" : "Belum punya akun?")} {" "}
+              <button type="button" onClick={() => changeMode(mode === "signup" ? "login" : "signup")} disabled={busy} className="font-extrabold text-emerald-700 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+                {t(mode === "signup" ? "Masuk" : "Daftar")}
+              </button>
+            </p>
+          )}
 
           {(mode === "reset" || isUpdate) && <button type="button" onClick={() => changeMode("login")} disabled={busy} className="mt-3 min-h-10 w-full text-sm font-bold text-slate-500 hover:text-emerald-700">{t("Kembali ke halaman masuk")}</button>}
 
@@ -249,14 +248,14 @@ export default function LoginPage() {
             {message && <div role={message.type === "error" ? "alert" : "status"} className={`mt-5 flex items-start gap-3 rounded-xl border p-3.5 text-sm leading-6 ${message.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{message.type === "success" ? <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0" /> : <Mail className="mt-0.5 h-4.5 w-4.5 shrink-0" />}<p>{t(message.text)}</p></div>}
           </div>
 
-          <div className={`${styles.privacyNote} mt-4 flex items-start gap-2.5 border-t border-slate-100 pt-3.5`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
+          <div className={`${styles.privacyNote} mt-5 flex items-start gap-2.5 border-t border-slate-100 pt-4`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
         </section>
       </main>
     </div>
   );
 }
 
-const inputStyles = "min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+const inputStyles = "min-h-12 w-full rounded-xl border border-slate-100 bg-slate-50 py-2.5 pl-10 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
 
 function EmailField({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
   const { t } = useLanguage();

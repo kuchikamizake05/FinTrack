@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { ApplicationLoading } from "@/components/AppBoundary";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/Button";
 import { isProtectedRoute } from "@/lib/auth";
 import { reportHandledError } from "@/lib/errors";
@@ -160,13 +161,14 @@ export default function OnboardingBoundary({ children }: { children: React.React
 }
 
 function OnboardingGateError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useLanguage();
   return (
     <main id="main-content" tabIndex={-1} className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0%,#f7faf7_55%,#f8faf9_100%)] px-4 py-10 outline-none">
       <section className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.1)] sm:p-8">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><AlertCircle className="h-6 w-6" /></span>
-        <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">Penyiapan belum bisa diperiksa</h1>
+        <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">{t("Penyiapan belum bisa diperiksa")}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
-        <Button className="mt-5 w-full" onClick={onRetry}><RefreshCw className="h-4 w-4" /> Coba lagi</Button>
+        <Button className="mt-5 w-full" onClick={onRetry}><RefreshCw className="h-4 w-4" /> {t("Coba lagi")}</Button>
       </section>
     </main>
   );

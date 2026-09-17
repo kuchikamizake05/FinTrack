@@ -14,6 +14,7 @@ import {
   PiggyBank,
   ReceiptText,
   ShieldCheck,
+  SkipForward,
   WalletCards,
 } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingBoundary";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/onboarding";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { cn } from "@/lib/utils";
+import styles from "./onboarding.module.css";
 
 const intentOptions = [
   { value: "cash-flow" as const, label: "Rapikan arus kas", description: "Mulai melihat pemasukan dan pengeluaran dengan lebih jernih.", icon: CircleDollarSign },
@@ -311,8 +313,8 @@ export default function OnboardingPage() {
   }, [savedAccount, savedTransaction]);
 
   return (
-    <div className="min-h-[100svh] bg-[linear-gradient(180deg,#e9f8ee_0%,#f7faf7_48%,#f8faf9_100%)] text-slate-900">
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10 lg:py-7">
+    <div className={styles.page}>
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-3 sm:px-8 lg:px-10 lg:py-5">
         <Link href="/" className="inline-flex min-h-11 items-center gap-3 rounded-xl pr-3 font-bold tracking-tight text-slate-900">
           <BrandLogo size={40} priority />
           <span className="text-xl">FinTrack</span>
@@ -320,13 +322,13 @@ export default function OnboardingPage() {
         <div className="flex items-center gap-2">
           <LanguageSwitcher compact />
           {step !== "welcome" && step !== "summary" && (
-            <button onClick={deferSetup} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-slate-500 hover:bg-white hover:text-emerald-800">{t("Lanjutkan nanti")}</button>
+            <button type="button" onClick={deferSetup} aria-label={t("Lewati penyiapan")} title={t("Lewati penyiapan")} className="grid size-11 shrink-0 place-items-center rounded-xl text-red-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"><SkipForward className="size-5" aria-hidden="true" /></button>
           )}
         </div>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="mx-auto grid w-full max-w-7xl gap-8 px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] outline-none sm:px-8 lg:min-h-[calc(100svh-96px)] lg:grid-cols-[340px_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-10 lg:pb-16">
-        <aside className="lg:self-stretch lg:border-r lg:border-emerald-100 lg:py-14 lg:pr-12">
+      <main id="main-content" tabIndex={-1} className={`${styles.main} outline-none`}>
+        <aside className={styles.aside}>
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700"><ShieldCheck className="h-4 w-4" /> {t("Penyiapan privat")}</p>
           <h2 className="mt-4 text-2xl font-bold tracking-[-0.035em] text-slate-900 lg:text-3xl">{t("Mulai dari angka yang paling berguna.")}</h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">{t("Satu akun dan satu transaksi sudah cukup untuk membuka ringkasan pertamamu.")}</p>
@@ -341,7 +343,11 @@ export default function OnboardingPage() {
           </ol>
         </aside>
 
-        <section className="mx-auto w-full max-w-2xl rounded-3xl border border-emerald-100 bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-8 lg:p-10">
+        <section className={styles.panel}>
+          <div className={styles.progress} role="progressbar" aria-label={t("Kemajuan penyiapan")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressInfo.percentage} aria-valuetext={t("Langkah {current} dari {total}", { current: progressInfo.current, total: progressInfo.total })}>
+            {["welcome", "account", "transaction", "summary"].map((item, index, steps) => <span key={item} className={cn(styles.dot, item === step ? styles.current : index < steps.indexOf(step) && styles.complete)} />)}
+          </div>
+          <OnboardingArt step={step} />
           {step === "welcome" && (
             <WelcomeStep
               headingRef={headingRef}
@@ -389,6 +395,11 @@ export default function OnboardingPage() {
   );
 }
 
+function OnboardingArt({ step }: { step: string }) {
+  const Icon = step === "summary" ? CheckCircle2 : step === "transaction" ? ReceiptText : step === "account" ? Landmark : WalletCards;
+  return <div className={styles.art} aria-hidden="true"><div className={styles.wallet}><Icon /></div><div className={styles.receipt}><span /><span /><span /><span /></div><div className={styles.coin}><PiggyBank className="size-7" /></div></div>;
+}
+
 function WelcomeStep({ headingRef, selected, error, onSelect, onContinue }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   selected: OnboardingIntent | null;
@@ -396,22 +407,23 @@ function WelcomeStep({ headingRef, selected, error, onSelect, onContinue }: {
   onSelect: (intent: OnboardingIntent) => void;
   onContinue: () => void;
 }) {
+  const { t } = useLanguage();
   return <>
-    <p className="text-sm font-bold text-emerald-700">Selamat datang</p>
-    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">Apa yang ingin kamu rapikan dulu?</h1>
-    <p className="mt-3 text-sm leading-6 text-slate-500">Pilihan ini hanya membantu FinTrack memberi konteks yang lebih pas. Kamu tetap mendapat semua fitur.</p>
-    <div className="mt-7 grid gap-3">
+    <p className="text-sm font-bold text-emerald-700">{t("Selamat datang")}</p>
+    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">{t("Apa yang ingin kamu rapikan dulu?")}</h1>
+    <p className="mt-3 text-sm leading-6 text-slate-500">{t("Pilihan ini hanya membantu FinTrack memberi konteks yang lebih pas. Kamu tetap mendapat semua fitur.")}</p>
+    <div className="mt-4 grid gap-2">
       {intentOptions.map(({ value, label, description, icon: Icon }) => {
         const active = selected === value;
         return <button key={value} type="button" aria-pressed={active} onClick={() => onSelect(value)} className={cn("grid min-h-20 grid-cols-[44px_minmax(0,1fr)_24px] items-center gap-3 rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100", active ? "border-emerald-500 bg-emerald-50/70" : "border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/30")}>
           <span className={cn("flex h-11 w-11 items-center justify-center rounded-xl", active ? "bg-emerald-700 text-white" : "bg-slate-50 text-slate-500")}><Icon className="h-5 w-5" /></span>
-          <span><span className="block text-sm font-bold text-slate-800">{label}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{description}</span></span>
+          <span><span className="block text-sm font-bold text-slate-800">{t(label)}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{t(description)}</span></span>
           <Check className={cn("h-5 w-5", active ? "text-emerald-700" : "text-slate-200")} />
         </button>;
       })}
     </div>
     <FormMessage message={error} />
-    <Button className="mt-7 w-full sm:w-auto sm:min-w-44" onClick={onContinue}>Lanjutkan <ArrowRight className="h-4 w-4" /></Button>
+    <Button className="mt-4 w-full rounded-full" onClick={onContinue}>{t("Lanjutkan")} <ArrowRight className="h-4 w-4" /></Button>
   </>;
 }
 
@@ -425,11 +437,12 @@ function AccountStep({ headingRef, form, setForm, errors, error, saving, onBack,
   onBack: () => void;
   onSubmit: (event: FormEvent) => void;
 }) {
+  const { t } = useLanguage();
   return <form onSubmit={onSubmit} noValidate>
-    <p className="text-sm font-bold text-emerald-700">Akun pertama</p>
-    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">Di mana uangmu paling sering bergerak?</h1>
-    <p className="mt-3 text-sm leading-6 text-slate-500">Mulai dari rekening atau e-wallet utama. Akun lain bisa ditambahkan kapan saja.</p>
-    <div className="mt-7 grid gap-5 sm:grid-cols-2">
+    <p className="text-sm font-bold text-emerald-700">{t("Akun pertama")}</p>
+    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">{t("Di mana uangmu paling sering bergerak?")}</h1>
+    <p className="mt-3 text-sm leading-6 text-slate-500">{t("Mulai dari rekening atau e-wallet utama. Akun lain bisa ditambahkan kapan saja.")}</p>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="Nama akun" htmlFor="onboarding-account-name" error={errors.name}><input id="onboarding-account-name" autoFocus value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: BCA Utama" className={fieldControlStyles} /></Field>
       <Field label="Institusi (opsional)" htmlFor="onboarding-institution"><input id="onboarding-institution" value={form.institution} onChange={(event) => setForm((current) => ({ ...current, institution: event.target.value }))} placeholder="Nama bank atau penyedia" className={fieldControlStyles} /></Field>
       <Field label="Jenis akun" htmlFor="onboarding-account-kind"><select id="onboarding-account-kind" value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinancialAccountKind }))} className={fieldControlStyles}>{accountKinds.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
@@ -438,7 +451,7 @@ function AccountStep({ headingRef, form, setForm, errors, error, saving, onBack,
       {form.currency !== "IDR" && <Field label="Nilai setara IDR (opsional)" htmlFor="onboarding-reporting-balance" error={errors.reportingBalanceIdr}><input id="onboarding-reporting-balance" type="number" inputMode="decimal" value={form.reportingBalanceIdr} onChange={(event) => setForm((current) => ({ ...current, reportingBalanceIdr: event.target.value }))} className={fieldControlStyles} /></Field>}
     </div>
     <FormMessage message={error} />
-    <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between"><Button variant="ghost" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Kembali</Button><Button type="submit" disabled={saving}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan akun...</> : <>Simpan akun <ArrowRight className="h-4 w-4" /></>}</Button></div>
+    <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between"><Button variant="ghost" onClick={onBack}><ArrowLeft className="h-4 w-4" /> {t("Kembali")}</Button><Button type="submit" disabled={saving}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("Menyimpan akun...")}</> : <>{t("Simpan akun")} <ArrowRight className="h-4 w-4" /></>}</Button></div>
   </form>;
 }
 
@@ -452,14 +465,15 @@ function TransactionStep({ headingRef, accountName, form, setForm, errors, error
   saving: boolean;
   onSubmit: (event: FormEvent) => void;
 }) {
+  const { t } = useLanguage();
   return <form onSubmit={onSubmit} noValidate>
-    <p className="text-sm font-bold text-emerald-700">Transaksi pertama</p>
-    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">Catat satu aktivitas nyata.</h1>
-    <p className="mt-3 text-sm leading-6 text-slate-500">Transaksi ini langsung masuk ke <strong className="font-semibold text-slate-700">{accountName}</strong> dan membentuk ringkasan pertamamu.</p>
+    <p className="text-sm font-bold text-emerald-700">{t("Transaksi pertama")}</p>
+    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">{t("Catat satu aktivitas nyata.")}</h1>
+    <p className="mt-3 text-sm leading-6 text-slate-500">{t("Transaksi ini langsung masuk ke {account} dan membentuk ringkasan pertamamu.", { account: accountName })}</p>
     <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1" aria-label="Jenis transaksi">
       {(["expense", "income"] as const).map((type) => <button key={type} type="button" aria-pressed={form.type === type} onClick={() => setForm((current) => ({ ...current, type, category: type === "income" ? "Pemasukan lainnya" : "Lainnya" }))} className={cn("min-h-11 rounded-lg px-3 text-sm font-bold transition", form.type === type ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500")}>{type === "expense" ? "Pengeluaran" : "Pemasukan"}</button>)}
     </div>
-    <div className="mt-6 grid gap-5 sm:grid-cols-2">
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="Nominal" htmlFor="onboarding-amount" error={errors.amount}><input id="onboarding-amount" autoFocus type="number" inputMode="decimal" min="0" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} placeholder="0" className={fieldControlStyles} /></Field>
       <Field label={form.type === "income" ? "Sumber pemasukan" : "Merchant atau tujuan"} htmlFor="onboarding-merchant" error={errors.merchant}><input id="onboarding-merchant" value={form.merchant} onChange={(event) => setForm((current) => ({ ...current, merchant: event.target.value }))} placeholder={form.type === "income" ? "Contoh: Gaji" : "Contoh: Supermarket"} className={fieldControlStyles} /></Field>
       <Field label="Tanggal" htmlFor="onboarding-date" error={errors.date}><input id="onboarding-date" type="date" value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} className={fieldControlStyles} /></Field>
@@ -467,7 +481,7 @@ function TransactionStep({ headingRef, accountName, form, setForm, errors, error
       <Field className="sm:col-span-2" label="Catatan (opsional)" htmlFor="onboarding-note"><textarea id="onboarding-note" rows={3} value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} placeholder="Tambahkan konteks bila perlu" className={fieldControlStyles} /></Field>
     </div>
     <FormMessage message={error} />
-    <div className="mt-7 flex justify-end"><Button type="submit" disabled={saving}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan transaksi...</> : <>Simpan transaksi <ArrowRight className="h-4 w-4" /></>}</Button></div>
+    <div className="mt-7 flex justify-end"><Button type="submit" disabled={saving}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("Menyimpan transaksi...")}</> : <>{t("Simpan transaksi")} <ArrowRight className="h-4 w-4" /></>}</Button></div>
   </form>;
 }
 
@@ -477,18 +491,18 @@ function SummaryStep({ headingRef, summary, transaction, onFinish }: {
   transaction: SavedTransaction | null;
   onFinish: () => void;
 }) {
-  if (!summary || !transaction) return <div className="flex min-h-80 items-center justify-center" role="status"><Loader2 className="h-6 w-6 animate-spin text-emerald-700" /><span className="sr-only">Memuat ringkasan pertama</span></div>;
+  const { t } = useLanguage();
+  if (!summary || !transaction) return <div className="flex min-h-80 items-center justify-center" role="status"><Loader2 className="h-6 w-6 animate-spin text-emerald-700" /><span className="sr-only">{t("Memuat ringkasan pertama")}</span></div>;
   return <>
-    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" /></span>
-    <p className="mt-6 text-sm font-bold text-emerald-700">Ringkasan pertama siap</p>
-    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">Sekarang angkamu punya konteks.</h1>
-    <p className="mt-3 text-sm leading-6 text-slate-500">Akun dan transaksi pertamamu sudah tersimpan aman. Dashboard akan memakai data nyata ini.</p>
+    <p className="mt-6 text-sm font-bold text-emerald-700">{t("Ringkasan pertama siap")}</p>
+    <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-3xl font-bold tracking-[-0.04em] outline-none sm:text-4xl">{t("Sekarang angkamu punya konteks.")}</h1>
+    <p className="mt-3 text-sm leading-6 text-slate-500">{t("Akun dan transaksi pertamamu sudah tersimpan aman. Dashboard akan memakai data nyata ini.")}</p>
     <dl className="mt-8 divide-y divide-slate-100 border-y border-slate-100">
       <SummaryRow icon={Landmark} label="Akun" value={summary.accountName} />
       <SummaryRow icon={ReceiptText} label={transaction.type === "income" ? "Pemasukan" : "Pengeluaran"} value={`${transaction.type === "income" ? "+" : "−"}${formatMoney(Math.abs(summary.cashFlowImpact), summary.currency)}`} />
       <SummaryRow icon={WalletCards} label="Saldo saat ini" value={formatMoney(summary.currentBalance, summary.currency)} emphasized />
     </dl>
-    <Button className="mt-8 w-full sm:w-auto" onClick={onFinish}>Buka dashboard <ArrowRight className="h-4 w-4" /></Button>
+    <Button className="mt-8 w-full rounded-full" onClick={onFinish}>{t("Buka dashboard")} <ArrowRight className="h-4 w-4" /></Button>
   </>;
 }
 
