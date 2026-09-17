@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="public/brand/fintrack-logo.png" alt="FinTrack" width="280" />
+  <span style="display:inline-block;border-radius:9999px;background:#123524;padding:28px;line-height:0">
+    <img src="public/brand/fintrack-mark.png" alt="FinTrack" width="180" style="filter:brightness(0) invert(1)" />
+  </span>
 </p>
 
 <p align="center">
