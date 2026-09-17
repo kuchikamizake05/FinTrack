@@ -53,7 +53,7 @@ export default function BerandaPreview() {
             <div className="flex items-center gap-2.5 text-[var(--brand-ink)]"><span className="grid size-[38px] place-items-center rounded-full bg-[var(--brand-ink)]">
               {/* Same local brand asset used by BrandLogo; plain image also works in the standalone preview. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/fintrack-mark.png" width={28} height={28} alt="" className="object-contain brightness-0 invert" />
+              <img src="/brand/fintrack-logo-inverted.png" width={28} height={28} alt="" className="rounded-full object-cover" />
             </span><span className="text-xl font-black tracking-[-0.06em]">FinTrack</span></div>
             <button onClick={() => open("Profil")} aria-label="Buka profil" className="grid size-[42px] place-items-center rounded-full bg-[var(--brand-ink)] text-[var(--brand-lime)] shadow-[0_6px_0_rgba(18,53,36,0.10)]"><UserRound size={18} /></button>
           </header>

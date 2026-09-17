@@ -16,7 +16,7 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   return (
     <Image
-      src="/brand/fintrack-mark.png"
+      src="/brand/fintrack-logo-inverted.png"
       alt={alt}
       width={size}
       height={size}
