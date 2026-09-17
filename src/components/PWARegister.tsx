@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Download, RefreshCw, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useLanguage } from "@/components/LanguageProvider";
 import { reportHandledError } from "@/lib/errors";
 import {
   getInstallPromptState,
@@ -15,6 +16,7 @@ import {
 const installDismissedKey = "fintrack-install-dismissed-at";
 
 export default function PWARegister() {
+  const { t } = useLanguage();
   const online = useSyncExternalStore(
     subscribeToNetworkStatus,
     getNetworkSnapshot,
@@ -119,17 +121,17 @@ export default function PWARegister() {
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[90] mx-auto flex max-w-md flex-col gap-2 md:bottom-6" aria-live="polite" aria-atomic="true">
       {!online && (
-        <StatusCard icon={WifiOff} title="Kamu sedang offline" description="Data yang sudah terbuka tetap bisa dibaca. Perubahan baru menunggu koneksi kembali." />
+        <StatusCard icon={WifiOff} title={t("Kamu sedang offline")} description={t("Data yang sudah terbuka tetap bisa dibaca. Perubahan baru menunggu koneksi kembali.")} />
       )}
       {updateAvailable && (
-        <StatusCard icon={RefreshCw} title="Versi baru tersedia" description="Muat ulang untuk memakai pembaruan terbaru." action={<Button size="compact" onClick={applyUpdate}><RefreshCw className="h-3.5 w-3.5" /> Perbarui</Button>} />
+        <StatusCard icon={RefreshCw} title={t("Versi baru tersedia")} description={t("Muat ulang untuk memakai pembaruan terbaru.")} action={<Button size="compact" onClick={applyUpdate}><RefreshCw className="h-3.5 w-3.5" /> {t("Perbarui")}</Button>} />
       )}
       {showInstall && installPrompt && (
         <StatusCard
           icon={Download}
-          title="Pasang FinTrack"
-          description="Buka lebih cepat dari layar utama dan nikmati tampilan penuh seperti aplikasi."
-          action={<div className="flex gap-1"><Button variant="ghost" size="icon" className="h-9 w-9 min-h-9" onClick={dismissInstall} aria-label="Ingatkan nanti"><X className="h-4 w-4" /></Button><Button size="compact" onClick={() => void installApp()}><Download className="h-3.5 w-3.5" /> Pasang</Button></div>}
+          title={t("Pasang FinTrack")}
+          description={t("Buka lebih cepat dari layar utama dan nikmati tampilan penuh seperti aplikasi.")}
+          action={<div className="flex gap-1"><Button variant="ghost" size="icon" className="h-9 w-9 min-h-9" onClick={dismissInstall} aria-label={t("Ingatkan nanti")}><X className="h-4 w-4" /></Button><Button size="compact" onClick={() => void installApp()}><Download className="h-3.5 w-3.5" /> {t("Pasang")}</Button></div>}
         />
       )}
     </div>

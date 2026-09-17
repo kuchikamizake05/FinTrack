@@ -10,6 +10,7 @@ import { getAuthGateState, sanitizeNextPath } from "@/lib/auth";
 import { getNetworkSnapshot, getServerNetworkSnapshot, subscribeToNetworkStatus } from "@/lib/pwa";
 import { isSupabaseConfigured, supabase } from "@/infrastructure/supabase/browser-client";
 import PasskeyUnlockScreen from "@/components/PasskeyUnlockScreen";
+import { useLanguage } from "@/components/LanguageProvider";
 import { PASSKEY_STATE_CHANGE_EVENT, clearPasskeyDeviceState, readPasskeyDeviceState, writePasskeyDeviceState } from "@/lib/passkeys";
 
 export default function AppBoundary({ children }: { children: React.ReactNode }) {
@@ -114,6 +115,7 @@ export default function AppBoundary({ children }: { children: React.ReactNode })
 }
 
 export function ApplicationLoading() {
+  const { t } = useLanguage();
   return (
     <div className="min-h-[100svh] overflow-hidden bg-[linear-gradient(180deg,#e9f8ee_0%,#f7fbf8_21rem,#f8faf9_100%)]">
       <div aria-hidden="true" className="sticky top-0 z-40 h-[74px] border-b border-emerald-900/[0.08] bg-[rgba(233,248,238,0.94)] px-4 md:h-[76px] md:px-6">
@@ -127,7 +129,7 @@ export function ApplicationLoading() {
       </div>
 
       <main id="main-content" tabIndex={-1} role="status" aria-live="polite" aria-busy="true" className="mx-auto w-full max-w-7xl px-4 py-5 outline-none sm:px-6 sm:py-8 md:py-10">
-        <span className="sr-only">Memuat aplikasi</span>
+      <span className="sr-only">{t("Memuat aplikasi")}</span>
         <div aria-hidden="true" className="animate-pulse space-y-5 motion-reduce:animate-none sm:space-y-6">
           <div className="space-y-3">
             <div className="h-6 w-28 rounded-full bg-emerald-900/[0.08]" />
@@ -166,33 +168,35 @@ export function ApplicationLoading() {
 }
 
 export function ConfigurationRequired() {
+  const { t } = useLanguage();
   return (
     <main id="main-content" tabIndex={-1} className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0%,#f7faf7_55%,#f8faf9_100%)] px-4 py-10 outline-none">
       <section className="w-full max-w-lg rounded-3xl border border-emerald-100 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.1)] sm:p-8">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><Database className="h-6 w-6" /></span>
-        <p className="mt-5 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Environment setup</p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Supabase belum dikonfigurasi</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Tambahkan URL proyek dan anon key browser-safe ke <code className="font-bold text-slate-700">.env.local</code>. FinTrack menghentikan akses data sampai konfigurasi valid.</p>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">{t("Penyiapan lingkungan")}</p>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{t("Supabase belum dikonfigurasi")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{t("Tambahkan URL proyek dan anon key browser-safe ke .env.local. FinTrack menghentikan akses data sampai konfigurasi valid.")}</p>
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-700">
           <p>NEXT_PUBLIC_SUPABASE_URL=https://…</p>
           <p>NEXT_PUBLIC_SUPABASE_ANON_KEY=…</p>
         </div>
-        <Button className="mt-5 w-full" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /> Muat ulang konfigurasi</Button>
+        <Button className="mt-5 w-full" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /> {t("Muat ulang konfigurasi")}</Button>
       </section>
     </main>
   );
 }
 
 function OfflineRecovery() {
+  const { t } = useLanguage();
   return (
     <main id="main-content" tabIndex={-1} className="flex min-h-[100svh] items-center justify-center bg-[linear-gradient(180deg,#e9f8ee_0%,#f7faf7_55%,#f8faf9_100%)] px-4 py-10 outline-none">
       <section className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.1)] sm:p-8">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><CloudOff className="h-6 w-6" /></span>
-        <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">Sesi belum tersedia offline</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Sambungkan internet untuk memverifikasi sesi. Data privat tidak dibuka tanpa sesi lokal yang valid.</p>
+        <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900">{t("Sesi belum tersedia offline")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{t("Sambungkan internet untuk memverifikasi sesi. Data privat tidak dibuka tanpa sesi lokal yang valid.")}</p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <Button className="flex-1" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /> Coba lagi</Button>
-          <Link href="/offline" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"><AlertTriangle className="h-4 w-4" /> Bantuan offline</Link>
+          <Button className="flex-1" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /> {t("Coba lagi")}</Button>
+          <Link href="/offline" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"><AlertTriangle className="h-4 w-4" /> {t("Bantuan offline")}</Link>
         </div>
       </section>
     </main>

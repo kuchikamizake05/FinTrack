@@ -4,7 +4,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const surfaceStyles = cva(
-  "rounded-[var(--radius-surface)] border bg-[var(--surface)] sm:rounded-2xl",
+  "app-card",
   {
     variants: {
       variant: {

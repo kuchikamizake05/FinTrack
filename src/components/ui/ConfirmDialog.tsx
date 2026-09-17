@@ -4,6 +4,7 @@ import { useRef, type ReactNode } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { DialogFrame } from "@/components/ui/DialogFrame";
+import { useLanguage } from "@/components/LanguageProvider";
 import { cn } from "@/lib/utils";
 
 type ConfirmDialogProps = {
@@ -36,6 +37,7 @@ export function ConfirmDialog({
   contentClassName,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const { t } = useLanguage();
 
   return (
     <DialogFrame
@@ -62,7 +64,7 @@ export function ConfirmDialog({
           <Check className="h-4 w-4" /> {confirmLabel}
         </Button>
       </div>
-      {loading && <span className="sr-only">Memproses...</span>}
+      {loading && <span className="sr-only">{t("Memproses...")}</span>}
     </DialogFrame>
   );
 }

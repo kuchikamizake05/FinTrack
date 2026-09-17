@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BrainCircuit, CalendarClock, ChevronDown, FileClock, LogOut, Plus, Settings, Tags, User, WalletCards, X } from "lucide-react";
+import { BrainCircuit, CalendarClock, ChevronDown, FileClock, LayoutDashboard, LogOut, MoreHorizontal, Plus, Receipt, Settings, User, WalletCards, X } from "lucide-react";
 import { isNavigationActive, primaryNavigation } from "@/lib/navigation";
 import { reportHandledError } from "@/lib/errors";
 import { clearPasskeyDeviceState } from "@/lib/passkeys";
@@ -11,13 +11,13 @@ import { supabase } from "@/infrastructure/supabase/browser-client";
 import BrandLockup from "@/components/BrandLockup";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
+import { QuickTransactionDialog } from "@/components/QuickTransactionDialog";
 
 const profileItems = [
-  { name: "Akun & saldo", href: "/accounts", icon: WalletCards },
-  { name: "Kategori", href: "/categories", icon: Tags },
-  { name: "Smart Insights", href: "/insights", icon: BrainCircuit },
-  { name: "Rencana & kontrol", href: "/planning", icon: CalendarClock },
-  { name: "Laporan bulanan", href: "/reports", icon: FileClock },
+  { name: "Dompet & akun", href: "/accounts", icon: WalletCards },
+  { name: "Analisis keuangan", href: "/insights", icon: BrainCircuit },
+  { name: "Rencana keuangan", href: "/planning", icon: CalendarClock },
+  { name: "Ringkasan bulanan", href: "/reports", icon: FileClock },
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
 
@@ -33,6 +33,8 @@ export default function Navbar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin>(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [quickTransactionOpen, setQuickTransactionOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
@@ -180,106 +182,41 @@ export default function Navbar() {
         {profileOrigin === "mobile" && <ProfileMenu ref={profileMenuRef} onClose={() => closeProfile(true)} onLogout={handleLogout} mobile loggingOut={loggingOut} error={logoutError} />}
       </header>
 
-      <nav
-        aria-label={t("Navigasi utama")}
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:rgba(18,53,36,0.12)] bg-[color:rgba(244,251,246,0.96)] px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(18,53,36,0.08)] backdrop-blur-xl md:hidden"
-      >
+      <nav aria-label={t("Navigasi utama")} className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:rgba(18,53,36,0.12)] bg-[color:rgba(244,251,246,0.96)] px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(18,53,36,0.08)] backdrop-blur-xl md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 items-center">
-          {(() => {
-            const item0 = primaryNavigation[0];
-            const active0 = isActive(item0.href);
-            const Icon0 = item0.icon;
-            return (
-              <Link
-                key={item0.href}
-                href={item0.href}
-                prefetch={false}
-                aria-current={active0 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active0 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
-              >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active0 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
-                  <Icon0 className={`h-[18px] w-[18px] ${active0 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
-                </span>
-                <span className="truncate px-1">{t(item0.name)}</span>
-              </Link>
-            );
-          })()}
-
-          {(() => {
-            const item1 = primaryNavigation[1];
-            const active1 = isActive(item1.href);
-            const Icon1 = item1.icon;
-            return (
-              <Link
-                key={item1.href}
-                href={item1.href}
-                prefetch={false}
-                aria-current={active1 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active1 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
-              >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active1 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
-                  <Icon1 className={`h-[18px] w-[18px] ${active1 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
-                </span>
-                <span className="truncate px-1">{t(item1.name)}</span>
-              </Link>
-            );
-          })()}
-
-          <Link
-            href="/transactions?new=1"
-            prefetch={false}
-            aria-label={t("Buka form catat")}
-            className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"
-          >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-[transform,box-shadow,background-color] duration-100 group-hover:scale-105 group-hover:bg-[var(--brand-ink)] group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-[var(--brand-ink)] group-focus-visible:ring-offset-2">
-              <Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" />
-            </span>
-            <span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span>
-          </Link>
-
-          {(() => {
-            const item2 = primaryNavigation[2];
-            const active2 = isActive(item2.href);
-            const Icon2 = item2.icon;
-            return (
-              <Link
-                key={item2.href}
-                href={item2.href}
-                prefetch={false}
-                aria-current={active2 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active2 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
-              >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active2 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
-                  <Icon2 className={`h-[18px] w-[18px] ${active2 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
-                </span>
-                <span className="truncate px-1">{t(item2.name)}</span>
-              </Link>
-            );
-          })()}
-
-          {(() => {
-            const item3 = primaryNavigation[3];
-            const active3 = isActive(item3.href);
-            const Icon3 = item3.icon;
-            return (
-              <Link
-                key={item3.href}
-                href={item3.href}
-                prefetch={false}
-                aria-current={active3 ? "page" : undefined}
-                className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active3 ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}
-              >
-                <span className={`grid h-8 w-8 place-items-center rounded-full transition-colors duration-100 ${active3 ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : "bg-transparent"}`}>
-                  <Icon3 className={`h-[18px] w-[18px] ${active3 ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" />
-                </span>
-                <span className="truncate px-1">{t(item3.name)}</span>
-              </Link>
-            );
-          })()}
+          <MobileNavItem href="/dashboard" icon={LayoutDashboard} label={t("Beranda")} active={isActive("/dashboard")} />
+          <MobileNavItem href="/accounts" icon={WalletCards} label={t("Dompet")} active={isActive("/accounts")} />
+          <button type="button" onClick={() => setQuickTransactionOpen(true)} aria-label={t("Buka form catat")} className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"><span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-transform group-active:scale-95"><Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" /></span><span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span></button>
+          <MobileNavItem href="/transactions" icon={Receipt} label={t("Transaksi")} active={isActive("/transactions")} />
+          <button type="button" onClick={() => setMobileMoreOpen((open) => !open)} aria-expanded={mobileMoreOpen} aria-controls="mobile-more-menu" className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors active:scale-95 ${mobileMoreOpen ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)]"}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${mobileMoreOpen ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : ""}`}><MoreHorizontal className="h-[20px] w-[20px]" aria-hidden="true" /></span><span>{t("Lainnya")}</span></button>
         </div>
       </nav>
+      {mobileMoreOpen && <MobileMoreMenu onClose={() => setMobileMoreOpen(false)} />}
+      {quickTransactionOpen && <QuickTransactionDialog onClose={() => setQuickTransactionOpen(false)} />}
     </>
   );
+}
+
+function MobileNavItem({ href, icon: Icon, label, active }: { href: string; icon: typeof LayoutDashboard; label: string; active: boolean }) {
+  return (
+    <Link href={href} prefetch={false} aria-current={active ? "page" : undefined} className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors duration-100 active:scale-95 ${active ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)] hover:text-[var(--brand-ink)]"}`}>
+      <span className={`grid h-8 w-8 place-items-center rounded-full ${active ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : ""}`}><Icon className={`h-[18px] w-[18px] ${active ? "stroke-[2.5]" : "stroke-2"}`} aria-hidden="true" /></span>
+      <span className="truncate px-1">{label}</span>
+    </Link>
+  );
+}
+
+function MobileMoreMenu({ onClose }: { onClose: () => void }) {
+  const { t } = useLanguage();
+  const items = [
+    { name: "Budget", href: "/planning", icon: CalendarClock },
+    { name: "Goals", href: "/goals", icon: CalendarClock },
+    { name: "Portofolio", href: "/investments", icon: BrainCircuit },
+    { name: "Analisis", href: "/insights", icon: BrainCircuit },
+    { name: "Laporan bulanan", href: "/reports", icon: FileClock },
+    { name: "Pengaturan", href: "/settings", icon: Settings },
+  ];
+  return <div id="mobile-more-menu" role="dialog" aria-label={t("Menu lainnya")} className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 mx-auto w-full max-w-md px-4 md:hidden"><button type="button" aria-label={t("Tutup menu lainnya")} onClick={onClose} className="fixed inset-0 -z-10 bg-[rgba(18,53,36,0.12)]" /><div className="rounded-2xl border border-[color:rgba(18,53,36,0.14)] bg-white p-3 shadow-[var(--shadow-elevated)]"><div className="flex items-center justify-between px-2 py-1"><h2 className="text-sm font-extrabold text-[var(--brand-ink)]">{t("Lainnya")}</h2><button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50"><X className="h-4 w-4" /></button></div><div className="mt-2 grid grid-cols-2 gap-1">{items.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={onClose} className="flex min-h-12 items-center gap-2.5 rounded-xl px-3 text-xs font-bold text-[color:rgba(18,53,36,0.75)] hover:bg-[var(--brand-mint)]"><Icon className="h-4 w-4 text-[var(--brand-primary)]" />{t(item.name)}</Link>; })}</div></div></div>;
 }
 
 type ProfileMenuProps = {
@@ -301,7 +238,7 @@ const ProfileMenu = ({ onClose, onLogout, mobile = false, loggingOut, error, ref
       className={`${mobile ? "fixed inset-x-4 top-[calc(4.75rem+env(safe-area-inset-top))] mx-auto" : "absolute right-0 top-14"} z-50 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-[color:rgba(18,53,36,0.14)] bg-white p-2.5 text-[var(--brand-ink)] shadow-[var(--shadow-elevated)]`}
     >
       <div className="flex items-center justify-between border-b border-[color:rgba(18,53,36,0.10)] px-2.5 py-2.5 text-[11px] font-black uppercase tracking-[0.13em] text-[color:rgba(18,53,36,0.58)]">
-        <span>{t("Profil & lainnya")}</span>
+        <span>{t("Menu akun")}</span>
         {mobile && (
           <button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-8 w-8 place-items-center rounded-full hover:bg-[var(--brand-mint)]">
             <X className="h-4 w-4" aria-hidden="true" />
@@ -335,7 +272,7 @@ const ProfileMenu = ({ onClose, onLogout, mobile = false, loggingOut, error, ref
         className="flex min-h-11 w-full items-center gap-3 rounded-xl border-t border-[color:rgba(18,53,36,0.08)] px-3 py-2.5 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-wait disabled:opacity-60"
       >
         <LogOut className="h-4 w-4" aria-hidden="true" />
-        {loggingOut ? t("Menutup sesi...") : t("Keluar")}
+        {loggingOut ? t("Menutup sesi...") : t("Keluar akun")}
       </button>
     </div>
   );

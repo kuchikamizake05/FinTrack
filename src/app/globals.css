@@ -60,7 +60,7 @@
   --shadow-elevated: 0 22px 55px rgba(18, 53, 36, 0.14);
   --shadow-action: 0 8px 20px rgba(21, 128, 61, 0.16);
   --radius-control: 0.75rem;
-  --radius-surface: 1.375rem;
+  --radius-surface: 1rem;
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -163,6 +163,16 @@ a {
 @media (min-width: 768px) {
   .app-page {
     padding-bottom: 2.5rem;
+  }
+}
+
+/* Shared card shell; utilities can customize semantic states and layout. */
+@layer components {
+  .app-card {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-surface);
+    background-color: var(--surface);
+    box-shadow: var(--shadow-surface);
   }
 }
 

@@ -12,7 +12,7 @@ export default function JourneySummary({ journey }: { journey: ReturnType<typeof
   const { data, error } = journey;
   const { level, progress } = journeyLevel(data?.totalXp ?? 0);
   return (
-    <Link href="/journey" aria-label={en ? "View Financial Journey" : "Lihat perjalanan Financial Journey"} className="my-5 block rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
+    <Link href="/journey" aria-label={en ? "View Financial Journey" : "Lihat perjalanan Financial Journey"} className="my-5 block app-card p-4 transition hover:border-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
       <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
         <Sprout aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700" />
         <h2>Financial Journey</h2>

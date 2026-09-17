@@ -31,7 +31,7 @@ export type InsightAction = {
   title: string;
   reason: string;
   impact: "high" | "medium" | "low";
-  href: "/transactions" | "/categories" | "/accounts" | "/dashboard";
+  href: "/transactions" | "/accounts" | "/dashboard";
 };
 
 type PeriodMetrics = {
@@ -247,7 +247,7 @@ function buildCandidateActions(snapshot: InsightSnapshot): InsightAction[] {
     title: `Tinjau kategori ${snapshot.categoryConcentration.category}`,
     reason: `Kategori ini menyumbang ${snapshot.categoryConcentration.share}% pengeluaran bulan berjalan.`,
     impact: "medium",
-    href: "/categories",
+    href: "/transactions",
   });
   if (snapshot.uncoveredForeignAccountCount > 0) actions.push({
     id: "complete-account-reporting",

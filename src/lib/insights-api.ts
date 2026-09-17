@@ -8,7 +8,7 @@ const actionIds = [
   "complete-account-reporting",
 ] as const;
 const impactValues = ["high", "medium", "low"] as const;
-const hrefValues = ["/transactions", "/categories", "/accounts", "/dashboard"] as const;
+const hrefValues = ["/transactions", "/accounts", "/dashboard"] as const;
 const finiteNumber = z.number().finite().min(-1_000_000_000_000_000).max(1_000_000_000_000_000);
 const nullableRate = z.number().finite().min(-100_000).max(100_000).nullable();
 

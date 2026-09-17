@@ -1,7 +1,6 @@
 const PUBLIC_ROUTES = new Set(["/", "/login", "/offline"]);
 const PROTECTED_ROUTE_PREFIXES = [
   "/accounts",
-  "/categories",
   "/dashboard",
   "/journey",
   "/insights",
