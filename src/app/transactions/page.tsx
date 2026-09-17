@@ -12,7 +12,6 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
@@ -47,6 +46,7 @@ import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
+import { useToast } from "@/components/ui/ToastProvider";
 import { reportHandledError } from "@/lib/errors";
 import { getIdrRates, type FxRateResult } from "@/lib/fx";
 import {
@@ -154,6 +154,7 @@ function MobileFilterSelect({ icon: Icon, label, value, onChange, className, chi
 
 export default function TransactionsPage() {
   const { language, t } = useLanguage();
+  const { showToast } = useToast();
   const dateLocale = language === "en" ? enUS : idLocale;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -494,6 +495,7 @@ export default function TransactionsPage() {
         await loadQueuedOperations(user.id);
         setModalOpen(false);
         setQueueMessage("Perubahan manual disimpan di perangkat dan menunggu sinkronisasi.");
+        showToast("Perubahan disimpan di perangkat dan akan disinkronkan.", "info");
         return;
       }
 
@@ -504,6 +506,7 @@ export default function TransactionsPage() {
 
       setModalOpen(false);
       await fetchTransactions();
+      showToast(isEditMode ? "Transaksi diperbarui." : "Transaksi disimpan.");
     } catch (error) {
       reportHandledError("Transaction save failed", error, "Transaksi belum berhasil disimpan.");
       setFormError("Transaksi belum berhasil disimpan. Coba lagi.");

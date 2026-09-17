@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
+import { useToast } from "@/components/ui/ToastProvider";
 import { supabase } from "@/infrastructure/supabase/browser-client";
 import { reportHandledError } from "@/lib/errors";
 import { formatLocalDate } from "@/lib/planning";
@@ -52,6 +53,7 @@ type Schedule = {
 
 export default function ReportsPage() {
   const { language, t } = useLanguage();
+  const { showToast } = useToast();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,7 @@ export default function ReportsPage() {
         : { user_id: user.id, is_active: false, enabled_from_period: schedule?.enabled_from_period ?? null };
       const { error } = await supabase.from("monthly_report_schedules").upsert(record, { onConflict: "user_id" });
       if (error) throw error;
-      setMessage(t(isActive ? "Laporan bulanan diaktifkan." : "Laporan bulanan dinonaktifkan. Arsip lama tetap tersedia."));
+      showToast(isActive ? "Laporan bulanan diaktifkan." : "Laporan bulanan dinonaktifkan. Arsip lama tetap tersedia.");
       await load();
     } catch (error) {
       reportHandledError("Monthly report schedule update failed", error, "Status laporan bulanan belum diperbarui.");
@@ -124,6 +126,7 @@ export default function ReportsPage() {
       const { data, error } = await supabase.storage.from("financial-reports").createSignedUrl(report.csv_path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("Report URL unavailable");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      showToast("CSV laporan dibuka di tab baru.");
     } catch (error) {
       reportHandledError("Monthly report signed URL failed", error, "CSV laporan belum dapat dibuka.");
       setMessage(t("CSV laporan belum dapat dibuka. Coba lagi."));

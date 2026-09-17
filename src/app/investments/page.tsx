@@ -16,6 +16,7 @@ import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
+import { useToast } from "@/components/ui/ToastProvider";
 import { buildPortfolioWeeklyEquitySeries } from "@/lib/analytics";
 import { reportHandledError } from "@/lib/errors";
 import { buildInvestmentPositions, filterStockExecutions, validateExecutionForm, validateSnapshotForm, type InvestmentExecution } from "@/lib/investments";
@@ -35,6 +36,7 @@ function createSnapshotForm(accountId = "") { return { accountId, equity: "", re
 
 export default function InvestmentsPage() {
   const { language, t } = useLanguage();
+  const { showToast } = useToast();
   const dateLocale = language === "en" ? enUS : idLocale;
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
@@ -131,7 +133,7 @@ export default function InvestmentsPage() {
         ? await supabase.from("stock_executions").update(record).eq("id", editingExecution.id).eq("user_id", user.id)
         : await supabase.from("stock_executions").insert({ user_id: user.id, ...record });
       if (error) throw error;
-      setExecutionOpen(false); setEditingExecution(null); await loadData();
+      setExecutionOpen(false); setEditingExecution(null); await loadData(); showToast(editingExecution ? "Eksekusi diperbarui." : "Eksekusi investasi disimpan.");
     } catch (error) { reportHandledError("Execution save failed", error, "Eksekusi belum berhasil disimpan."); setFormError(t("Eksekusi belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
   }
@@ -154,7 +156,7 @@ export default function InvestmentsPage() {
         ? await supabase.from("account_equity_snapshots").update(record).eq("id", editingSnapshot.id).eq("user_id", user.id)
         : await supabase.from("account_equity_snapshots").insert({ user_id: user.id, ...record });
       if (error) throw error;
-      setSnapshotOpen(false); setEditingSnapshot(null); await loadData();
+      setSnapshotOpen(false); setEditingSnapshot(null); await loadData(); showToast(editingSnapshot ? "Snapshot diperbarui." : "Snapshot equity disimpan.");
     } catch (error) { reportHandledError("Investment snapshot save failed", error, "Snapshot belum berhasil disimpan."); setFormError(t("Snapshot belum berhasil disimpan. Coba lagi.")); }
     finally { setSaving(false); }
   }
@@ -169,7 +171,7 @@ export default function InvestmentsPage() {
       const table = recordToDelete.kind === "execution" ? "stock_executions" : "account_equity_snapshots";
       const { error } = await supabase.from(table).delete().eq("id", recordToDelete.id).eq("user_id", user.id);
       if (error) throw error;
-      setRecordToDelete(null); await loadData();
+      setRecordToDelete(null); await loadData(); showToast("Catatan investasi dihapus.");
     } catch (error) {
       reportHandledError("Investment journal delete failed", error, "Catatan belum berhasil dihapus.");
       setFormError(t("Catatan belum berhasil dihapus. Coba lagi."));
