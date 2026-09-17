@@ -198,13 +198,23 @@ export default function LoginPage() {
 
   return (
     <div className={`${styles.page} fixed inset-0 min-h-[100svh] w-dvw overflow-x-hidden overflow-y-auto bg-[url('/auth/fintrack-login-hero.png')] bg-[position:center_top] bg-cover bg-no-repeat text-[var(--brand-ink)] sm:bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#eefaf2_0%,#ddf5e6_55%,#c6edd3_100%)] sm:bg-[length:24px_24px,auto]`}>
-      <header className="relative z-10 mx-auto flex h-[76px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between border-b border-white/35 sm:h-[72px] sm:w-[calc(100%-3rem)] sm:border-[color:rgba(18,53,36,0.14)]">
+      <header className="relative z-10 mx-auto flex h-[76px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between sm:h-[72px] sm:w-[calc(100%-3rem)] sm:border-b sm:border-[color:rgba(18,53,36,0.14)]">
         <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
       </header>
 
-      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex min-h-[calc(100svh-76px)] w-full items-start justify-center px-0 pb-0 pt-[184px] sm:min-h-[calc(100svh-72px)] sm:px-6 sm:pb-8 sm:pt-14 lg:items-center lg:py-8`}>
-        <section className={`${styles.card} mx-auto w-full max-w-[420px] rounded-t-[32px] bg-white px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-7 shadow-[0_-16px_42px_rgba(18,53,36,0.18)] sm:rounded-[28px] sm:border sm:border-white/85 sm:bg-white/[0.97] sm:p-6 sm:shadow-[0_24px_65px_rgba(18,53,36,0.14)] sm:ring-1 sm:ring-emerald-950/[0.06] sm:backdrop-blur-sm`} aria-labelledby="login-title">
+      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex min-h-[calc(100svh-76px)] w-full items-start justify-center px-0 pb-0 pt-[148px] sm:min-h-[calc(100svh-72px)] sm:px-6 sm:pb-8 sm:pt-14 lg:items-center lg:py-8`}>
+        <div className={`${styles.desktopShell} w-full lg:grid lg:max-w-[980px] lg:grid-cols-[0.82fr_1.18fr] lg:overflow-hidden lg:rounded-[30px] lg:bg-white lg:shadow-[0_30px_80px_rgba(18,53,36,0.18)] lg:ring-1 lg:ring-emerald-950/[0.08]`}>
+          <aside className="relative hidden overflow-hidden bg-[url('/auth/fintrack-login-hero.png')] bg-cover bg-[position:center_top] lg:flex lg:min-h-[590px] lg:flex-col lg:justify-end lg:p-9">
+            <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,39,25,0.02)_24%,rgba(8,39,25,0.88)_100%)]" />
+            <div className="relative text-white">
+              <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] backdrop-blur-sm">{t("Keuangan pribadi")}</span>
+              <h1 className="mt-4 max-w-xs text-4xl font-black leading-[0.98] tracking-[-0.06em] !text-white">{t("Uangmu, lebih jelas.")}</h1>
+              <p className="mt-4 max-w-[17rem] text-sm leading-6 text-white/80">{t("Catat, pahami, dan rencanakan keuanganmu dalam satu tempat yang privat.")}</p>
+              <div className="mt-7 flex items-center gap-2 text-xs font-bold text-white/75"><span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_0_5px_rgba(110,231,183,0.15)]" />{t("Data tetap milikmu")}</div>
+            </div>
+          </aside>
+        <section className={`${styles.card} min-h-[calc(100svh-148px)] w-dvw max-w-none rounded-t-[32px] bg-white px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-7 shadow-[0_-16px_42px_rgba(18,53,36,0.18)] sm:mx-auto sm:min-h-0 sm:w-full sm:max-w-[420px] sm:rounded-[28px] sm:border sm:border-white/85 sm:bg-white/[0.97] sm:p-6 sm:shadow-[0_24px_65px_rgba(18,53,36,0.14)] sm:ring-1 sm:ring-emerald-950/[0.06] sm:backdrop-blur-sm lg:max-w-none lg:rounded-none lg:border-0 lg:px-12 lg:py-10 lg:shadow-none lg:ring-0`} aria-labelledby="login-title">
           <div className={`${styles.cardHeader} mb-6 text-center sm:mb-5 sm:text-left`}>
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
             <h2 id="login-title" className={`${styles.cardTitle} mt-4 text-[30px] font-black leading-[1.06] tracking-[-0.055em] text-[var(--brand-ink)] sm:mt-3 sm:text-[30px]`}>{title}</h2>
@@ -250,6 +260,7 @@ export default function LoginPage() {
 
           <div className={`${styles.privacyNote} mt-5 flex items-start gap-2.5 border-t border-slate-100 pt-4`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
         </section>
+        </div>
       </main>
     </div>
   );

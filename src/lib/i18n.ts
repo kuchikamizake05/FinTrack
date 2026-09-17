@@ -56,6 +56,10 @@ const englishTranslations: Record<string, string> = {
   "Aktifkan laporan otomatis untuk menyimpan ringkasan dan CSV privat setiap bulan.":
     "Enable automatic reports to save a monthly summary and private CSV.",
   "Privat untuk akunmu": "Private to your account",
+  "Keuangan pribadi": "Personal finance",
+  "Uangmu, lebih jelas.": "Your money, made clearer.",
+  "Catat, pahami, dan rencanakan keuanganmu dalam satu tempat yang privat.":
+    "Record, understand, and plan your money in one private place.",
   "Simpan ringkasan bulan yang sudah selesai beserta snapshot CSV privat yang dapat diunduh.":
     "Save completed-month summaries with downloadable private CSV snapshots.",
   "Laporan bulanan belum berhasil dimuat. Coba lagi.": "Monthly reports could not be loaded. Try again.",
