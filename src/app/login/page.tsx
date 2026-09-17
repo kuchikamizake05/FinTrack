@@ -197,15 +197,15 @@ export default function LoginPage() {
         : "Masuk menggunakan email dan kata sandi atau akun Google.";
 
   return (
-    <div className={`${styles.page} fixed inset-0 min-h-[100svh] w-dvw overflow-x-hidden overflow-y-auto bg-[url('/auth/fintrack-login-hero.png')] bg-[position:center_top] bg-cover bg-no-repeat text-[var(--brand-ink)] sm:bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#eefaf2_0%,#ddf5e6_55%,#c6edd3_100%)] sm:bg-[length:24px_24px,auto]`}>
-      <header className="relative z-10 mx-auto flex h-[76px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between sm:h-[72px] sm:w-[calc(100%-3rem)] sm:border-b sm:border-[color:rgba(18,53,36,0.14)]">
+    <div className={`${styles.page} fixed -inset-2 overflow-x-hidden overflow-y-auto bg-[url('/auth/fintrack-login-hero.png')] bg-[position:center_top] bg-cover bg-no-repeat text-[var(--brand-ink)] sm:overflow-y-hidden sm:bg-[radial-gradient(circle_at_9%_36%,rgba(255,255,255,0.42)_0_2px,transparent_2.5px),linear-gradient(145deg,#eefaf2_0%,#ddf5e6_55%,#c6edd3_100%)] sm:bg-[length:24px_24px,auto]`}>
+      <header className="relative z-20 mx-auto flex h-[76px] w-[calc(100%-2rem)] max-w-[1440px] items-center justify-between sm:h-[72px] sm:w-[calc(100%-3rem)] sm:border-b sm:border-[color:rgba(18,53,36,0.14)] lg:absolute lg:inset-x-0 lg:top-0 lg:h-20 lg:w-full lg:max-w-none lg:border-b-0 lg:px-9 xl:px-12">
         <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
         <LanguageSwitcher compact className="sm:[&>svg]:block" />
       </header>
 
-      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex h-[calc(100svh-76px)] w-full items-start justify-center px-0 pb-0 pt-[148px] sm:min-h-[calc(100svh-72px)] sm:px-6 sm:pb-8 sm:pt-14 lg:items-center lg:py-8`}>
-        <div className={`${styles.desktopShell} w-full lg:grid lg:max-w-[980px] lg:grid-cols-[0.82fr_1.18fr] lg:overflow-hidden lg:rounded-[30px] lg:bg-white lg:shadow-[0_30px_80px_rgba(18,53,36,0.18)] lg:ring-1 lg:ring-emerald-950/[0.08]`}>
-          <aside className="relative hidden overflow-hidden bg-[url('/auth/fintrack-login-hero.png')] bg-cover bg-[position:center_top] lg:flex lg:min-h-[590px] lg:flex-col lg:justify-end lg:p-9">
+      <main id="main-content" tabIndex={-1} className={`${styles.main} mx-auto flex h-[calc(100dvh-76px)] w-full items-start justify-center px-0 pb-0 pt-[148px] sm:min-h-[calc(100dvh-72px)] sm:px-6 sm:pb-8 sm:pt-14 lg:h-full lg:min-h-full lg:items-stretch lg:px-0 lg:py-0`}>
+        <div className={`${styles.desktopShell} w-full lg:grid lg:min-h-full lg:max-w-none lg:grid-cols-2 lg:overflow-hidden lg:rounded-none lg:bg-white lg:shadow-none lg:ring-0`}>
+          <aside className="relative hidden overflow-hidden bg-[url('/auth/fintrack-login-hero.png')] bg-cover bg-[position:center_top] lg:flex lg:min-h-full lg:flex-col lg:justify-end lg:p-14 xl:p-20">
             <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,39,25,0.02)_24%,rgba(8,39,25,0.88)_100%)]" />
             <div className="relative text-white">
               <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] backdrop-blur-sm">{t("Keuangan pribadi")}</span>
@@ -214,7 +214,7 @@ export default function LoginPage() {
               <div className="mt-7 flex items-center gap-2 text-xs font-bold text-white/75"><span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_0_5px_rgba(110,231,183,0.15)]" />{t("Data tetap milikmu")}</div>
             </div>
           </aside>
-        <section className={`${styles.card} min-h-[calc(100svh-224px)] w-dvw max-w-none rounded-t-[32px] bg-white px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-7 shadow-[0_-16px_42px_rgba(18,53,36,0.18)] sm:mx-auto sm:min-h-0 sm:w-full sm:max-w-[420px] sm:rounded-[28px] sm:border sm:border-white/85 sm:bg-white/[0.97] sm:p-6 sm:shadow-[0_24px_65px_rgba(18,53,36,0.14)] sm:ring-1 sm:ring-emerald-950/[0.06] sm:backdrop-blur-sm lg:max-w-none lg:rounded-none lg:border-0 lg:px-12 lg:py-10 lg:shadow-none lg:ring-0`} aria-labelledby="login-title">
+        <section className={`${styles.card} min-h-[calc(100svh-224px)] w-dvw max-w-none rounded-t-[32px] bg-white px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-7 shadow-[0_-16px_42px_rgba(18,53,36,0.18)] sm:mx-auto sm:min-h-0 sm:w-full sm:max-w-[420px] sm:rounded-[28px] sm:border sm:border-white/85 sm:bg-white/[0.97] sm:p-6 sm:shadow-[0_24px_65px_rgba(18,53,36,0.14)] sm:ring-1 sm:ring-emerald-950/[0.06] sm:backdrop-blur-sm lg:flex lg:min-h-full lg:max-w-none lg:flex-col lg:items-center lg:justify-center lg:rounded-none lg:border-0 lg:px-[clamp(3rem,8vw,9rem)] lg:py-12 lg:shadow-none lg:ring-0 lg:[&>*]:w-full lg:[&>*]:max-w-[560px]`} aria-labelledby="login-title">
           <div className={`${styles.cardHeader} mb-6 text-center sm:mb-5 sm:text-left`}>
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-mint)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--brand-primary)]"><ShieldCheck className="h-3.5 w-3.5" /> {t("Akses aman")}</span>
             <h2 id="login-title" className={`${styles.cardTitle} mt-4 text-[30px] font-black leading-[1.06] tracking-[-0.055em] text-[var(--brand-ink)] sm:mt-3 sm:text-[30px]`}>{title}</h2>
