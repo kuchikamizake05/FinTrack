@@ -6,6 +6,7 @@ import OnboardingBoundary from "@/components/OnboardingBoundary";
 import PWARegister from "@/components/PWARegister";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import SkipLink from "@/components/SkipLink";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -56,9 +57,11 @@ export default function RootLayout({
     <html lang="id" className={`${jetbrainsMono.variable} ${manrope.variable} ${archivoBlack.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-[var(--canvas)] font-sans text-slate-900">
         <LanguageProvider>
-          <PWARegister />
-          <SkipLink />
-          <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
+          <ToastProvider>
+            <PWARegister />
+            <SkipLink />
+            <AppBoundary><OnboardingBoundary>{children}</OnboardingBoundary></AppBoundary>
+          </ToastProvider>
         </LanguageProvider>
       </body>
     </html>
