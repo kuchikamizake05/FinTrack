@@ -1,237 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  Check,
-  ChevronRight,
-  CircleDollarSign,
-  Eye,
-  Landmark,
-  LockKeyhole,
-  Menu,
-  PiggyBank,
-  ReceiptText,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  WalletCards,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Menu, X, TrendingUp, Sparkles, PiggyBank } from "lucide-react";
+import { buttonStyles } from "@/components/ui/button-styles";
 import BrandLockup from "@/components/BrandLockup";
+import BrandLogo from "@/components/BrandLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import styles from "./landing.module.css";
-
-const features = [
-  {
-    icon: ReceiptText,
-    index: "01",
-    title: "Catat tanpa ribet",
-    copy: "Pemasukan dan pengeluaran tersusun rapi, lengkap dengan kategori dan bukti transaksi.",
-  },
-  {
-    icon: BarChart3,
-    index: "02",
-    title: "Lihat pola uangmu",
-    copy: "Grafik yang jernih membantu kamu memahami kebiasaan, bukan sekadar melihat angka.",
-  },
-  {
-    icon: Sparkles,
-    index: "03",
-    title: "Dapat insight nyata",
-    copy: "FinTrack merangkum perubahan penting dan memberi langkah yang bisa langsung kamu ambil.",
-  },
-];
-
-const activity = [
-  { icon: Landmark, label: "Gaji bulanan", meta: "Hari ini", value: "+Rp8.500.000", positive: true },
-  { icon: WalletCards, label: "Belanja harian", meta: "Hari ini", value: "−Rp286.500", positive: false },
-  { icon: PiggyBank, label: "Dana masa depan", meta: "Kemarin", value: "+Rp1.250.000", positive: true },
-];
+import LandingVisual from "@/components/LandingVisual";
+import HeroDeck from "@/components/HeroDeck";
 
 export default function LandingPage() {
-  const { t } = useLanguage();
-  return (
-    <main id="main-content" tabIndex={-1} className={styles.page}>
-      <section className={styles.hero}>
-        <header className={styles.nav}>
-          <BrandLockup href="/" priority ariaLabel="FinTrack beranda" />
-
-          <nav className={styles.navLinks} aria-label={t("Navigasi utama")}>
-            <a href="#fitur">{t("Fitur")}</a>
-            <a href="#cara-kerja">{t("Cara kerja")}</a>
-            <a href="#keamanan">{t("Keamanan")}</a>
-          </nav>
-
-          <div className={styles.navActions}>
-            <LanguageSwitcher compact />
-            <Link className={styles.loginLink} href="/login">{t("Masuk")}</Link>
-            <Link className={styles.navCta} href="/dashboard">{t("Mulai sekarang")}</Link>
-          </div>
-
-          <details className={styles.mobileMenu}>
-            <summary aria-label={t("Buka menu navigasi")}><Menu aria-hidden="true" /></summary>
-            <div>
-              <LanguageSwitcher compact />
-              <a href="#fitur">{t("Fitur")}</a>
-              <a href="#cara-kerja">{t("Cara kerja")}</a>
-              <a href="#keamanan">{t("Keamanan")}</a>
-              <Link href="/login">{t("Masuk")}</Link>
-            </div>
-          </details>
-        </header>
-
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}><span /> {t("Keuangan pribadi, tanpa kabut")}</p>
-          <h1>{t("Uangmu.")}<br /><em>{t("Lebih jelas.")}</em></h1>
-          <p className={styles.heroText}>
-            {t("Satu tempat untuk memahami arus kas, menjaga target, dan membuat keputusan finansial dengan tenang.")}
-          </p>
-          <div className={styles.heroActions}>
-            <Link className={styles.primaryCta} href="/dashboard">
-              {t("Mulai gratis")} <ArrowRight aria-hidden="true" />
-            </Link>
-            <a className={styles.secondaryCta} href="#cara-kerja">{t("Lihat cara kerjanya")}</a>
-          </div>
-          <p className={styles.reassurance}><Check aria-hidden="true" /> {t("Gratis untuk memulai. Tidak perlu kartu.")}</p>
-        </div>
-
-        <section className={styles.productStage} aria-label={t("Pratinjau dashboard FinTrack")}>
-          <div className={styles.orbitOne} />
-          <div className={styles.orbitTwo} />
-
-          <div className={styles.balanceCard}>
-            <div className={styles.cardTopline}>
-              <span>{t("Saldo bersih")}</span>
-              <span className={styles.visibility}><Eye aria-hidden="true" /> {t("Terlihat")}</span>
-            </div>
-            <p className={styles.balance}>Rp24.860.000</p>
-            <div className={styles.balanceTrend}><TrendingUp aria-hidden="true" /> {t("12,4% bulan ini")}</div>
-            <div className={styles.chart} aria-hidden="true">
-              <span style={{ height: "32%" }} />
-              <span style={{ height: "46%" }} />
-              <span style={{ height: "39%" }} />
-              <span style={{ height: "64%" }} />
-              <span style={{ height: "58%" }} />
-              <span style={{ height: "82%" }} />
-              <span style={{ height: "96%" }} />
-            </div>
-            <div className={styles.chartLabels}><span>1 Jul</span><span>{t("Hari ini")}</span></div>
-          </div>
-
-          <div className={styles.goalCard}>
-            <div className={styles.goalIcon}><PiggyBank aria-hidden="true" /></div>
-            <div><span>{t("Target darurat")}</span><strong>{t("78% tercapai")}</strong></div>
-            <div className={styles.progress}><span /></div>
-          </div>
-
-          <div className={styles.insightCard}>
-            <Sparkles aria-hidden="true" />
-            <div><span>{t("Insight minggu ini")}</span><strong>{t("Pengeluaran makan turun 18%")}</strong></div>
-          </div>
-        </section>
-      </section>
-
-      <section className={styles.ticker} aria-label={t("Ringkasan manfaat FinTrack")}>
-        <div>
-          <span>{t("Arus kas terbaca")}</span><i>✦</i>
-          <span>{t("Target lebih dekat")}</span><i>✦</i>
-          <span>{t("Data tetap milikmu")}</span><i>✦</i>
-          <span>{t("Keputusan lebih tenang")}</span><i>✦</i>
-        </div>
-      </section>
-
-      <section className={styles.features} id="fitur">
-        <div className={styles.sectionIntro}>
-          <p className={styles.kicker}>{t("Semua yang penting")}</p>
-          <h2>{t("Bukan lebih banyak angka.")}<br />{t("Lebih banyak")} <em>{t("kendali.")}</em></h2>
-          <p>{t("FinTrack mengubah catatan keuangan yang berantakan menjadi gambaran yang mudah dipahami.")}</p>
-        </div>
-
-        <div className={styles.featureGrid}>
-          {features.map(({ icon: Icon, index, title, copy }) => (
-            <article className={styles.featureCard} key={title}>
-              <div className={styles.featureHead}>
-                <span>{index}</span>
-                <Icon aria-hidden="true" />
-              </div>
-              <h3>{t(title)}</h3>
-              <p>{t(copy)}</p>
-              <Link href="/dashboard" aria-label={`${t("Jelajahi")} ${t(title)}`}>{t("Jelajahi")} <ChevronRight aria-hidden="true" /></Link>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.controlSection} id="cara-kerja">
-        <div className={styles.controlCopy}>
-          <p className={styles.kicker}>{t("Satu pandangan utuh")}</p>
-          <h2>{t("Setiap rupiah punya cerita.")}</h2>
-          <p>
-            Hubungkan semua bagian kehidupan finansialmu—rekening, transaksi, investasi, sampai jurnal trading—dalam alur yang terasa sederhana.
-          </p>
-          <ul>
-            <li><Check aria-hidden="true" /> {t("Ringkasan otomatis setiap saat")}</li>
-            <li><Check aria-hidden="true" /> {t("Kategori yang mudah disesuaikan")}</li>
-            <li><Check aria-hidden="true" /> {t("Insight yang fokus pada tindakan")}</li>
-          </ul>
-          <Link className={styles.darkCta} href="/dashboard">{t("Buka dashboard")} <ArrowRight aria-hidden="true" /></Link>
-        </div>
-
-        <div className={styles.activityPanel}>
-          <div className={styles.activityHeader}>
-            <div><span>{t("Aktivitas terbaru")}</span><strong>{t("Juli 2026")}</strong></div>
-            <button type="button" aria-label="Buka filter aktivitas">•••</button>
-          </div>
-          <div className={styles.activityList}>
-            {activity.map(({ icon: Icon, label, meta, value, positive }) => (
-              <div className={styles.activityRow} key={label}>
-                <span className={styles.activityIcon}><Icon aria-hidden="true" /></span>
-                <div><strong>{t(label)}</strong><span>{t(meta)}</span></div>
-                <strong className={positive ? styles.positive : undefined}>{value}</strong>
-              </div>
-            ))}
-          </div>
-          <div className={styles.spendSummary}>
-            <div><span>{t("Pengeluaran bulan ini")}</span><strong>Rp3.740.500</strong></div>
-            <div className={styles.donut} aria-label="62 persen anggaran terpakai"><span>62%</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.security} id="keamanan">
-        <div className={styles.securityVisual}>
-          <div className={styles.shieldRing}>
-            <div><ShieldCheck aria-hidden="true" /></div>
-          </div>
-          <span className={styles.lockBadge}><LockKeyhole aria-hidden="true" /> {t("Terenkripsi")}</span>
-          <span className={styles.privateBadge}><CircleDollarSign aria-hidden="true" /> {t("Data privat")}</span>
-        </div>
-        <div className={styles.securityCopy}>
-          <p className={styles.kicker}>{t("Aman dari awal")}</p>
-          <h2>{t("Uangmu privat.")}<br />{t("Begitu juga datanya.")}</h2>
-          <p>{t("Setiap akun hanya dapat mengakses datanya sendiri. Autentikasi aman dan kebijakan database berlapis menjaga informasi tetap pada tempatnya.")}</p>
-          <div className={styles.securityFacts}>
-            <div><strong>RLS</strong><span>{t("Proteksi per pengguna")}</span></div>
-            <div><strong>SSL</strong><span>{t("Koneksi terenkripsi")}</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.finalCta}>
-        <div className={styles.ctaCoin}><CircleDollarSign aria-hidden="true" /></div>
-        <p>{t("Mulai dari satu catatan")}</p>
-        <h2>{t("Bikin uangmu")}<br /><em>{t("masuk akal.")}</em></h2>
-        <Link href="/dashboard">{t("Mulai pakai FinTrack")} <ArrowRight aria-hidden="true" /></Link>
-      </section>
-
-      <footer className={styles.footer}>
-        <BrandLockup href="/" compact ariaLabel="FinTrack beranda" />
-        <p>{t("Ruang tenang untuk keuangan pribadimu.")}</p>
-        <div><a href="#fitur">{t("Fitur")}</a><a href="#keamanan">{t("Keamanan")}</a><Link href="/login">{t("Masuk")}</Link></div>
-        <span>© 2026 FinTrack</span>
-      </footer>
-    </main>
-  );
+  const { language } = useLanguage();
+  const copy = (id: string, en: string) => language === "id" ? id : en;
+  const root = useRef<HTMLElement>(null);
+  const [menu, setMenu] = useState(false);
+  const sections = [
+    { id: "overview", label: copy("Ringkasan", "Overview") },
+    { id: "cashflow", label: copy("Arus kas", "Cash flow") },
+    { id: "investments", label: copy("Investasi", "Investments") },
+    { id: "insights", label: "Insights" },
+    { id: "privacy", label: copy("Privasi", "Privacy") },
+  ];
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add(styles.visible);
+        }
+      });
+    }, { threshold: 0.12 });
+    root.current?.querySelectorAll("[data-reveal]").forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+  return <main ref={root} id="main-content" tabIndex={-1} className={styles.page}>
+    <header className={styles.nav}>
+      <BrandLockup href="/" priority />
+      <nav className={styles.desktopNav} aria-label={copy("Navigasi utama", "Main navigation")}>
+        {sections.slice(1).map(section => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+      </nav>
+      <div className={styles.navActions}><LanguageSwitcher compact /><Link className={`${styles.login} ${buttonStyles({variant: "secondary"})}`} href="/login">{copy("Masuk", "Log in")}</Link><Link className={buttonStyles()} href="/login">{copy("Mulai gratis", "Get started")}</Link></div>
+      <button className={styles.menuButton} aria-expanded={menu} aria-controls="landing-menu" aria-label={copy("Menu navigasi", "Navigation menu")} onClick={() => setMenu(!menu)}>{menu ? <X /> : <Menu />}</button>
+      {menu && <nav id="landing-menu" className={styles.mobileNav}><LanguageSwitcher compact />{sections.map(section => <a onClick={() => setMenu(false)} key={section.id} href={`#${section.id}`}>{section.label}</a>)}<Link href="/login">{copy("Masuk", "Log in")}</Link></nav>}
+    </header>
+    <section className={styles.hero} id="overview" data-reveal>
+      <div className={styles.atmosphere} aria-hidden="true"><i /><i /><i /></div>
+      <HeroDeck />
+      <div className={styles.heroContent}><h1>{copy("Keuangan yang lebih jelas, untuk setiap rencana hidupmu.", "A clearer view of your money. For every chapter of life.")}</h1><Link className={buttonStyles()} href="/login">{copy("Mulai dengan FinTrack", "Get started with FinTrack")}</Link></div>
+    </section>
+    <section className={styles.manifesto} data-reveal><h2>{copy("Dari pengeluaran kecil hari ini, sampai rencana besar nanti. Semua bagian keuanganmu, dalam satu pandangan yang utuh.", "From the little things today to the big plans ahead. Every part of your financial life, together in one clear picture.")}</h2></section>
+    <LandingVisual />
+    <section className={`${styles.panel} ${styles.cashflow}`} id="cashflow" data-reveal>
+      <div className={styles.panelCopy}><p>{copy("Arus kas", "Cash flow")}</p><h2>{copy("Kenali uang yang datang. Pahami ke mana ia pergi.", "Know what comes in. Understand what goes out.")}</h2><Link className={styles.arrowButton} href="/transactions" aria-label={copy("Buka transaksi", "Explore transactions")}><ArrowRight /></Link></div>
+      <div className={styles.statement} aria-label={copy("Contoh ringkasan, data ilustrasi", "Example summary, illustrative data")}><span>FinTrack</span><p>{copy("Bulan ini, dalam genggaman.", "Your month, at a glance.")}</p><strong>Rp24.860.000</strong><small>{copy("Saldo bersih · Data ilustrasi", "Net balance · Illustrative data")}</small><div className={styles.barChart} aria-hidden="true">{[25,40,32,56,49,76,88].map((height,i) => <i key={i} style={{height:`${height}%`}} />)}</div><div className={styles.statementBottom}><span>{copy("Pemasukan", "Income")}<b>Rp8.500.000</b></span><span>{copy("Pengeluaran", "Expenses")}<b>Rp3.740.500</b></span></div></div>
+    </section>
+    <section className={`${styles.panel} ${styles.investments}`} id="investments" data-reveal>
+      <div className={styles.panelCopy}><p>{copy("Investasi & target", "Investments & goals")}</p><h2>{copy("Rencana jangka panjang. Gambaran yang selalu dekat.", "Long-term plans. A picture that’s always within reach.")}</h2><Link className={styles.arrowButton} href="/investments" aria-label={copy("Buka investasi", "Explore investments")}><ArrowRight /></Link></div>
+      <div className={styles.appPreview}>
+        <div className={styles.previewHeading}><span>{copy("Investasi", "Investments")}</span><small>{copy("Data ilustrasi", "Illustrative data")}</small></div>
+        <div className={styles.investmentBalance}><span>{copy("Nilai investasi", "Investment value")}</span><strong>Rp18.750.000</strong><small><TrendingUp size={15} aria-hidden="true" /> +Rp1.250.000 (7,14%)</small></div>
+        <div className={styles.previewSurface}><h3>{copy("Alokasi aset", "Asset allocation")}</h3><div className={styles.allocation} aria-hidden="true"><i /><i /><i /></div>{[[copy("Reksa dana", "Mutual funds"), "50%"], [copy("Saham", "Stocks"), "30%"], [copy("Emas", "Gold"), "20%"]].map(([label,value],index) => <div className={styles.assetRow} key={label}><i data-tone={index} /><span>{label}</span><strong>{value}</strong></div>)}</div>
+        <div className={styles.previewSurface}><div className={styles.goalHeading}><PiggyBank size={21} aria-hidden="true" /><div><h3>{copy("Dana darurat", "Emergency fund")}</h3><small>Rp15.600.000 / Rp20.000.000</small></div><strong>78%</strong></div><div className={styles.goalProgress} aria-hidden="true"><i /></div></div>
+      </div>
+    </section>
+    <section className={`${styles.panel} ${styles.insights}`} id="insights" data-reveal>
+      <div className={styles.panelCopy}><p>{copy("Insight keuangan", "Financial insights")}</p><h2>{copy("Lebih sedikit menebak. Lebih banyak memahami.", "Less guesswork. More understanding.")}</h2><Link className={styles.arrowButton} href="/insights" aria-label={copy("Buka analisis", "Explore insights")}><ArrowRight /></Link></div>
+      <div className={styles.appPreview}>
+        <div className={styles.previewHeading}><span>{copy("Analisis bulan ini", "This month’s insights")}</span><small>{copy("Data ilustrasi", "Illustrative data")}</small></div>
+        <div className={styles.previewSurface}><div className={styles.insightLabel}><Sparkles size={18} aria-hidden="true" />{copy("Ringkasan keuangan", "Financial review")}</div><h3 className={styles.insightTitle}>{copy("Pengeluaranmu lebih terkendali.", "Your spending is more in control.")}</h3><p>{copy("Pengeluaran makan turun 18% dibanding bulan lalu. Ada lebih banyak ruang untuk target tabunganmu.", "Food spending is down 18% from last month. There’s more room for your savings goals.")}</p><div className={styles.comparison}><div><span>{copy("Bulan lalu", "Last month")}</span><i style={{width:"100%"}} /><strong>Rp1.000.000</strong></div><div><span>{copy("Bulan ini", "This month")}</span><i style={{width:"82%"}} /><strong>Rp820.000</strong></div></div></div>
+        <div className={styles.previewSurface}><h3>{copy("Langkah berikutnya", "Your next step")}</h3><p>{copy("Tinjau anggaran makan dan sisihkan selisihnya ke dana darurat.", "Review your food budget and set aside the difference for your emergency fund.")}</p><Link className={buttonStyles({variant:"secondary",size:"compact"})} href="/planning">{copy("Lihat anggaran", "View budget")}<ArrowRight size={14} aria-hidden="true" /></Link></div>
+      </div>
+    </section>
+    <section className={styles.tools} data-reveal><h2>{copy("Tempat untuk setiap bagian keuanganmu.", "A place for every part of your money.")}</h2><div>{[
+      ["/accounts", copy("Dompet & rekening", "Wallets & accounts"), copy("Lihat saldo di satu tempat.", "Your balances, together.")],
+      ["/planning", copy("Anggaran & target", "Budgets & goals"), copy("Beri arah untuk setiap rupiah.", "Give every dollar a direction.")],
+      ["/reports", copy("Laporan bulanan", "Monthly reports"), copy("Luangkan waktu untuk melihat kembali.", "Take a moment to look back.")],
+    ].map(([href,title,description]) => <Link href={href} key={href}><h3>{title}</h3><p>{description}</p><ArrowRight aria-hidden="true" /></Link>)}</div></section>
+    <section className={`${styles.panel} ${styles.privacy}`} id="privacy" data-reveal><div className={styles.panelCopy}><p>{copy("Privasi sejak awal", "Private from the start")}</p><h2>{copy("Uangmu punya cerita. Hanya kamu yang perlu tahu.", "Your money tells a story. Yours to keep.")}</h2><p className={styles.description}>{copy("Catatan keuangan terhubung ke akunmu. Kamu mengatur, meninjau, dan mengakses datamu sendiri.", "Your financial records belong to your account. You manage, review, and access your own data.")}</p></div><div className={styles.privacyArt} aria-hidden="true"><BrandLogo size={170} /></div></section>
+    <section className={styles.finalCta} data-reveal><h2>{copy("Mulai dari hari ini. Untuk hidup yang kamu rencanakan.", "Start with today. For the life you’re planning.")}</h2><Link className={buttonStyles()} href="/login">{copy("Mulai gratis", "Get started free")}</Link></section>
+    <footer className={styles.footer}><BrandLockup href="/" /><p>{copy("Ruang tenang untuk keuangan pribadimu.", "A calmer place for your personal finances.")}</p><Link href="/login">{copy("Masuk ke akun", "Log in to your account")}</Link><span>© 2026 FinTrack</span></footer>
+  </main>;
 }
