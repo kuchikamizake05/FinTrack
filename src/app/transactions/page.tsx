@@ -8,6 +8,7 @@ import {
   useState,
   type Dispatch,
   type FormEvent,
+  type ReactNode,
   type RefObject,
   type SetStateAction,
 } from "react";
@@ -117,6 +118,7 @@ type TransactionFormState = {
   accountId: string;
 };
 
+
 const defaultFilters: TransactionFilters = {
   search: "",
   category: "all",
@@ -136,6 +138,18 @@ function createDefaultForm(): TransactionFormState {
     note: "",
     accountId: "",
   };
+}
+
+function MobileFilterSelect({ icon: Icon, label, value, onChange, className, children }: { icon: typeof SlidersHorizontal; label: string; value: string; onChange: (value: string) => void; className: string; children: ReactNode }) {
+  return (
+    <div className={cn("relative shrink-0", className)}>
+      <Icon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-emerald-700" />
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-0 pl-9 pr-8 text-[11px] font-bold leading-5 text-slate-700 shadow-[var(--shadow-control)] outline-none transition-colors focus:border-emerald-500 focus:ring-0 focus-visible:!outline-none focus-visible:!outline-offset-0">
+        {children}
+      </select>
+      <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+    </div>
+  );
 }
 
 export default function TransactionsPage() {
@@ -654,6 +668,17 @@ export default function TransactionsPage() {
     <div className="app-page">
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
+        <section className="flex items-start justify-between gap-4 pt-1 md:hidden">
+          <div>
+            <h1 className="text-[1.75rem] font-bold leading-[1.06] tracking-[-0.045em] text-slate-900">{t("Transaksi")}</h1>
+            <p className="mt-2 text-[13px] leading-5 text-slate-500">{t("Uangmu lari ke mana aja?")}</p>
+          </div>
+          <Button onClick={openAdd} size="icon" className="h-11 min-h-11 w-11 rounded-xl shadow-[0_8px_18px_rgba(21,128,61,0.25)]" aria-label={t("Catat transaksi")}>
+            <Plus className="h-5 w-5" />
+          </Button>
+        </section>
+
+        <div className="hidden md:block">
         <PageHeader
           eyebrow={t("Ledger keuangan")}
           title={t("Transaksi")}
@@ -699,20 +724,15 @@ export default function TransactionsPage() {
                   <Printer className="h-4 w-4" /> {t("Cetak laporan")}
                 </Button>
               </div>
-              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "sm:hidden")} aria-label={t("Kategori")} data-print-hide>
-                <Tags className="h-4 w-4" />
-              </Link>
-              <Link href="/categories" className={cn(buttonStyles({ variant: "secondary" }), "hidden sm:inline-flex")} data-print-hide>
-                <Tags className="h-4 w-4" /> {t("Kategori")}
-              </Link>
               <Button onClick={openAdd} data-print-hide>
                 <Plus className="h-4 w-4" /> {t("Catat")}
               </Button>
             </>
           )}
         />
+        </div>
 
-        <CurrencySummary report={report} />
+        <div className="hidden md:block"><CurrencySummary report={report} /></div>
 
         {pageError && (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
@@ -745,8 +765,8 @@ export default function TransactionsPage() {
           </div>
         )}
 
-        <Surface className="p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
+        <Surface className="border-0 bg-transparent p-0 shadow-none md:rounded-2xl md:border md:bg-[var(--surface)] md:p-5 md:shadow-[var(--shadow-surface)]">
+          <div className="hidden items-center justify-between gap-3 md:flex">
             <div>
               <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
                 <SlidersHorizontal className="h-4 w-4 text-emerald-700" /> {t("Cari dan filter")}
@@ -760,8 +780,48 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1.5fr)_repeat(3,minmax(150px,0.75fr))]">
-            <div className="relative sm:col-span-2 lg:col-span-1">
+          <div className="md:hidden">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                aria-label={t("Cari transaksi")}
+                type="search"
+                placeholder={t("Cari catatan...")}
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                className={cn(fieldControlStyles, "h-12 min-h-12 rounded-2xl pl-11")}
+              />
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <MobileFilterSelect icon={SlidersHorizontal} label={t("Filter tipe transaksi")} value={filters.type} onChange={(value) => setFilters((current) => ({ ...current, type: value as TransactionFilters["type"] }))} className="w-[132px]">
+                <option value="all">{t("Semua tipe")}</option>
+                <option value="expense">{t("Pengeluaran")}</option>
+                <option value="income">{t("Pemasukan")}</option>
+              </MobileFilterSelect>
+              <MobileFilterSelect icon={Tags} label={t("Filter kategori")} value={filters.category} onChange={(value) => setFilters((current) => ({ ...current, category: value }))} className="w-[160px]">
+                <option value="all">{t("Semua kategori")}</option>
+                {filterCategoryOptions.map((category) => <option key={category} value={category}>{t(category)}</option>)}
+              </MobileFilterSelect>
+              <MobileFilterSelect icon={ReceiptText} label={t("Filter status transaksi")} value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value as TransactionFilters["status"] }))} className="w-[112px]">
+                <option value="active">{t("Aktif")}</option>
+                <option value="review">{t("Perlu ditinjau")}</option>
+                <option value="confirmed">{t("Terkonfirmasi")}</option>
+                <option value="pending_approval">{t("Perlu persetujuan")}</option>
+                <option value="needs_review">{t("Perlu ditinjau")}</option>
+                <option value="deleted">{t("Sampah")}</option>
+                <option value="all">{t("Semua riwayat")}</option>
+              </MobileFilterSelect>
+              {filtersActive && <Button variant="secondary" size="compact" onClick={resetFilters} className="h-10 min-h-10 shrink-0 rounded-xl px-3 text-[11px]"><RotateCcw className="h-3.5 w-3.5" /> {t("Reset")}</Button>}
+              </div>
+              <button type="button" onClick={() => setDateFiltersOpen((value) => !value)} aria-expanded={dateFiltersOpen} className="flex h-10 min-h-10 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-700 bg-emerald-700 px-3 text-[11px] font-bold text-white shadow-[0_6px_14px_rgba(21,128,61,0.22)] transition-colors active:bg-emerald-800">
+                <SlidersHorizontal className="h-4 w-4" /> {t("Filter")}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 hidden grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3 md:grid md:grid-cols-2 lg:grid-cols-[minmax(240px,1.5fr)_repeat(3,minmax(150px,0.75fr))]">
+            <div className="relative col-span-2 sm:col-span-2 lg:col-span-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 aria-label={t("Cari transaksi")}
@@ -811,7 +871,7 @@ export default function TransactionsPage() {
             type="button"
             onClick={() => setDateFiltersOpen((value) => !value)}
             aria-expanded={dateFiltersOpen}
-            className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-slate-200 px-3.5 text-sm font-semibold text-slate-600 sm:hidden"
+            className="hidden"
           >
             <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-emerald-700" /> {t("Rentang tanggal")}</span>
             <ChevronDown className={cn("h-4 w-4 transition-transform", dateFiltersOpen && "rotate-180")} />
@@ -1071,38 +1131,129 @@ function TransactionResults({ transactions, accountNames, accountCurrencies, dat
         </div>
       </Surface>
 
-      <div className="space-y-3 md:hidden">
-        {transactions.map((transaction) => (
-          <Surface key={transaction.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate font-bold text-slate-900">{transaction.merchant || t(transaction.category)}</p>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                  <CalendarDays className="h-3.5 w-3.5" /> {format(parseISO(transaction.date), "dd MMM yyyy", { locale: dateLocale })}
-                </p>
-              </div>
-              <p className={cn("shrink-0 text-sm font-bold", transaction.type === "income" ? "text-emerald-700" : "text-slate-900")}>
-                {transaction.type === "income" ? "+" : "−"}{formatCurrency(transaction.amount, transaction.account_id ? accountCurrencies.get(transaction.account_id) ?? "IDR" : "IDR")}
-              </p>
-            </div>
-            <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 border-t border-slate-100 pt-3">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-slate-600">
-                  {transaction.account_id ? accountNames.get(transaction.account_id) ?? t("Akun tidak tersedia") : t("Tanpa akun")} · {t(transaction.category)}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <StatusBadge status={transaction.status} />
-                  <QueueOperationStatus operation={queuedOperations.get(transaction.id)} onRetry={onRetryQueue} onDiscard={onDiscardQueue} compact />
-                  <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
-                </div>
-              </div>
-              <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} onApprove={onApprove} deletingId={deletingId} restoringId={restoringId} approvingId={approvingId} />
-            </div>
-            {transaction.note && <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">{transaction.note}</p>}
-          </Surface>
-        ))}
-      </div>
+      <MobileTransactionList
+        transactions={transactions}
+        accountNames={accountNames}
+        accountCurrencies={accountCurrencies}
+        dateLocale={dateLocale}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onRestore={onRestore}
+        onApprove={onApprove}
+        deletingId={deletingId}
+        restoringId={restoringId}
+        approvingId={approvingId}
+        queuedOperations={queuedOperations}
+        onRetryQueue={onRetryQueue}
+        onDiscardQueue={onDiscardQueue}
+      />
     </>
+  );
+}
+
+function MobileTransactionList({ transactions, accountNames, accountCurrencies, dateLocale, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId, queuedOperations, onRetryQueue, onDiscardQueue }: {
+  transactions: Transaction[];
+  accountNames: ReadonlyMap<string, string>;
+  accountCurrencies: ReadonlyMap<string, string>;
+  dateLocale: typeof idLocale;
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (transaction: Transaction) => void;
+  onRestore: (transactionId: string) => Promise<void>;
+  onApprove: (transaction: Transaction) => void;
+  deletingId: string | null;
+  restoringId: string | null;
+  approvingId: string | null;
+  queuedOperations: ReadonlyMap<string, QueuedTransactionOperation>;
+  onRetryQueue: (operation: QueuedTransactionOperation) => Promise<void>;
+  onDiscardQueue: (operation: QueuedTransactionOperation) => void;
+}) {
+  const { t } = useLanguage();
+  const groupedTransactions = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+    transactions.forEach((transaction) => groups.set(transaction.date, [...(groups.get(transaction.date) ?? []), transaction]));
+    return [...groups.entries()];
+  }, [transactions]);
+
+  return (
+    <div className="space-y-5 md:hidden">
+      {groupedTransactions.map(([date, dayTransactions]) => {
+        const expense = dayTransactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
+        const income = dayTransactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
+        const currency = dayTransactions[0]?.account_id ? accountCurrencies.get(dayTransactions[0].account_id) ?? "IDR" : "IDR";
+        return (
+          <section key={date}>
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <h2 className="text-[11px] font-extrabold uppercase tracking-[0.13em] text-slate-400">{format(parseISO(date), "dd MMM yyyy", { locale: dateLocale })}</h2>
+              <p className={cn("text-xs font-bold", income > expense ? "text-emerald-700" : "text-slate-500")}>{income > 0 ? "+" : "−"}{formatCurrency(Math.abs(income - expense), currency)}</p>
+            </div>
+            <div className="space-y-2.5">
+              {dayTransactions.map((transaction) => (
+                <MobileTransactionCard
+                  key={transaction.id}
+                  transaction={transaction}
+                  accountName={transaction.account_id ? accountNames.get(transaction.account_id) ?? t("Dompet tidak tersedia") : t("Tanpa dompet")}
+                  currency={transaction.account_id ? accountCurrencies.get(transaction.account_id) ?? "IDR" : "IDR"}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onRestore={onRestore}
+                  onApprove={onApprove}
+                  deletingId={deletingId}
+                  restoringId={restoringId}
+                  approvingId={approvingId}
+                  queuedOperation={queuedOperations.get(transaction.id)}
+                  onRetryQueue={onRetryQueue}
+                  onDiscardQueue={onDiscardQueue}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function MobileTransactionCard({ transaction, accountName, currency, onEdit, onDelete, onRestore, onApprove, deletingId, restoringId, approvingId, queuedOperation, onRetryQueue, onDiscardQueue }: {
+  transaction: Transaction;
+  accountName: string;
+  currency: string;
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (transaction: Transaction) => void;
+  onRestore: (transactionId: string) => Promise<void>;
+  onApprove: (transaction: Transaction) => void;
+  deletingId: string | null;
+  restoringId: string | null;
+  approvingId: string | null;
+  queuedOperation?: QueuedTransactionOperation;
+  onRetryQueue: (operation: QueuedTransactionOperation) => Promise<void>;
+  onDiscardQueue: (operation: QueuedTransactionOperation) => void;
+}) {
+  const { t } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Surface className={cn("overflow-hidden rounded-2xl p-0", expanded && "border-emerald-300 ring-1 ring-emerald-200")}>
+      <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} className="flex w-full items-center gap-3 p-3.5 text-left">
+        <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg", transaction.type === "income" ? "bg-emerald-50" : "bg-rose-50")}>{transaction.type === "income" ? "↗" : "↘"}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold text-slate-900">{transaction.merchant || t(transaction.category)}</span>
+          <span className="mt-1 block truncate text-xs text-slate-500">{accountName} · {t(transaction.category)}</span>
+        </span>
+        <span className={cn("shrink-0 text-sm font-extrabold", transaction.type === "income" ? "text-emerald-700" : "text-slate-900")}>{transaction.type === "income" ? "+" : "−"}{formatCurrency(transaction.amount, currency)}</span>
+      </button>
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50/70 p-3.5">
+          {transaction.note && <p className="mb-3 text-xs leading-5 text-slate-500">{transaction.note}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={transaction.status} />
+            <QueueOperationStatus operation={queuedOperation} onRetry={onRetryQueue} onDiscard={onDiscardQueue} compact />
+            <span className="text-[11px] text-slate-400">{t(getTransactionSourceLabel(transaction.source))}</span>
+          </div>
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} onRestore={onRestore} onApprove={onApprove} deletingId={deletingId} restoringId={restoringId} approvingId={approvingId} />
+          </div>
+        </div>
+      )}
+    </Surface>
   );
 }
 
@@ -1440,18 +1591,19 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
             </div>
           </Field>
 
-          <Field label={t("Kategori")} htmlFor="transaction-category">
-            <select
+          <Field label={t("Kategori")} htmlFor="transaction-category" hint={t("Pilih dari kategori yang sudah ada atau ketik kategori baru.")}>
+            <input
               id="transaction-category"
               required
+              list="transaction-category-options"
               value={form.category}
               onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+              placeholder={t("Contoh: Makan")}
               className={fieldControlStyles}
-            >
-              {categoryOptions.length === 0 && <option value="">{t("Belum ada kategori untuk tipe ini")}</option>}
+            />
+            <datalist id="transaction-category-options">
               {categoryOptions.map((category) => <option key={category} value={category}>{t(category)}</option>)}
-            </select>
-            {categoryOptions.length === 0 && <p className="mt-2 text-xs leading-5 text-amber-700">{t("Buat kategori {type} di ", { type: form.type === "expense" ? t("Pengeluaran") : t("Pemasukan") })}<Link href="/categories" className="font-bold underline underline-offset-2">{t("halaman Kategori")}</Link>.</p>}
+            </datalist>
           </Field>
 
           <Field label={t("Catatan")} htmlFor="transaction-note" hint={t("Opsional—tambahkan konteks yang berguna saat ditinjau nanti.")}>
@@ -1482,7 +1634,7 @@ function TransactionDialog({ form, setForm, accounts, categories, categoryOption
 
         <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white/95 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:justify-end sm:px-6 sm:pb-4">
           <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">{t("Batal")}</Button>
-          <Button type="submit" disabled={saving || accounts.length === 0 || categoryOptions.length === 0} className="flex-[1.4] sm:flex-none">
+          <Button type="submit" disabled={saving || accounts.length === 0} className="flex-[1.4] sm:flex-none">
             {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("Menyimpan...")}</> : <><FileSpreadsheet className="h-4 w-4" /> {isEditMode ? t("Simpan perubahan") : t("Simpan transaksi")}</>}
           </Button>
         </div>

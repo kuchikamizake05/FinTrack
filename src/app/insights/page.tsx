@@ -14,6 +14,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Eye,
+  HeartPulse,
   Info,
   Layers3,
   Loader2,
@@ -25,6 +26,7 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
+import { buttonStyles } from "@/components/ui/button-styles";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
@@ -287,7 +289,17 @@ export default function InsightsPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main id="main-content" tabIndex={-1} className="app-page-content outline-none">
+      <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
+        <section className="md:hidden">
+          <h1 className="text-[27px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">{t("Analisis")}</h1>
+          <p className="mt-1 text-[13px] leading-5 text-slate-500">{t("Analisa kebiasaan keuanganmu.")}</p>
+          <div className="mt-4 flex items-center gap-2">
+            <label htmlFor="mobile-insight-month" className="sr-only">{t("Periode insight")}</label>
+            <input id="mobile-insight-month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-[var(--shadow-control)] outline-none focus:border-emerald-500" />
+            <Button variant="secondary" size="compact" disabled={!month || loadingData || loadingAi} onClick={() => refreshInsights(true)} className="min-h-11"><RefreshCw className={cn("h-4 w-4", (loadingData || loadingAi) && "animate-spin")} /> {t("Perbarui")}</Button>
+          </div>
+        </section>
+        <div className="hidden md:block">
         <PageHeader
           eyebrow={<span className="inline-flex items-center gap-2"><BrainCircuit className="h-4 w-4" /> {t("Review keuangan")}</span>}
           title="Smart Insights"
@@ -298,14 +310,16 @@ export default function InsightsPage() {
             <Button variant="secondary" disabled={!month || loadingData || loadingAi} onClick={() => refreshInsights(true)}><RefreshCw className={cn("h-4 w-4", (loadingData || loadingAi) && "animate-spin")} /> {t("Perbarui")}</Button>
           </>}
         />
+        </div>
 
-        {dataError && <div role="alert" className="mt-6 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{dataError}</span><Button variant="secondary" size="compact" onClick={() => refreshInsights(true)}>{t("Coba lagi")}</Button></div>}
+        {dataError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{dataError}</span><Button variant="secondary" size="compact" onClick={() => refreshInsights(true)}>{t("Coba lagi")}</Button></div>}
 
         {loadingData || !month ? <InsightsSkeleton /> : snapshot && snapshot.current.confirmedCount === 0 ? (
-          <Surface className="mt-7"><EmptyState icon={BrainCircuit} title={t("Belum ada data terverifikasi di {period}", { period: snapshot.periodLabel })} description={t("Catat atau konfirmasi setidaknya satu pemasukan atau pengeluaran agar FinTrack bisa menyusun review yang berguna.")} action={<Link href="/transactions" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">{t("Buka transaksi")} <ArrowRight className="h-4 w-4" /></Link>} /></Surface>
+          <Surface><EmptyState icon={BrainCircuit} title={t("Belum ada data terverifikasi di {period}", { period: snapshot.periodLabel })} description={t("Catat atau konfirmasi setidaknya satu pemasukan atau pengeluaran agar FinTrack bisa menyusun review yang berguna.")} action={<Link href="/transactions" className={buttonStyles()}>{t("Buka transaksi")} <ArrowRight className="h-4 w-4" /></Link>} /></Surface>
         ) : snapshot && displayInsight ? (
-          <div className="mt-7 space-y-4">
-            <Pulse snapshot={snapshot} fxRates={fxRates} language={language} />
+          <div className="space-y-4">
+            <MobileFinancialHealth snapshot={snapshot} />
+            <div className="hidden md:block"><Pulse snapshot={snapshot} fxRates={fxRates} language={language} /></div>
             <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div className="space-y-4">
                 {snapshot.fxState === "converted" && analytics ? <Analytics snapshot={snapshot} analytics={analytics} language={language} /> : <CurrencyPulse snapshot={snapshot} fxRates={fxRates} />}
@@ -338,6 +352,23 @@ function mapGeneratedInsight(generated: GeneratedInsightEnvelope, candidates: In
     generatedAt: generated.generatedAt,
     model: generated.model,
   };
+}
+
+function MobileFinancialHealth({ snapshot }: { snapshot: InsightSnapshot }) {
+  const { t } = useLanguage();
+  const savingsScore = snapshot.savingsRate === null ? 45 : Math.max(0, Math.min(100, snapshot.savingsRate));
+  const cashFlowScore = snapshot.current.netCashFlow >= 0 ? 25 : 0;
+  const consistencyScore = Math.min(25, snapshot.current.confirmedCount * 3);
+  const score = Math.round(Math.min(100, 25 + savingsScore * 0.5 + cashFlowScore + consistencyScore));
+  const status = score >= 75 ? t("Sehat") : score >= 50 ? t("Cukup sehat") : t("Perlu perhatian");
+  const tone = score >= 75 ? "text-emerald-700" : score >= 50 ? "text-amber-700" : "text-rose-700";
+  const strokeDasharray = `${score} ${100 - score}`;
+
+  return <Surface className="overflow-hidden p-4 md:hidden"><div className="flex items-center justify-center"><div className="relative grid h-44 w-44 place-items-center"><svg viewBox="0 0 36 36" className="h-full w-full -rotate-90" aria-hidden="true"><path d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31" fill="none" stroke="#e2e8f0" strokeWidth="3.5" /><path d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31" fill="none" stroke="#15803d" strokeLinecap="round" strokeWidth="3.5" pathLength="100" strokeDasharray={strokeDasharray} /></svg><div className="absolute text-center"><p className="text-4xl font-bold tracking-[-0.06em] text-slate-900">{score}</p><p className="mt-0.5 text-xs font-bold text-slate-400">/ 100</p></div></div></div><div className="mt-3 text-center"><h2 className="flex items-center justify-center gap-2 text-xl font-bold tracking-tight text-slate-900"><HeartPulse className="h-5 w-5 text-rose-500" /> {t("Skor Kesehatan Finansial")}</h2><p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">{t("Skor dihitung dari arus kas, kebiasaan mencatat, dan rasio tabungan.")}</p><span className={cn("mt-3 inline-flex rounded-full bg-slate-50 px-3 py-1 text-xs font-bold", tone)}>{status}</span></div><div className="mt-6 space-y-4 border-t border-slate-100 pt-5"><HealthMetric label={t("Rasio tabungan")} value={snapshot.savingsRate === null ? "—" : `${snapshot.savingsRate}%`} percentage={Math.max(0, Math.min(100, snapshot.savingsRate ?? 0))} tone="bg-emerald-500" /><HealthMetric label={t("Arus kas bersih")} value={formatMoney(snapshot.current.netCashFlow)} percentage={snapshot.current.netCashFlow >= 0 ? 100 : 25} tone={snapshot.current.netCashFlow >= 0 ? "bg-sky-500" : "bg-rose-500"} /></div></Surface>;
+}
+
+function HealthMetric({ label, value, percentage, tone }: { label: string; value: string; percentage: number; tone: string }) {
+  return <div><div className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-500">{label}</span><span className="font-bold text-slate-700">{value}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", tone)} style={{ width: `${percentage}%` }} /></div></div>;
 }
 
 function Pulse({ snapshot, fxRates, language }: { snapshot: InsightSnapshot; fxRates: ReadonlyMap<string, FxRateResult>; language: "id" | "en" }) {
@@ -607,7 +638,7 @@ function PrivacyDisclosure() {
 function InsightsSkeleton() {
   const { t } = useLanguage();
   return (
-    <div className="mt-7 animate-pulse space-y-6" aria-label={t("Memuat Smart Insights")}>
+    <div className="animate-pulse space-y-6" aria-label={t("Memuat Smart Insights")}>
       <div className="h-64 rounded-2xl border border-emerald-100 bg-white/80" />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" />

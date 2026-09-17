@@ -537,9 +537,16 @@ export default function AccountsPage() {
     <div className="app-page">
       <Navbar />
       <main id="main-content" tabIndex={-1} className="app-page-content space-y-5 outline-none sm:space-y-6">
-        <PageHeader
+        <section className="flex items-center justify-between gap-4 pt-1 md:hidden">
+          <div>
+            <h1 className="text-[27px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">{t("Dompet")}</h1>
+            <p className="mt-1 text-[13px] text-slate-500">{t("Atur semua sumber uangmu.")}</p>
+          </div>
+          <button type="button" onClick={openAccountDialog} aria-label={t("Tambah Dompet")} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--brand-primary)] text-white shadow-[0_8px_18px_rgba(21,128,61,0.28)] transition active:scale-95"><Plus className="size-6" strokeWidth={2.5} /></button>
+        </section>
+        <div className="hidden md:block"><PageHeader
           eyebrow={t("Pusat akun")}
-          title={t("Akun & saldo")}
+          title={t("Dompet & saldo")}
           description={t("Lihat kekayaan bersih, cek kesegaran saldo, dan pindahkan dana tanpa kehilangan konteks.")}
           actions={
             <>
@@ -553,11 +560,11 @@ export default function AccountsPage() {
                 {activeAccounts.length < 2 && <p id="transfer-prerequisite" className="mt-1 max-w-48 text-xs leading-4 text-slate-500">{t("Tambahkan satu akun aktif lagi untuk transfer.")}</p>}
               </div>
               <Button onClick={openAccountDialog}>
-                <Plus className="h-4 w-4" /> {t("Tambah akun")}
+                <Plus className="h-4 w-4" /> {t("Tambah Dompet")}
               </Button>
             </>
           }
-        />
+        /></div>
 
         {pageError && (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
@@ -581,7 +588,9 @@ export default function AccountsPage() {
           <AccountsSkeleton />
         ) : (
           <>
-            <WealthOverview summary={summary} />
+            {accounts.length > 0 && <div className="md:hidden"><MobileWalletOverview summary={summary} /></div>}
+            {accounts.length === 0 && <section className="flex min-h-[360px] flex-col items-center justify-center app-card px-6 text-center md:hidden"><span className="grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><WalletCards className="size-6" /></span><h2 className="mt-5 text-lg font-extrabold tracking-tight text-slate-900">{t("Mulai dari dompet pertamamu")}</h2><p className="mt-2 max-w-[290px] text-xs leading-5 text-slate-500">{t("Tambahkan rekening, e-wallet, RDN, atau broker untuk melihat semua uangmu di satu tempat.")}</p><Button onClick={openAccountDialog} className="mt-5 w-full max-w-xs"><Plus className="h-4 w-4" /> {t("Tambah Dompet")}</Button></section>}
+            <div className="hidden md:block"><WealthOverview summary={summary} /></div>
 
             {missingForeignAccounts.length > 0 && (
               <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -598,12 +607,13 @@ export default function AccountsPage() {
               </div>
             )}
 
-            <Surface className="overflow-hidden">
-              <div className="border-b border-emerald-100 px-4 py-4 sm:px-5">
+            <Surface className={cn("overflow-hidden rounded-none border-0 bg-transparent shadow-none md:rounded-[var(--radius-surface)] md:border md:bg-[var(--surface)] md:shadow-[var(--shadow-surface)]", accounts.length === 0 && "hidden md:block")}>
+              <div className="px-1 py-3 md:border-b md:border-emerald-100 md:px-5 md:py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900">{t("Portofolio akun")}</h2>
-                    <p className="mt-1 text-xs text-slate-500">{t("{count} akun terhubung · {active} aktif", { count: accounts.length, active: summary.activeCount })}</p>
+                    <h2 className="text-lg font-bold tracking-tight text-slate-900 md:hidden">{t("Dompetmu")}</h2>
+                    <h2 className="hidden text-lg font-bold tracking-tight text-slate-900 md:block">{t("Portofolio dompet")}</h2>
+                    <p className="mt-1 text-xs text-slate-500">{t("{count} dompet terhubung · {active} aktif", { count: accounts.length, active: summary.activeCount })}</p>
                   </div>
                 </div>
                 <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1" aria-label={t("Filter jenis akun")}>
@@ -629,9 +639,9 @@ export default function AccountsPage() {
               {accounts.length === 0 ? (
                 <EmptyState
                   icon={WalletCards}
-                  title={t("Mulai dari akun pertamamu")}
-                  description={t("Tambahkan rekening bank, e-wallet, akun investasi, atau broker untuk membangun gambaran kekayaan yang utuh.")}
-                  action={<Button onClick={openAccountDialog}><Plus className="h-4 w-4" /> {t("Tambah akun")}</Button>}
+                  title={t("Mulai dari dompet pertamamu")}
+                  description={t("Tambahkan rekening bank, e-wallet, RDN, atau broker untuk membangun gambaran uangmu yang utuh.")}
+                  action={<Button onClick={openAccountDialog}><Plus className="h-4 w-4" /> {t("Tambah Dompet")}</Button>}
                 />
               ) : filteredAccounts.length === 0 ? (
                 <EmptyState
@@ -645,12 +655,12 @@ export default function AccountsPage() {
               )}
             </Surface>
 
-            <AccountHistory
+            <div className={accounts.length === 0 ? "hidden md:block" : undefined}><AccountHistory
               accounts={accounts}
               transfers={transfers}
               reconciliations={reconciliations}
               dateLocale={dateLocale}
-            />
+            /></div>
           </>
         )}
       </main>
@@ -729,6 +739,16 @@ export default function AccountsPage() {
   );
 }
 
+function MobileWalletOverview({ summary }: { summary: ReturnType<typeof summarizeAccounts> }) {
+  const { t } = useLanguage();
+  return (
+    <section className="pt-1" aria-label={t("Ringkasan saldo")}>
+      <div className="flex items-center justify-between gap-3"><p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">{t("Saldo & tabungan")}</p><p className="font-mono text-sm font-bold text-[var(--brand-primary)]">{idrFormatter.format(summary.assets)}</p></div>
+      <p className="mt-1 text-xs text-slate-500">{t("Dari {count} akun aktif yang kamu pantau.", { count: summary.activeCount })}</p>
+    </section>
+  );
+}
+
 function WealthOverview({ summary }: { summary: ReturnType<typeof summarizeAccounts> }) {
   const { t } = useLanguage();
   return (
@@ -778,7 +798,7 @@ function AccountLedger({ accounts, onUpdateBalance, onEdit, onToggleActive, onDe
         </div>
         {accounts.map((account) => <AccountRow key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} dateLocale={dateLocale} />)}
       </div>
-      <div className="divide-y divide-slate-100 md:hidden">
+      <div className="space-y-3 py-2 md:hidden">
         {accounts.map((account) => <AccountCard key={account.id} account={account} onUpdateBalance={onUpdateBalance} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} dateLocale={dateLocale} />)}
       </div>
     </>
@@ -798,7 +818,7 @@ function AccountIdentity({ account, dateLocale }: { account: AccountOverviewReco
           <p className="truncate text-sm font-bold text-slate-900">{account.name}</p>
           {!account.is_active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">{t("Nonaktif")}</span>}
         </div>
-        <p className="mt-1 truncate text-xs text-slate-500">{account.institution || t("Akun pribadi")} · {t("Diperbarui {date}", { date: format(parseISO(account.updated_at), "dd MMM yyyy", { locale: dateLocale }) })}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{account.institution || t("Dompet pribadi")} · {t("Diperbarui {date}", { date: format(parseISO(account.updated_at), "dd MMM yyyy", { locale: dateLocale }) })}</p>
       </div>
     </div>
   );
@@ -832,14 +852,15 @@ function AccountRow({ account, onUpdateBalance, onEdit, onToggleActive, onDelete
 
 function AccountCard({ account, onUpdateBalance, onEdit, onToggleActive, onDelete, dateLocale }: { account: AccountOverviewRecord; onUpdateBalance: (account: AccountOverviewRecord) => void; onEdit: (account: AccountOverviewRecord) => void; onToggleActive: (account: AccountOverviewRecord) => void; onDelete: (account: AccountOverviewRecord) => void; dateLocale: typeof idLocale }) {
   const { t } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  const Icon = kindIcon[account.kind];
   return (
-    <article className="p-4">
-      <AccountIdentity account={account} dateLocale={dateLocale} />
-      <div className="mt-4 flex items-end justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-3">
-        <AccountBalance account={account} align="left" />
-        <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">{t(getAccountKindLabel(account.kind))}</span>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Edit")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && account.currency !== "IDR" && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui nilai IDR")}</Button>}<Button variant="ghost" onClick={() => onDelete(account)} className="col-span-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800">{t("Hapus permanen")}</Button></div>
+    <article className={cn("app-card overflow-hidden p-4", expanded ? "border-[var(--brand-lime)] ring-1 ring-[var(--brand-lime)]/40" : "border-[var(--border-subtle)]")}>
+      <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} className="flex w-full items-center gap-3 rounded-2xl px-1 py-1 text-left">
+        <span className={cn("grid size-11 shrink-0 place-items-center rounded-2xl", account.kind === "liability" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-700")}><Icon className="size-5" /></span>
+        <span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate text-sm text-slate-900">{account.name}</strong><AccountBalance account={account} /></span><span className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500"><span>{account.institution || t("Dompet pribadi")}</span><span>·</span><span>{t(getAccountKindLabel(account.kind))}</span></span></span>
+      </button>
+      {expanded && <div className="mt-3 border-t border-emerald-100 pt-3"><p className="text-[11px] text-slate-500">{t("Diperbarui {date}", { date: format(parseISO(account.updated_at), "dd MMM yyyy", { locale: dateLocale }) })}</p><div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => onEdit(account)}>{t("Ubah")}</Button><Button variant="secondary" onClick={() => onToggleActive(account)}>{t(account.is_active ? "Arsipkan" : "Aktifkan")}</Button>{account.is_active && account.currency !== "IDR" && <Button variant="secondary" onClick={() => onUpdateBalance(account)} className="col-span-2">{t("Perbarui nilai IDR")}</Button>}<Button variant="ghost" onClick={() => onDelete(account)} className="col-span-2 text-rose-700 hover:bg-rose-50 hover:text-rose-800">{t("Hapus")}</Button></div></div>}
     </article>
   );
 }
@@ -925,9 +946,9 @@ function AccountDialogFrame({ title, eyebrow, description, saving, error, initia
       <form onSubmit={onSubmit}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{eyebrow}</p>
-            <h2 id="account-dialog-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">{title}</h2>
-            <p id="account-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+            {eyebrow && <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{eyebrow}</p>}
+            <h2 id="account-dialog-title" className={cn("text-xl font-bold tracking-tight text-slate-900", eyebrow && "mt-1")}>{title}</h2>
+            {description && <p id="account-dialog-description" className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} disabled={saving} aria-label={t("Tutup {title}", { title: title.toLowerCase() })}><X className="h-5 w-5" /></Button>
         </div>
@@ -959,15 +980,15 @@ function AccountDialog({ form, setForm, mode, errors, error, saving, nameInputRe
   const validation = validateAccountForm(form);
   const editing = mode === "edit";
   return (
-    <AccountDialogFrame title={t(editing ? "Edit akun" : "Tambah akun")} eyebrow={t(editing ? "Identitas akun" : "Akun baru")} description={t(editing ? "Nama dan institusi dapat diperbarui. Saldo memakai form pembaruan saldo terpisah." : "Hubungkan satu sumber dana atau kewajiban ke overview FinTrack.")} saving={saving} error={error} initialFocusRef={nameInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t(editing ? "Simpan perubahan" : "Simpan akun")} submitDisabled={!validation.valid}>
-      <Field label={t("Nama akun")} htmlFor="account-name" error={errors.name ? t(errors.name) : undefined} hint={t("Contoh: Jago Utama atau Stockbit.")}>
+    <AccountDialogFrame title={t(editing ? "Ubah Dompet" : "Tambah Dompet")} eyebrow={editing ? t("Identitas akun") : ""} description={editing ? t("Nama dan institusi dapat diperbarui. Saldo memakai form pembaruan saldo terpisah.") : ""} saving={saving} error={error} initialFocusRef={nameInputRef} onClose={onClose} onSubmit={onSubmit} submitLabel={t(editing ? "Simpan perubahan" : "Tambah")} submitDisabled={!validation.valid}>
+      <Field label={t("Nama")} htmlFor="account-name" error={errors.name ? t(errors.name) : undefined} hint={t("Contoh: Jago Utama atau Stockbit.")}>
         <input ref={nameInputRef} id="account-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder={t("Nama yang mudah dikenali")} className={fieldControlStyles} />
       </Field>
       <Field label={t("Institusi")} htmlFor="account-institution" hint={t("Opsional—misalnya Bank Jago, BCA, atau HFM.")}>
         <input id="account-institution" value={form.institution} onChange={(event) => setForm((current) => ({ ...current, institution: event.target.value }))} placeholder={t("Nama bank atau platform")} className={fieldControlStyles} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("Jenis akun")} htmlFor="account-kind">
+        <Field label={t("Tipe")} htmlFor="account-kind">
           <select id="account-kind" disabled={editing} value={form.kind} onChange={(event) => setForm((current) => ({ ...current, kind: event.target.value as FinancialAccountKind }))} className={fieldControlStyles}>
             {accountKinds.map((kind) => <option key={kind.value} value={kind.value}>{t(kind.label)}</option>)}
           </select>
@@ -976,7 +997,7 @@ function AccountDialog({ form, setForm, mode, errors, error, saving, nameInputRe
           <input id="account-currency" disabled={editing} minLength={3} maxLength={3} value={form.currency} onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} className={fieldControlStyles} />
         </Field>
       </div>
-      {!editing && <><Field label={t("Saldo awal")} htmlFor="account-balance" error={errors.currentBalance ? t(errors.currentBalance) : undefined} hint={t("Masukkan angka tanpa pemisah ribuan.")}>
+      {!editing && <><Field label={t("Saldo saat ini")} htmlFor="account-balance" error={errors.currentBalance ? t(errors.currentBalance) : undefined} hint={t("Masukkan angka tanpa pemisah ribuan.")}>
         <input id="account-balance" type="number" step="any" inputMode="decimal" value={form.currentBalance} onChange={(event) => setForm((current) => ({ ...current, currentBalance: event.target.value }))} className={cn(fieldControlStyles, "font-mono text-base font-bold")} />
       </Field>
       {form.currency !== "IDR" && (

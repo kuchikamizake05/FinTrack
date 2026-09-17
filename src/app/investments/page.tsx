@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { enUS, id as idLocale } from "date-fns/locale";
-import { BarChart3, History, LineChart as LineChartIcon, Plus, Search, TrendingDown, TrendingUp, WalletCards, X } from "lucide-react";
+import { BarChart3, History, LineChart as LineChartIcon, Plus, Search, WalletCards, X } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "@/components/Navbar";
 import { PortfolioTabs } from "@/components/PortfolioTabs";
@@ -184,12 +184,12 @@ export default function InvestmentsPage() {
           <PageHeader
             eyebrow={t("Portfolio journal")}
             title={t("Investasi")}
-            description={t("Pantau posisi, cost basis, equity, dan setiap eksekusi saham dalam satu ledger yang tenang.")}
+            description={t("Lihat perkembangan aset dan investasi yang kamu miliki.")}
           />
 
           <PortfolioTabs />
 
-          <div role="group" aria-label={t("Aksi investasi")} className="flex w-full flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div role="group" aria-label={t("Aksi investasi")} className="grid w-full grid-cols-2 gap-2.5 sm:flex sm:items-center">
             <Button variant="secondary" onClick={openSnapshot} disabled={!activeAccounts.length} className="w-full sm:w-auto">
               <History className="h-4 w-4" /> {t("Update equity")}
             </Button>
@@ -213,12 +213,22 @@ export default function InvestmentsPage() {
           </div>
         )}
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("Ringkasan portfolio")}>
-          <Metric label={t("Posisi terbuka")} value={String(openPositions.length)} hint={t("Ticker yang masih dimiliki")} icon={BarChart3} />
-          <Metric label={t("Modal tersisa")} value={formatMoney(totalCostBasis, currency)} hint={t("Cost basis rata-rata tertimbang")} icon={WalletCards} />
-          <Metric label={t("Equity terakhir")} value={latestEquity === null ? t("Belum ada") : formatMoney(latestEquity, currency)} hint={latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")} icon={LineChartIcon} />
-          <Metric label={t("P/L terealisasi")} value={formatSignedMoney(totalRealizedPnl, currency)} hint={t("Setelah biaya jual")} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} tone={totalRealizedPnl >= 0 ? "text-emerald-700" : "text-rose-700"} />
-        </section>
+        {loading ? <InvestmentSkeleton /> : <section className="space-y-3" aria-label={t("Ringkasan portfolio")}>
+          <div className="relative overflow-hidden rounded-[var(--radius-surface)] bg-[#173c32] p-5 text-white sm:p-7">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full border-[32px] border-white/5" />
+            <div className="relative flex items-center justify-between gap-3"><p className="text-sm font-semibold text-emerald-100">{t("Nilai investasi")}</p><span className="rounded-full border border-white/20 px-3 py-1 text-xs font-bold">{currency}</span></div>
+            <p className="relative mt-3 break-words text-3xl font-extrabold tracking-tight sm:text-4xl">{latestEquity === null ? "—" : formatMoney(latestEquity, currency)}</p>
+            <p className="mt-2 text-xs text-emerald-100/75">{latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")}</p>
+            <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/15 pt-4"><div><p className="text-xs text-emerald-100/75">{t("P/L terealisasi")}</p><p className={cn("mt-1 text-lg font-bold", totalRealizedPnl >= 0 ? "text-lime-200" : "text-rose-200")}>{formatSignedMoney(totalRealizedPnl, currency)}</p></div><p className="text-xs text-emerald-100/75">{t("Setelah biaya jual")}</p></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2"><Metric label={t("Modal tersisa")} value={formatMoney(totalCostBasis, currency)} hint={t("Cost basis rata-rata tertimbang")} icon={WalletCards} /><Metric label={t("Posisi terbuka")} value={String(openPositions.length)} hint={t("Ticker yang masih dimiliki")} icon={BarChart3} /></div>
+        </section>}
+
+        {!loading && openPositions.length > 0 && totalCostBasis > 0 && <Surface className="p-4 sm:p-5">
+          <h2 className="text-base font-bold">{t("Komposisi investasi")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Berdasarkan modal tersisa, bukan harga pasar.")}</p>
+          <div className="mt-4 flex h-3 overflow-hidden rounded-full" aria-hidden="true">{openPositions.map((position, index) => <span key={`${position.accountId}:${position.ticker}`} style={{ width: `${position.summary.costBasis / totalCostBasis * 100}%`, backgroundColor: ["#173c32", "#5b9472", "#9fca9c", "#cadfa6", "#c4ad74"][index % 5] }} />)}</div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">{openPositions.map((position, index) => <div key={`${position.accountId}:${position.ticker}`} className="flex items-center gap-2 text-xs"><span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: ["#173c32", "#5b9472", "#9fca9c", "#cadfa6", "#c4ad74"][index % 5] }} /><span className="min-w-0 flex-1 truncate font-semibold">{position.ticker} <span className="font-normal text-slate-500">· {accountNames.get(position.accountId)}</span></span><span className="font-bold tabular-nums">{(position.summary.costBasis / totalCostBasis * 100).toFixed(1)}%</span></div>)}</div>
+        </Surface>}
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Surface className="p-4 sm:p-5">
@@ -461,7 +471,10 @@ function DialogActions({ saving, onClose, label }: { saving: boolean; onClose: (
     </div>
   );
 }
-function InvestmentSkeleton() { return <div className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-20 bg-slate-50/60" />)}</div>; }
+function InvestmentSkeleton() {
+  const { t } = useLanguage();
+  return <div role="status" aria-label={t("Memuat investasi")} className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-20 bg-slate-50/60" />)}<span className="sr-only">{t("Memuat investasi")}</span></div>;
+}
 function formatMoney(value: number, currency: string) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",

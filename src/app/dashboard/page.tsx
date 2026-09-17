@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, getDaysInMonth, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { enUS, id } from "date-fns/locale";
 import {
   AlertCircle,
+  ArrowDownLeft,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
@@ -19,6 +21,7 @@ import {
   Eye,
   EyeOff,
   Goal,
+  Flame,
   Loader2,
   ReceiptText,
   RefreshCw,
@@ -39,6 +42,7 @@ import { useFinancialJourney } from "@/components/FinancialJourney";
 import JourneySummary from "@/components/JourneySummary";
 import { useOnboarding } from "@/components/OnboardingBoundary";
 import { Button } from "@/components/ui/Button";
+import { CardHeader } from "@/components/ui/CardHeader";
 import { calculatePercentageChange } from "@/lib/analytics";
 import { groupTransactionAmountsByCurrency } from "@/lib/finance";
 import {
@@ -90,6 +94,13 @@ type FinancialGoal = {
   due_date: string | null;
 };
 
+type FinancialBudget = {
+  id: string;
+  category: string;
+  month: string;
+  limit_amount: number;
+};
+
 function withTimeout<T>(promise: PromiseLike<T>, milliseconds: number) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -117,6 +128,7 @@ export default function DashboardPage() {
   const [pendingTx, setPendingTx] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [budgets, setBudgets] = useState<FinancialBudget[]>([]);
   const [firstName, setFirstName] = useState("Kamu");
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Array<Pick<Transaction, "amount" | "account_id">>>([]);
@@ -157,7 +169,7 @@ export default function DashboardPage() {
         const end = format(endOfMonth(selectedMonth), "yyyy-MM-dd");
         const previousMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
 
-        const [txResult, previousResult, pendingResult, accountResult, goalResult] = await Promise.all([
+        const [txResult, previousResult, pendingResult, accountResult, goalResult, budgetResult] = await Promise.all([
           supabase
             .from("transactions")
             .select("*")
@@ -197,6 +209,12 @@ export default function DashboardPage() {
             .eq("is_active", true)
             .order("due_date", { ascending: true, nullsFirst: false })
             .order("created_at", { ascending: false }),
+          supabase
+            .from("financial_budgets")
+            .select("id, category, month, limit_amount")
+            .eq("user_id", user.id)
+            .eq("month", start)
+            .order("category"),
         ]);
 
         if (txResult.error) throw txResult.error;
@@ -214,6 +232,13 @@ export default function DashboardPage() {
           setGoals([]);
         } else {
           setGoals((goalResult.data || []) as FinancialGoal[]);
+        }
+
+        if (budgetResult.error) {
+          if (budgetResult.error.code !== "42P01" && budgetResult.error.code !== "PGRST205") throw budgetResult.error;
+          setBudgets([]);
+        } else {
+          setBudgets((budgetResult.data || []) as FinancialBudget[]);
         }
       })(), 12_000);
     } catch (error) {
@@ -282,6 +307,26 @@ export default function DashboardPage() {
     (account.institution || account.name).toLowerCase().includes("gopay"),
   ) || accounts.find((account) => account.kind === "ewallet") || accounts[0];
   const recentTransactions = transactions.slice(0, 5);
+  const idrExpenses = transactions.filter((transaction) => transaction.type === "expense" && transaction.account_id && accountCurrencies.get(transaction.account_id) === "IDR");
+  const spendingByCategory = new Map<string, number>();
+  idrExpenses.forEach((transaction) => {
+    spendingByCategory.set(transaction.category, (spendingByCategory.get(transaction.category) ?? 0) + Number(transaction.amount));
+  });
+  const budgetProgress = budgets.map((budget) => ({
+    ...budget,
+    spent: spendingByCategory.get(budget.category) ?? 0,
+  })).sort((left, right) => right.spent - left.spent).slice(0, 4);
+  const totalBudget = budgets.reduce((sum, budget) => sum + Number(budget.limit_amount), 0);
+  const totalBudgetSpent = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
+  const budgetRemaining = Math.max(0, totalBudget - totalBudgetSpent);
+  const budgetUsedPercentage = totalBudget > 0 ? Math.min(100, Math.round((totalBudgetSpent / totalBudget) * 100)) : 0;
+  const isCurrentMonth = selectedMonth.getFullYear() === new Date().getFullYear() && selectedMonth.getMonth() === new Date().getMonth();
+  const elapsedDays = isCurrentMonth ? Math.min(new Date().getDate(), daysInMonth) : daysInMonth;
+  const dailyAmounts = new Map<number, number>();
+  idrExpenses.forEach((transaction) => {
+    const day = parseISO(transaction.date).getDate();
+    dailyAmounts.set(day, (dailyAmounts.get(day) ?? 0) + Number(transaction.amount));
+  });
   const showSetupCard = onboardingEligibility !== undefined && shouldShowOnboardingResume({
     eligibility: onboardingEligibility,
     hasConfirmedTransaction: transactions.length > 0,
@@ -308,32 +353,12 @@ export default function DashboardPage() {
         <div className="relative mx-auto w-full px-5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-5 md:hidden">
         <section aria-labelledby="mobile-dashboard-title">
           <p className="text-[13px] font-semibold text-emerald-700">{t("Selamat datang, {name}", { name: firstName })}</p>
-          <div className="mt-1 flex items-end justify-between gap-4">
-            <div>
-              <h1 id="mobile-dashboard-title" className="text-[26px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">{t("Keuanganmu")}</h1>
-              <p className="mt-1 text-xs font-medium text-slate-500">{format(today, "EEEE, dd MMMM yyyy", { locale: dateLocale })}</p>
-            </div>
-            {!loading && (
-              <span className={`mb-0.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${balance >= 0 ? "bg-emerald-100/80 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
-                <Sparkles className="h-3 w-3" /> {t(balance >= 0 ? "Terkendali" : "Perlu dicek")}
-              </span>
-            )}
-          </div>
-        </section>
-
-        <section aria-label="Pilih periode" className="mt-4 flex items-center gap-2">
-          <div className="flex min-h-11 flex-1 items-center justify-between rounded-xl border border-emerald-900/[0.08] bg-white/90 px-1 shadow-[0_3px_14px_rgba(23,35,59,0.04)]">
-            <button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-xs font-bold text-slate-700">{format(selectedMonth, "MMMM yyyy", { locale: dateLocale })}</span>
-            <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 active:scale-95">
-              <ChevronRight className="h-4 w-4" />
+          <div className="mt-2 flex items-center justify-between gap-4">
+            <h1 id="mobile-dashboard-title" className="text-[27px] font-extrabold leading-[1.1] tracking-[-0.045em] text-slate-900">{t("Keuanganmu")}</h1>
+            <button onClick={toggleBalances} aria-label={t(showBalances ? "Sembunyikan nominal" : "Tampilkan nominal")} className="grid size-11 shrink-0 place-items-center rounded-full bg-white text-slate-500 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:scale-95">
+              {showBalances ? <Eye className="h-[19px] w-[19px]" /> : <EyeOff className="h-[19px] w-[19px]" />}
             </button>
           </div>
-          <button onClick={toggleBalances} aria-label={showBalances ? "Sembunyikan nominal" : "Tampilkan nominal"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-900/[0.08] bg-white text-slate-500 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:scale-95">
-            {showBalances ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-          </button>
         </section>
 
         {loadError && (
@@ -348,35 +373,30 @@ export default function DashboardPage() {
           <MobileDashboardSkeleton />
         ) : (
           <>
-            <section aria-labelledby="mobile-cash-flow-title" className={`relative mt-4 overflow-hidden rounded-[24px] px-5 py-5 text-white shadow-[0_18px_36px_rgba(23,60,50,0.20)] ${cashFlowUnavailable || balance >= 0 ? "bg-[#173c32]" : "bg-[#542a32]"}`}>
+            <section aria-labelledby="mobile-cash-flow-title" className="relative mt-3 overflow-hidden rounded-[var(--radius-surface)] border border-emerald-900/10 bg-[#173c32] p-4 text-white shadow-[var(--shadow-surface)]">
               <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full border-[28px] border-white/[0.07]" />
               <div className="pointer-events-none absolute -bottom-20 right-6 h-36 w-36 rounded-full bg-white/[0.06] blur-2xl" />
               <div className="relative">
-                {cashFlowUnavailable ? (
+                <div className="flex items-center justify-between text-xs text-emerald-100/80">
+                  <span className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />{format(selectedMonth, "MMMM yyyy", { locale: language === "en" ? enUS : id })}</span>
+                  <span>{elapsedDays} {t("dari")} {daysInMonth} {t("hari")}</span>
+                </div>
+                {totalBudget > 0 ? (
                   <>
-                    <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">{t("Arus kas bulan ini")}</p>
-                    <p className="mt-2 text-sm font-bold leading-6 text-emerald-50">{t("Ada lebih dari satu mata uang. Arus kas tidak dijumlahkan tanpa kurs.")}</p>
+                    <p id="mobile-cash-flow-title" className="mt-3 text-sm font-medium text-emerald-50/90">{t("Sisa anggaran bulan ini")}</p>
+                    <p className="mt-1 text-[29px] font-extrabold tracking-[-0.045em] text-white">{displayCurrency(budgetRemaining, "IDR")}</p>
+                    <p className="mt-1.5 text-xs leading-5 text-emerald-100/80">{t("Dari anggaran")} {displayCurrency(totalBudget, "IDR")} {t("yang kamu atur.")}</p>
+                    <div role="progressbar" aria-label={t("Anggaran terpakai")} aria-valuenow={budgetUsedPercentage} aria-valuemin={0} aria-valuemax={100} className="mt-3.5 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-[var(--brand-lime)]" style={{ width: `${budgetUsedPercentage}%` }} /></div>
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-emerald-100/80"><span>{budgetUsedPercentage}% {t("terpakai")}</span><Link href="/planning" className="flex min-h-8 items-center gap-1 font-bold text-white">{t("Lihat budget")} <ArrowRight className="size-3.5" /></Link></div>
                   </>
                 ) : (
                   <>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p id="mobile-cash-flow-title" className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-100/70">{t("Arus kas bulan ini")} · {cashFlowCurrency}</p>
-                        <p className="mt-2 text-[29px] font-extrabold tracking-[-0.05em] text-[#ffffff]">{balance < 0 ? "-" : "+"}{displayCurrency(balance, cashFlowCurrency)}</p>
-                      </div>
-                      <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-emerald-50">
-                        {t(balance >= 0 ? "Arus kas aman" : "Butuh perhatian")}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 max-w-[285px] text-xs leading-5 text-emerald-50/65">
-                      {t(balance >= 0 ? "Pendapatan masih lebih besar dari pengeluaran. Pertahankan ritmemu." : "Pengeluaran melewati pemasukan. Cek kembali pos terbesar bulan ini.")}
-                    </p>
-                    <div className="mt-5 grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 pt-4">
-                      <MobileMetric icon={ArrowDownRight} label={language === "en" ? "Income" : "Masuk"} value={displayCurrency(totalIncome, cashFlowCurrency)} />
-                      <MobileMetric icon={ArrowUpRight} label={language === "en" ? "Expenses" : "Keluar"} value={displayCurrency(totalExpense, cashFlowCurrency)} right />
-                    </div>
+                    <p id="mobile-cash-flow-title" className="mt-3 text-base font-bold !text-white">{t("Belum ada anggaran bulan ini")}</p>
+                    <p className="mt-1.5 text-xs leading-5 text-emerald-100/80">{t("Atur budget agar sisa pengeluaranmu bisa dipantau dari Beranda.")}</p>
+                    <Link href="/planning" className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-lg bg-[var(--brand-lime)] px-3 text-xs font-extrabold text-[var(--brand-ink)]">{t("Atur budget")} <ArrowRight className="size-3.5" /></Link>
                   </>
                 )}
+                {!cashFlowUnavailable && <div className="mt-3 grid grid-cols-2 gap-4 border-t border-white/15 pt-3"><div><p className="flex items-center gap-1 text-xs text-emerald-100/80"><ArrowDownLeft className="size-3.5" />{language === "en" ? "Income" : "Pemasukan"}</p><p className="mt-1 text-base font-bold">{displayCurrency(totalIncome, cashFlowCurrency)}</p></div><div><p className="flex items-center gap-1 text-xs text-emerald-100/80"><ArrowUpRight className="size-3.5" />{language === "en" ? "Expenses" : "Pengeluaran"}</p><p className="mt-1 text-base font-bold">{displayCurrency(totalExpense, cashFlowCurrency)}</p></div></div>}
               </div>
             </section>
 
@@ -388,41 +408,36 @@ export default function DashboardPage() {
             )}
 
             {showSetupCard && (
-              <section className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-[#effaf4] px-3.5 py-3" aria-label="Progres penyiapan">
+              <section className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-[#effaf4] px-3.5 py-3" aria-label={t("Progres penyiapan")}>
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm"><WalletCards className="h-[17px] w-[17px]" /></span>
                 <button onClick={resumeSetup} className="min-w-0 flex-1 text-left">
-                  <span className="block text-[11px] font-extrabold uppercase tracking-[0.08em] text-emerald-700">{completedSetupDataSteps} dari 2 selesai</span>
-                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-700">Lanjutkan penyiapan data keuanganmu</span>
+                  <span className="block text-[11px] font-extrabold uppercase tracking-[0.08em] text-emerald-700">{t("{count} dari 2 selesai", { count: completedSetupDataSteps })}</span>
+                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-700">{t("Lanjutkan penyiapan data keuanganmu")}</span>
                 </button>
                 <ArrowRight className="h-4 w-4 shrink-0 text-emerald-700" />
-                <button onClick={dismissSetupCard} aria-label="Tutup pengingat penyiapan" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-600"><X className="h-3.5 w-3.5" /></button>
+                <button onClick={dismissSetupCard} aria-label={t("Tutup pengingat penyiapan")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-600"><X className="h-3.5 w-3.5" /></button>
               </section>
             )}
 
-            <JourneySummary journey={journey} />
+            <MobileStreak journey={journey} />
             <section aria-labelledby="mobile-quick-actions-title" className="mt-5">
               <div className="flex items-center justify-between">
-                <h2 id="mobile-quick-actions-title" className="text-sm font-extrabold tracking-[-0.02em] text-slate-900">{t("Aksi cepat")}</h2>
-                <Link href="/insights" className="text-[11px] font-bold text-emerald-700">{t("Lihat insights")}</Link>
+                <h2 id="mobile-quick-actions-title" className="text-sm font-extrabold tracking-[-0.02em] text-slate-900">{t("Rencanakan & pantau")}</h2>
+                <Link href="/planning" className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-semibold leading-5 text-emerald-700">{t("Lihat semua")}<ArrowRight aria-hidden="true" className="size-3.5" /></Link>
               </div>
-              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-                <Link href="/transactions" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(5,150,105,0.18)] transition active:translate-y-px">
-                  <CircleDollarSign className="h-4 w-4" /> {t("Catat transaksi")}
-                </Link>
-                <Link href="/accounts" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-900/[0.08] bg-white px-4 text-xs font-extrabold text-slate-700 shadow-[0_3px_14px_rgba(23,35,59,0.04)] transition active:translate-y-px">
-                  <WalletCards className="h-4 w-4 text-emerald-700" /> {t("Lihat akun")}
-                </Link>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                <MobileShortcut href="/planning" icon={Goal} label={t("Budget")} />
+                <MobileShortcut href="/goals" icon={Goal} label={t("Goals")} />
+                <MobileShortcut href="/investments" icon={CircleDollarSign} label={t("Portofolio")} />
+                <MobileShortcut href="/insights" icon={Sparkles} label={t("Analisis")} />
               </div>
             </section>
 
-            <section aria-labelledby="mobile-activity-title" className="mt-5 overflow-hidden rounded-[20px] border border-emerald-900/[0.07] bg-white shadow-[0_8px_24px_rgba(23,35,59,0.045)]">
-              <div className="flex items-center justify-between px-4 pb-3 pt-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{t("Bulan ini")}</p>
-                  <h2 id="mobile-activity-title" className="mt-0.5 text-sm font-extrabold text-slate-900">{t("Aktivitas terbaru")}</h2>
-                </div>
-                <Link href="/transactions" className="text-[11px] font-bold text-emerald-700">{t("Semua")}</Link>
-              </div>
+            <MobileBudgetProgress items={budgetProgress} displayCurrency={displayCurrency} />
+            <MobileActivityCalendar month={selectedMonth} daysInMonth={daysInMonth} amounts={dailyAmounts} />
+
+            <section aria-labelledby="mobile-activity-title" className="mt-5 overflow-hidden app-card">
+              <CardHeader className="p-4" titleId="mobile-activity-title" title={t("Aktivitas terbaru")} subtitle={format(selectedMonth, "MMMM yyyy", { locale: language === "en" ? enUS : id })} action={{ href: "/transactions", label: t("Lihat semua") }} />
               {recentTransactions.length === 0 ? (
                 <div className="border-t border-slate-100 px-5 py-8 text-center">
                   <ReceiptText className="mx-auto h-6 w-6 text-emerald-600" />
@@ -431,12 +446,13 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 border-t border-slate-100">
-                  {recentTransactions.slice(0, 2).map((transaction) => (
+                  {recentTransactions.slice(0, 3).map((transaction) => (
                     <MobileActivity key={transaction.id} transaction={transaction} amount={displayCurrency(Number(transaction.amount), transaction.account_id ? accountCurrencies.get(transaction.account_id) : undefined)} />
                   ))}
                 </div>
               )}
             </section>
+            <MobileGoal goal={primaryGoal} displayCurrency={displayCurrency} />
           </>
         )}
         </div>
@@ -455,17 +471,17 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-12 items-center rounded-xl border border-emerald-100 bg-white p-1 shadow-sm">
-              <button onClick={() => adjustMonth(-1)} aria-label="Bulan sebelumnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
+              <button onClick={() => adjustMonth(-1)} aria-label={t("Bulan sebelumnya")} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="min-w-32 px-2 text-center text-sm font-semibold text-slate-700">
                 {format(selectedMonth, "MMMM yyyy", { locale: dateLocale })}
               </span>
-              <button onClick={() => adjustMonth(1)} aria-label="Bulan berikutnya" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
+              <button onClick={() => adjustMonth(1)} aria-label={t("Bulan berikutnya")} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            <button onClick={toggleBalances} aria-label={showBalances ? "Sembunyikan nominal" : "Tampilkan nominal"} className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-100 bg-white text-slate-500 shadow-sm hover:bg-emerald-50 hover:text-emerald-700">
+            <button onClick={toggleBalances} aria-label={t(showBalances ? "Sembunyikan nominal" : "Tampilkan nominal")} className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-100 bg-white text-slate-500 shadow-sm hover:bg-emerald-50 hover:text-emerald-700">
               {showBalances ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </button>
           </div>
@@ -474,7 +490,7 @@ export default function DashboardPage() {
         {loadError && (
           <div role="alert" className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
             <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" />{loadError}</span>
-            <button onClick={() => void fetchDashboardData()} className="inline-flex items-center gap-2 self-start font-semibold hover:text-amber-700 sm:self-auto"><RefreshCw className="h-4 w-4" /> Coba lagi</button>
+            <button onClick={() => void fetchDashboardData()} className="inline-flex items-center gap-2 self-start font-semibold hover:text-amber-700 sm:self-auto"><RefreshCw className="h-4 w-4" /> {t("Coba lagi")}</button>
           </div>
         )}
 
@@ -483,24 +499,24 @@ export default function DashboardPage() {
         ) : (
           <>
           {showSetupCard && (
-            <section className="mb-6 grid gap-5 rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_10px_35px_rgba(22,101,52,0.07)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6" aria-labelledby="setup-card-title">
+            <section className="mb-6 grid gap-5 app-card p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6" aria-labelledby="setup-card-title">
               <div className="flex min-w-0 gap-4">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><Sparkles className="h-5 w-5" /></span>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{completedSetupDataSteps} dari 2 langkah data selesai</p>
-                  <h2 id="setup-card-title" className="mt-1 text-lg font-bold tracking-tight text-slate-900">Selesaikan penyiapan FinTrack</h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">Tambahkan data berikutnya agar dashboard mulai menunjukkan kondisi keuanganmu.</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-emerald-700">{t("{count} dari 2 langkah data selesai", { count: completedSetupDataSteps })}</p>
+                  <h2 id="setup-card-title" className="mt-1 text-lg font-bold tracking-tight text-slate-900">{t("Selesaikan penyiapan FinTrack")}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">{t("Tambahkan data berikutnya agar dashboard mulai menunjukkan kondisi keuanganmu.")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 sm:justify-end">
-                <Button className="flex-1 sm:flex-none" onClick={resumeSetup}>Selesaikan penyiapan <ArrowRight className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" aria-label="Sembunyikan pengingat penyiapan" onClick={dismissSetupCard}><X className="h-4 w-4" /></Button>
+                <Button className="flex-1 sm:flex-none" onClick={resumeSetup}>{t("Selesaikan penyiapan")} <ArrowRight className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" aria-label={t("Sembunyikan pengingat penyiapan")} onClick={dismissSetupCard}><X className="h-4 w-4" /></Button>
               </div>
             </section>
           )}
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-6">
-              <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_10px_35px_rgba(22,101,52,0.07)] sm:p-7">
+              <section className="app-card p-5 sm:p-6">
                 <div className="grid gap-7 md:grid-cols-[300px_minmax(0,1fr)] md:items-stretch">
                   <div className="flex flex-col justify-between">
                     <div>
@@ -526,9 +542,9 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="min-w-0">
-                    <ul aria-label="Legenda arus kas" className="mb-2 flex items-center gap-4 text-xs font-semibold text-slate-500">
-                      <li className="flex items-center gap-2"><span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-emerald-600" />Pendapatan</li>
-                      <li className="flex items-center gap-2"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-rose-500" />Pengeluaran</li>
+                    <ul aria-label={t("Legenda arus kas")} className="mb-2 flex items-center gap-4 text-xs font-semibold text-slate-500">
+                      <li className="flex items-center gap-2"><span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-emerald-600" />{t("Pendapatan")}</li>
+                      <li className="flex items-center gap-2"><span aria-hidden="true" className="w-4 border-t-2 border-dashed border-rose-500" />{t("Pengeluaran")}</li>
                     </ul>
                     {transactions.length === 0 || cashFlowUnavailable ? (
                       <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-emerald-50/55 px-6 text-center">
@@ -539,7 +555,7 @@ export default function DashboardPage() {
                     ) : (
                       <>
                         <figure aria-labelledby="cash-flow-chart-caption">
-                          <figcaption id="cash-flow-chart-caption" className="sr-only">Grafik akumulasi pendapatan dan pengeluaran bulan terpilih.</figcaption>
+                          <figcaption id="cash-flow-chart-caption" className="sr-only">{t("Grafik akumulasi pendapatan dan pengeluaran bulan terpilih.")}</figcaption>
                           <div className="h-40 w-full" aria-hidden="true">
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart data={cashFlowData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
@@ -550,19 +566,19 @@ export default function DashboardPage() {
                                   contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }}
                                   formatter={(value) => formatCurrency(Number(value || 0), cashFlowCurrency)}
                                 />
-                                <Line type="monotone" dataKey="income" name="Pemasukan" stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
-                                <Line type="monotone" dataKey="expense" name="Pengeluaran" stroke="#fb7185" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
+                                <Line type="monotone" dataKey="income" name={t("Pemasukan")} stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
+                                <Line type="monotone" dataKey="expense" name={t("Pengeluaran")} stroke="#fb7185" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
                         </figure>
                         <details className="group mt-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-2.5">
-                          <summary className="cursor-pointer text-xs font-semibold text-emerald-700 marker:text-emerald-700">Lihat data tabel arus kas</summary>
+                          <summary className="cursor-pointer text-xs font-semibold text-emerald-700 marker:text-emerald-700">{t("Lihat data tabel arus kas")}</summary>
                           <div className="mt-3 overflow-x-auto">
                             <table className="w-full min-w-[360px] text-left text-xs">
-                              <caption className="sr-only">Data akumulasi pendapatan dan pengeluaran bulan terpilih.</caption>
+                              <caption className="sr-only">{t("Data akumulasi pendapatan dan pengeluaran bulan terpilih.")}</caption>
                               <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.06em] text-slate-500">
-                                <tr><th scope="col" className="pb-2 pr-4">Tanggal</th><th scope="col" className="pb-2 pr-4 text-right">Pendapatan</th><th scope="col" className="pb-2 text-right">Pengeluaran</th></tr>
+                                <tr><th scope="col" className="pb-2 pr-4">{t("Tanggal")}</th><th scope="col" className="pb-2 pr-4 text-right">{t("Pendapatan")}</th><th scope="col" className="pb-2 text-right">{t("Pengeluaran")}</th></tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-slate-700">
                                 {cashFlowData.map((point) => (
@@ -579,42 +595,35 @@ export default function DashboardPage() {
                       </>
                     )}
                     <div className="mt-5 grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 pt-4">
-                      <CompactMetric icon={ArrowUpRight} label="Pendapatan" value={cashFlowUnavailable ? "—" : displayCurrency(totalIncome, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : `${cashFlowTransactions.filter((item) => item.type === "income").length} transaksi masuk`} tone="emerald" />
-                      <CompactMetric icon={ArrowDownRight} label="Pengeluaran" value={cashFlowUnavailable ? "—" : displayCurrency(totalExpense, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : expenseChange === null ? t("Belum ada pembanding") : `${expenseChange > 0 ? "+" : ""}${expenseChange}% vs bulan lalu`} tone="rose" />
+                      <CompactMetric icon={ArrowUpRight} label={t("Pendapatan")} value={cashFlowUnavailable ? "—" : displayCurrency(totalIncome, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : t("{count} transaksi masuk", { count: cashFlowTransactions.filter((item) => item.type === "income").length })} tone="emerald" />
+                      <CompactMetric icon={ArrowDownRight} label={t("Pengeluaran")} value={cashFlowUnavailable ? "—" : displayCurrency(totalExpense, cashFlowCurrency)} detail={cashFlowUnavailable ? t("Tidak dijumlahkan lintas mata uang") : expenseChange === null ? t("Belum ada pembanding") : t("{change}% vs bulan lalu", { change: `${expenseChange > 0 ? "+" : ""}${expenseChange}` })} tone="rose" />
                     </div>
                   </div>
                 </div>
               </section>
 
               <JourneySummary journey={journey} />
-              <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_8px_28px_rgba(22,101,52,0.05)]">
-                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-                  <div>
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900">{t("Transaksi terbaru")}</h2>
-                  </div>
-                  <Link href="/transactions" className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900">
-                    {t("Lihat semua")} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
+              <section className="overflow-hidden app-card">
+                <CardHeader className="border-b border-slate-100 px-5 py-4 sm:px-6" title={t("Transaksi terbaru")} action={{ href: "/transactions", label: t("Lihat semua") }} />
 
                 {recentTransactions.length === 0 ? (
                   <div className="px-6 py-12 text-center">
                     <ReceiptText className="mx-auto h-8 w-8 text-emerald-600" />
-                    <p className="mt-3 font-semibold text-slate-800">Belum ada transaksi</p>
-                    <p className="mt-1 text-sm text-slate-500">Transaksi terbaru akan muncul di sini.</p>
+                    <p className="mt-3 font-semibold text-slate-800">{t("Belum ada transaksi")}</p>
+                    <p className="mt-1 text-sm text-slate-500">{t("Transaksi terbaru akan muncul di sini.")}</p>
                   </div>
                 ) : (
                   <div>
                     <div className="hidden grid-cols-[110px_minmax(0,1.3fr)_minmax(120px,.8fr)_130px] gap-4 border-b border-slate-100 px-6 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400 sm:grid">
-                      <span>Tanggal</span><span>Transaksi</span><span>Kategori</span><span className="text-right">Nominal</span>
+                      <span>{t("Tanggal")}</span><span>{t("Transaksi")}</span><span>{t("Kategori")}</span><span className="text-right">{t("Nominal")}</span>
                     </div>
                     <div className="divide-y divide-slate-100">
                       {recentTransactions.map((transaction) => (
                         <div key={transaction.id} className="grid gap-3 px-5 py-3 transition-colors hover:bg-emerald-50/40 sm:grid-cols-[110px_minmax(0,1.3fr)_minmax(120px,.8fr)_130px] sm:items-center sm:gap-4 sm:px-6">
-                          <span className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarDays className="h-3.5 w-3.5 sm:hidden" />{format(parseISO(transaction.date), "dd MMM yyyy", { locale: id })}</span>
+                          <span className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarDays className="h-3.5 w-3.5 sm:hidden" />{format(parseISO(transaction.date), "dd MMM yyyy", { locale: dateLocale })}</span>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-800">{transaction.merchant || transaction.category}</p>
-                            <p className="mt-0.5 truncate text-xs text-slate-400">{transaction.note || "Tanpa catatan"}</p>
+                            <p className="mt-0.5 truncate text-xs text-slate-400">{transaction.note || t("Tanpa catatan")}</p>
                           </div>
                           <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{transaction.category}</span>
                           <span className={`text-sm font-bold sm:text-right ${transaction.type === "income" ? "text-emerald-700" : "text-slate-800"}`}>
@@ -628,10 +637,10 @@ export default function DashboardPage() {
               </section>
             </div>
 
-            <aside className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_10px_35px_rgba(22,101,52,0.07)] lg:sticky lg:top-24 sm:p-6">
+            <aside className="app-card p-5 lg:sticky lg:top-24 sm:p-6">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-slate-900">Perlu perhatian</h2>
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900">{t("Perlu perhatian")}</h2>
                 </div>
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600"><AlertCircle className="h-5 w-5" /></span>
               </div>
@@ -639,22 +648,22 @@ export default function DashboardPage() {
               <div className="divide-y divide-slate-100 border-y border-slate-100">
                 <AttentionRow
                   icon={pendingTx.length > 0 ? ReceiptText : CheckCircle2}
-                  title={pendingTx.length > 0 ? `${pendingTx.length} transaksi perlu ditinjau` : "Semua transaksi sudah ditinjau"}
-                  detail={pendingTx.length > 0 ? `${Object.entries(pendingByCurrency).map(([currency, amount]) => formatCurrency(amount, currency)).join(" · ")} · ${t("semua waktu, belum masuk total terkonfirmasi")}` : "Tidak ada approval yang tertunda."}
+                  title={pendingTx.length > 0 ? t("{count} transaksi perlu ditinjau", { count: pendingTx.length }) : t("Semua transaksi sudah ditinjau")}
+                  detail={pendingTx.length > 0 ? `${Object.entries(pendingByCurrency).map(([currency, amount]) => formatCurrency(amount, currency)).join(" · ")} · ${t("semua waktu, belum masuk total terkonfirmasi")}` : t("Tidak ada approval yang tertunda.")}
                   href="/transactions?status=review"
                   tone={pendingTx.length > 0 ? "amber" : "emerald"}
                 />
                 <AttentionRow
                   icon={WalletCards}
-                  title={attentionAccount ? `Cek saldo ${attentionAccount.name}` : "Tambahkan akun utama"}
-                  detail={attentionAccount ? `Terakhir diperbarui ${format(parseISO(attentionAccount.updated_at), "dd MMM", { locale: id })}.` : "Satukan saldo bank dan e-wallet di FinTrack."}
+                  title={attentionAccount ? t("Cek saldo {name}", { name: attentionAccount.name }) : t("Tambahkan akun utama")}
+                  detail={attentionAccount ? t("Terakhir diperbarui {date}.", { date: format(parseISO(attentionAccount.updated_at), "dd MMM", { locale: dateLocale }) }) : t("Satukan saldo bank dan e-wallet di FinTrack.")}
                   href="/accounts"
                   tone="blue"
                 />
                 <AttentionRow
                   icon={Goal}
-                  title={primaryGoal ? primaryGoal.name : "Buat target keuangan"}
-                  detail={primaryGoal ? `${calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount)).percentage}% dari target ${formatCurrency(Number(primaryGoal.target_amount), primaryGoal.currency)}${goals.length > 1 ? ` · +${goals.length - 1} target` : ""}.` : "Mulai dari dana darurat atau tabungan tujuan."}
+                  title={primaryGoal ? primaryGoal.name : t("Buat target keuangan")}
+                  detail={primaryGoal ? t("{percentage}% dari target {amount}{additional}.", { percentage: calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount)).percentage, amount: formatCurrency(Number(primaryGoal.target_amount), primaryGoal.currency), additional: goals.length > 1 ? ` · +${goals.length - 1} ${t("target")}` : "" }) : t("Mulai dari dana darurat atau tabungan tujuan.")}
                   href="/planning"
                   tone="emerald"
                 >
@@ -666,9 +675,9 @@ export default function DashboardPage() {
               </div>
 
               <Link href="/transactions" className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(21,128,61,0.18)] transition hover:bg-emerald-800 active:translate-y-px">
-                <CircleDollarSign className="h-5 w-5" /> Catat transaksi
+                <CircleDollarSign className="h-5 w-5" /> {t("Catat transaksi")}
               </Link>
-              <p className="mt-3 text-center text-xs leading-5 text-slate-400">Rata-rata selesai dalam kurang dari satu menit.</p>
+              <p className="mt-3 text-center text-xs leading-5 text-slate-400">{t("Rata-rata selesai dalam kurang dari satu menit.")}</p>
             </aside>
           </div>
           </>
@@ -679,21 +688,76 @@ export default function DashboardPage() {
   );
 }
 
-function MobileMetric({ icon: Icon, label, value, right = false }: {
-  icon: typeof ArrowDownRight;
-  label: string;
-  value: string;
-  right?: boolean;
-}) {
+function MobileShortcut({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
   return (
-    <div className={right ? "pl-4" : "pr-4"}>
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-100/60"><Icon className="h-3.5 w-3.5" />{label}</p>
-      <p className="mt-1 text-[13px] font-extrabold tracking-[-0.02em] text-emerald-50">{value}</p>
-    </div>
+    <Link href={href} className="flex min-h-[82px] flex-col items-center justify-center gap-1.5 rounded-xl text-center text-[10px] font-extrabold text-slate-700 transition active:scale-95">
+      <span className="grid size-[52px] place-items-center rounded-xl bg-emerald-50 text-emerald-700"><Icon className="size-[22px]" strokeWidth={1.7} /></span>
+      <span className="max-w-full truncate px-0.5">{label}</span>
+    </Link>
   );
 }
 
+function MobileStreak({ journey }: { journey: ReturnType<typeof useFinancialJourney> }) {
+  const { data, error, dailySaving, loading, completeDailyReview } = journey;
+  const { language, t } = useLanguage();
+  if (!data || error) return null;
+
+  return (
+    <section aria-label={t("Streak review harian")} className="mt-3 rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2"><span className="grid size-9 place-items-center rounded-xl bg-orange-100 text-orange-600"><Flame aria-hidden="true" className="size-[18px]" /></span><div><h2 className="text-sm font-bold text-slate-800">{t("Jaga ritmemu")}</h2><p className="text-[11px] text-slate-600">{t("{count} hari berturut-turut", { count: data.streak.current })}</p></div></div>
+        <span className="text-[11px] font-semibold text-slate-500">{t("Rekor: {count} hari", { count: data.streak.longest })}</span>
+      </div>
+      <div aria-label={t("Riwayat tujuh hari terakhir")} className="mt-2.5 grid grid-cols-7 gap-1.5">{data.streak.days.map((day, index) => {
+        const completed = day.completed;
+        const today = index === data.streak.days.length - 1;
+        const weekday = format(parseISO(day.date), "EEEEE", { locale: language === "en" ? enUS : id });
+        const dayNumber = format(parseISO(day.date), "d", { locale: language === "en" ? enUS : id });
+        return <button type="button" key={day.date} disabled={!today || completed || dailySaving || loading} onClick={() => void completeDailyReview()} aria-label={t("{weekday}, {day}: {status}{today}", { weekday, day: dayNumber, status: t(completed ? "sudah review" : "belum review"), today: today ? `, ${t("hari ini")}` : "" })} className="flex min-h-[50px] flex-col items-center justify-start text-[10px] font-bold disabled:cursor-default"><span className="mb-1 text-[9px] font-semibold text-slate-500">{weekday}</span><span className={`grid size-8 place-items-center rounded-full ${completed ? "bg-orange-600 text-white shadow-[0_4px_10px_rgba(234,88,12,0.22)]" : today ? "border-2 border-orange-500 bg-white text-orange-700 shadow-[0_3px_8px_rgba(234,88,12,0.12)]" : "bg-orange-100 text-orange-300"}`}>{completed ? <Flame aria-hidden="true" size={15} fill="currentColor" /> : dayNumber}</span></button>;
+      })}</div>
+    </section>
+  );
+}
+
+function MobileBudgetProgress({ items, displayCurrency }: { items: Array<FinancialBudget & { spent: number }>; displayCurrency: (amount: number, currency?: string | null) => string }) {
+  const { t } = useLanguage();
+  return (
+    <section className="mt-5 overflow-hidden app-card p-4" aria-labelledby="mobile-budget-progress-title">
+      <CardHeader titleId="mobile-budget-progress-title" title={t("Progres pengeluaran")} subtitle={t("Berdasarkan budget yang kamu atur")} action={{ href: "/planning", label: t("Lihat detail") }} />
+      {items.length === 0 ? <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs leading-5 text-emerald-900">{t("Belum ada budget bulan ini.")} <Link href="/planning" className="font-bold underline underline-offset-2">{t("Atur budget")}</Link> {t("agar pengeluaranmu lebih mudah dipantau.")}</div> : <div className="mt-4 space-y-4">{items.map((item, index) => {
+        const percentage = Math.min(100, Math.round((item.spent / Number(item.limit_amount)) * 100));
+        const tone = index === 0 ? "bg-violet-400" : index === 1 ? "bg-orange-400" : "bg-sky-400";
+        return <Link href="/planning" key={item.id} className="block"><div className="flex justify-between gap-2 text-xs"><strong className="truncate text-slate-800">{item.category}</strong><strong>{displayCurrency(item.spent, "IDR")}</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${tone}`} style={{ width: `${percentage}%` }} /></div><p className="mt-1 text-right text-[10px] text-slate-500">{t("{percentage}% dari {amount}", { percentage, amount: displayCurrency(Number(item.limit_amount), "IDR") })}</p></Link>;
+      })}</div>}
+    </section>
+  );
+}
+
+function MobileActivityCalendar({ month, daysInMonth, amounts }: { month: Date; daysInMonth: number; amounts: Map<number, number> }) {
+  const { language, t } = useLanguage();
+  const leadingBlanks = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const formatShort = (amount: number) => amount >= 1_000_000 ? `-${(amount / 1_000_000).toFixed(1)}JT` : `-${Math.round(amount / 1_000)}K`;
+  return (
+    <section className="mt-5 overflow-hidden app-card p-4" aria-labelledby="mobile-calendar-title">
+      <CardHeader titleId="mobile-calendar-title" title={t("Aktivitas bulan ini")} subtitle={format(month, "MMMM yyyy", { locale: language === "en" ? enUS : id })} action={{ href: "/transactions", label: t("Lihat semua") }} />
+      <div className="mt-4 grid grid-cols-7 gap-y-2 text-center">{(language === "en" ? ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] : ["Sn", "Sl", "Rb", "Km", "Jm", "Sb", "Mg"]).map((day) => <span key={day} className="text-[9px] font-bold text-slate-400">{day}</span>)}{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: daysInMonth }).map((_, index) => {
+        const day = index + 1;
+        const amount = amounts.get(day);
+        return <Link href={amount ? "/transactions" : "/transactions?new=1"} key={day} aria-label={t("{day} {month}{amount}", { day, month: format(month, "MMMM", { locale: language === "en" ? enUS : id }), amount: amount ? `, ${t("pengeluaran")} ${formatShort(amount)}` : "" })} className={`relative mx-auto grid size-[34px] place-items-center rounded-lg text-[10px] font-semibold ${amount ? "bg-emerald-50 text-emerald-800" : "text-slate-500"}`}><span className="self-start pt-1">{day}</span>{amount && <span className="absolute bottom-0.5 text-[7px] font-bold text-rose-500">{formatShort(amount)}</span>}</Link>;
+      })}</div>
+    </section>
+  );
+}
+
+function MobileGoal({ goal, displayCurrency }: { goal: FinancialGoal | undefined; displayCurrency: (amount: number, currency?: string | null) => string }) {
+  const { t } = useLanguage();
+  if (!goal) return <Link href="/planning" className="mt-5 block app-card p-4"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">{t("Mulai dari tujuanmu")}</p><h2 className="mt-1 text-base font-extrabold">{t("Buat goal keuangan")}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t("Dana darurat atau tabungan tujuanmu bisa dipantau dari sini.")}</p></Link>;
+  const progress = calculateGoalProgress(Number(goal.current_amount), Number(goal.target_amount));
+  return <Link href="/goals" className="mt-5 block app-card p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">{t("Goal terdekat")}</p><h2 className="mt-1 text-base font-extrabold">{goal.name}</h2></div><span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{t("Lihat goals")}</span></div><div className="mt-4 flex items-center gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-50 text-xl">🎯</span><span className="min-w-0 flex-1"><span className="flex justify-between gap-2 text-xs font-semibold"><span>{displayCurrency(Number(goal.current_amount), goal.currency)}</span><span className="text-slate-500">{progress.percentage}%</span></span><span className="mt-2 block h-2 overflow-hidden rounded-full bg-emerald-100"><span className="block h-full rounded-full bg-emerald-600" style={{ width: `${progress.percentage}%`, backgroundColor: goal.color ?? undefined }} /></span><span className="mt-2 block text-[11px] text-slate-500">{t("Menuju target {amount}.", { amount: displayCurrency(Number(goal.target_amount), goal.currency) })}</span></span></div></Link>;
+}
+
 function MobileActivity({ transaction, amount }: { transaction: Transaction; amount: string }) {
+  const { language } = useLanguage();
   const income = transaction.type === "income";
 
   return (
@@ -703,7 +767,7 @@ function MobileActivity({ transaction, amount }: { transaction: Transaction; amo
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-bold text-slate-700">{transaction.merchant || transaction.category}</p>
-        <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{transaction.category} · {format(parseISO(transaction.date), "dd MMM", { locale: id })}</p>
+        <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{transaction.category} · {format(parseISO(transaction.date), "dd MMM", { locale: language === "en" ? enUS : id })}</p>
       </div>
       <p className={`text-xs font-extrabold ${income ? "text-emerald-700" : "text-slate-700"}`}>{income ? "+" : "-"}{amount}</p>
     </div>
@@ -711,15 +775,16 @@ function MobileActivity({ transaction, amount }: { transaction: Transaction; amo
 }
 
 function MobileDashboardSkeleton() {
+  const { t } = useLanguage();
   return (
-    <div className="mt-4 animate-pulse" aria-label="Memuat dashboard mobile">
-      <div className="h-[229px] rounded-[24px] bg-emerald-950/15" />
+    <div className="mt-4 animate-pulse" aria-label={t("Memuat dashboard mobile")}>
+      <div className="h-[229px] rounded-[var(--radius-surface)] bg-emerald-950/15" />
       <div className="mt-3 h-[66px] rounded-2xl bg-emerald-100/70" />
       <div className="mt-5 grid grid-cols-2 gap-2.5">
         <div className="h-12 rounded-2xl bg-emerald-200/70" />
         <div className="h-12 rounded-2xl bg-white/80" />
       </div>
-      <span className="sr-only"><Loader2 className="h-4 w-4" /> Memuat data keuangan</span>
+      <span className="sr-only"><Loader2 className="h-4 w-4" /> {t("Memuat data keuangan")}</span>
     </div>
   );
 }
@@ -775,14 +840,15 @@ function AttentionRow({ icon: Icon, title, detail, href, tone, children }: {
 }
 
 function DashboardSkeleton() {
+  const { t } = useLanguage();
   return (
-    <div className="grid animate-pulse gap-6 lg:grid-cols-[minmax(0,1fr)_340px]" aria-label="Memuat dashboard">
+    <div className="grid animate-pulse gap-6 lg:grid-cols-[minmax(0,1fr)_340px]" aria-label={t("Memuat dashboard")}>
       <div className="space-y-6">
         <div className="h-[470px] rounded-2xl border border-emerald-100 bg-white/80" />
         <div className="h-80 rounded-2xl border border-emerald-100 bg-white/80" />
       </div>
       <div className="h-[470px] rounded-2xl border border-emerald-100 bg-white/80" />
-      <span className="sr-only"><Loader2 className="h-4 w-4" /> Memuat data keuangan</span>
+      <span className="sr-only"><Loader2 className="h-4 w-4" /> {t("Memuat data keuangan")}</span>
     </div>
   );
 }

@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarClock, Download, FileText, RefreshCw } from "lucide-react";
+import { CalendarClock, CheckCircle2, Download, FileText, LockKeyhole, RefreshCw } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
 import { supabase } from "@/infrastructure/supabase/browser-client";
@@ -139,32 +138,33 @@ export default function ReportsPage() {
   return (
     <div className="app-page">
       <Navbar />
-      <main id="main-content" tabIndex={-1} className="app-page-content max-w-5xl space-y-6 outline-none">
+      <main id="main-content" tabIndex={-1} className="app-page-content max-w-6xl space-y-6 outline-none">
         <PageHeader
           eyebrow="Arsip keuangan"
           title="Laporan bulanan"
-          description="Simpan ringkasan bulan yang sudah selesai beserta snapshot CSV privat yang dapat diunduh."
+          description="Rangkuman keuangan bulanan yang disimpan privat dan siap kamu unduh kapan saja."
         />
 
         {message && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{message}</div>}
         {loadError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between"><span>{loadError}</span><Button variant="secondary" size="compact" onClick={() => void load()}><RefreshCw className="h-4 w-4" /> {t("Coba lagi")}</Button></div>}
 
         {!loadError && (
-          <Surface className="overflow-hidden">
-            <div className="grid gap-5 bg-[linear-gradient(135deg,rgba(236,253,245,0.95),rgba(255,255,255,0.92))] p-5 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6">
+          <Surface className="relative overflow-hidden border-0 bg-[var(--brand-ink)] p-5 text-white shadow-[0_20px_48px_rgba(18,53,36,0.20)] sm:p-7">
+            <div aria-hidden="true" className="absolute -right-16 -top-20 h-56 w-56 rounded-full border-[28px] border-emerald-300/15" />
+            <div aria-hidden="true" className="absolute -bottom-20 right-24 h-36 w-36 rounded-full bg-emerald-400/10" />
+            <div className="relative grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${active ? "bg-emerald-500 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]" : "bg-slate-300"}`} aria-hidden="true" />
-                  <h2 className="text-lg font-bold text-slate-900">{t(active ? "Laporan otomatis aktif" : "Aktifkan laporan otomatis")}</h2>
-                </div>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{t("Laporan pertama dibuat setelah bulan opt-in selesai. Menonaktifkan jadwal tidak menghapus arsip yang sudah ada.")}</p>
-                {schedule?.enabled_from_period && <p className="mt-2 text-xs font-semibold text-emerald-800">{t("Aktif sejak periode {period}", { period: formatPeriod(schedule.enabled_from_period, locale) })}</p>}
+                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.13em] ${active ? "bg-emerald-300/15 text-emerald-100" : "bg-white/10 text-white/75"}`}><span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-300" : "bg-white/50"}`} />{t(active ? "Laporan otomatis aktif" : "Laporan otomatis belum aktif")}</span>
+                <h2 className="mt-4 text-2xl font-bold tracking-[-0.04em] !text-white sm:text-[1.75rem]">{t(active ? "Keuangan bulanan, tersimpan rapi." : "Mulai arsipkan setiap bulan.")}</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 !text-emerald-50/85">{t(active ? "FinTrack akan menyimpan ringkasan setiap bulan tanpa mengubah arsip yang sudah ada." : "Aktifkan sekali, lalu ringkasan bulan yang selesai akan tersimpan otomatis.")}</p>
+                {schedule?.enabled_from_period && <p className="mt-4 flex items-center gap-2 text-xs font-semibold text-emerald-100"><CheckCircle2 className="h-4 w-4 text-emerald-300" />{t("Aktif sejak periode {period}", { period: formatPeriod(schedule.enabled_from_period, locale) })}</p>}
               </div>
               <Button
                 variant={active ? "secondary" : "primary"}
                 loading={saving}
                 aria-pressed={active}
                 onClick={() => void setReportsActive(!active)}
+                className={active ? "border-white/20 bg-white/10 text-white hover:bg-white/20" : "bg-emerald-400 text-emerald-950 hover:bg-emerald-300"}
               >
                 <CalendarClock className="h-4 w-4" /> {t(active ? "Nonaktifkan" : "Aktifkan laporan")}
               </Button>
@@ -175,15 +175,26 @@ export default function ReportsPage() {
         {!loadError && (
           <section aria-labelledby="report-archive-title">
             <div className="mb-3 flex items-end justify-between gap-4">
-              <div>
+              <div className="max-w-xl">
                 <h2 id="report-archive-title" className="text-xl font-bold tracking-tight text-slate-900">{t("Arsip laporan")}</h2>
-                <p className="mt-1 text-sm text-slate-500">{t("Setiap periode disimpan satu kali dan tidak berubah saat transaksi berikutnya diperbarui.")}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">{t("Setiap periode disimpan satu kali, sehingga catatan bulan lalu tetap utuh saat transaksi baru masuk.")}</p>
               </div>
               {!loading && reports.length > 0 && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">{t("{count} laporan", { count: reports.length })}</span>}
             </div>
 
             {loading ? <ReportsSkeleton /> : reports.length === 0 ? (
-              <Surface><EmptyState icon={FileText} title={t("Belum ada laporan bulanan")} description={t("Aktifkan laporan, lalu arsip pertama akan dibuat setelah bulan ini selesai.")} /></Surface>
+              <Surface className="relative overflow-hidden p-5 sm:p-7">
+                <div aria-hidden="true" className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-emerald-50" />
+                <div className="relative grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-[var(--shadow-control)]"><FileText className="h-6 w-6" /></span>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">{t("Arsip pertama")}</p>
+                    <h3 className="mt-2 text-lg font-bold tracking-tight text-slate-900">{t(active ? "Laporan pertama sedang menunggu bulan selesai." : "Belum ada laporan untuk ditampilkan.")}</h3>
+                    <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">{t(active ? "Begitu periode ini selesai, ringkasan pemasukan, pengeluaran, dan kategori akan muncul di sini." : "Aktifkan laporan otomatis untuk menyimpan ringkasan dan CSV privat setiap bulan.")}</p>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500"><span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5"><LockKeyhole className="h-3.5 w-3.5 text-emerald-700" />{t("Privat untuk akunmu")}</span><span className="rounded-full bg-slate-50 px-3 py-1.5">CSV</span></div>
+                  </div>
+                </div>
+              </Surface>
             ) : (
               <div className="space-y-4">
                 {reports.map((report) => (

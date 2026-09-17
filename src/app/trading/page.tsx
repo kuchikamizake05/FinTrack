@@ -17,6 +17,7 @@ import { DialogFrame } from "@/components/ui/DialogFrame";
 import { Field, fieldControlStyles } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Surface } from "@/components/ui/Surface";
+import { buildPortfolioWeeklyEquitySeries } from "@/lib/analytics";
 import { reportHandledError } from "@/lib/errors";
 import { calculateForexRMultiple, calculateTradingJournalMetrics, filterForexTrades, filterForexTradesByCurrency, validateForexTradeForm } from "@/lib/trading";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
@@ -97,6 +98,9 @@ export default function TradingPage() {
   const currencyTrades = useMemo(() => filterForexTradesByCurrency(trades, currency), [currency, trades]);
   const currencySnapshots = useMemo(() => snapshots.filter((snapshot) => snapshot.currency === currency), [currency, snapshots]);
   const metrics = useMemo(() => calculateTradingJournalMetrics(currencyTrades), [currencyTrades]);
+  const latestEquity = useMemo(() => buildPortfolioWeeklyEquitySeries(
+    currencySnapshots.map((snapshot) => ({ accountId: snapshot.account_id, recordedAt: snapshot.recorded_at, equity: Number(snapshot.equity), currency: snapshot.currency })), currency,
+  ).at(-1)?.equity ?? null, [currencySnapshots, currency]);
   const filteredTrades = useMemo(() => filterForexTrades(currencyTrades, { status: statusFilter, search }), [currencyTrades, search, statusFilter]);
   const accountNames = useMemo(() => new Map(accounts.map((account) => [account.id, account.name])), [accounts]);
 
@@ -242,7 +246,16 @@ export default function TradingPage() {
                 {currencies.map((item) => <Button key={item} variant={currency === item ? "secondary" : "ghost"} size="compact" onClick={() => setSelectedCurrency(item)} aria-pressed={currency === item}>{item}</Button>)}
               </div>
             )}
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("Ringkasan trading")}><TradeMetric label={t("Trade terbuka")} value={String(metrics.open)} hint={t("Posisi yang belum ditutup")} icon={Target} /><TradeMetric label={t("Win rate")} value={`${metrics.winRate.toFixed(0)}%`} hint={t("Dari {count} trade tertutup", { count: metrics.closed })} icon={TrendingUp} /><TradeMetric label={t("P/L tertutup")} value={formatSignedMoney(metrics.pnl, currency)} hint={t("Sesuai mata uang akun")} icon={metrics.pnl >= 0 ? TrendingUp : TrendingDown} tone={metrics.pnl >= 0 ? "text-emerald-700" : "text-rose-700"} /><TradeMetric label={t("R rata-rata")} value={metrics.averageR === null ? t("Belum ada") : `${metrics.averageR.toFixed(2)}R`} hint={t("Hasil dibanding risiko awal")} icon={BrainCircuit} /></section>
+            {loading ? <TradeSkeleton /> : <section className="space-y-3" aria-label={t("Ringkasan trading")}>
+              <div className="relative overflow-hidden rounded-[var(--radius-surface)] bg-[#173c32] p-5 text-white sm:p-7">
+                <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full border-[32px] border-white/5" />
+                <div className="relative flex items-center justify-between gap-3"><p className="text-sm font-semibold text-emerald-100">{t("Total equity")}</p><span className="rounded-full border border-white/20 px-3 py-1 text-xs font-bold">{currency}</span></div>
+                <p className="relative mt-3 break-words text-3xl font-extrabold tracking-tight sm:text-4xl">{latestEquity === null ? "—" : new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { style: "currency", currency, maximumFractionDigits: currency === "IDR" ? 0 : 2 }).format(latestEquity)}</p>
+                <p className="mt-2 text-xs text-emerald-100/75">{latestEquity === null ? t("Catat snapshot pertama") : t("Snapshot portfolio terbaru")}</p>
+                <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/15 pt-4"><div><p className="text-xs text-emerald-100/75">{t("P/L tertutup")}</p><p className={cn("mt-1 text-lg font-bold", metrics.pnl >= 0 ? "text-lime-200" : "text-rose-200")}>{formatSignedMoney(metrics.pnl, currency)}</p></div><p className="text-xs text-emerald-100/75">{t("Dari {count} trade tertutup", { count: metrics.closed })}</p></div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3"><TradeMetric label={t("Trade terbuka")} value={String(metrics.open)} hint={t("Posisi yang belum ditutup")} icon={Target} /><TradeMetric label={t("Win rate")} value={metrics.closed ? `${metrics.winRate.toFixed(0)}%` : "—"} hint={t("Dari {count} trade tertutup", { count: metrics.closed })} icon={TrendingUp} /><TradeMetric label={t("R rata-rata")} value={metrics.averageR === null ? t("Belum ada") : `${metrics.averageR.toFixed(2)}R`} hint={t("Hasil dibanding risiko awal")} icon={BrainCircuit} /></div>
+            </section>}
             {!loading && <TradingAnalytics trades={currencyTrades} snapshots={currencySnapshots} currency={currency} />}
 
             <Surface className="overflow-hidden">
@@ -483,7 +496,10 @@ function DialogActions({ saving, onClose, label }: { saving: boolean; onClose: (
     </div>
   );
 }
-function TradeSkeleton() { return <div className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-40 bg-slate-50/60" />)}</div>; }
+function TradeSkeleton() {
+  const { t } = useLanguage();
+  return <div role="status" aria-label={t("Memuat trading")} className="animate-pulse divide-y divide-slate-100">{[0, 1, 2].map((item) => <div key={item} className="h-40 bg-slate-50/60" />)}<span className="sr-only">{t("Memuat trading")}</span></div>;
+}
 function formatSignedMoney(value: number, currency: string) {
   const amount = new Intl.NumberFormat("id-ID", {
     style: "currency",

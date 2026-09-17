@@ -268,7 +268,7 @@ function SharedReceiptContent() {
         />
 
         {loading ? (
-          <Surface className="p-6 text-sm text-slate-500">Menyiapkan bukti share...</Surface>
+          <Surface role="status" aria-label="Menyiapkan bukti pembayaran" className="animate-pulse space-y-5 p-5 sm:p-6"><div className="h-5 w-40 rounded bg-emerald-100" /><div className="h-36 rounded-xl bg-slate-100" /><div className="grid gap-3 sm:grid-cols-2"><div className="h-11 rounded-xl bg-slate-100" /><div className="h-11 rounded-xl bg-slate-100" /></div><div className="h-12 rounded-xl bg-emerald-100" /><span className="sr-only">Menyiapkan bukti pembayaran...</span></Surface>
         ) : error && !metadata ? (
           <Surface role="alert" className="p-6 text-sm text-rose-700">
             {error}
