@@ -1,0 +1,14 @@
+/* Match the Manrope family loaded by the production Next.js layout. */
+@font-face {
+  font-family: "FinTrack Preview Manrope";
+  src: url("./manrope-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+:root {
+  --font-manrope: "FinTrack Preview Manrope";
+}
+body {
+  font-family: var(--font-manrope), sans-serif;
+}
