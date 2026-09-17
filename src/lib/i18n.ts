@@ -228,6 +228,7 @@ const englishTranslations: Record<string, string> = {
   "Arus kas terbaca": "Clear cash flow",
   "Target lebih dekat": "Goals within reach",
   "Data tetap milikmu": "Your data stays yours",
+  "Gunakan sidik jari, wajah, atau kunci layar perangkatmu.": "Use your fingerprint, face, or device screen lock.",
   "Keputusan lebih tenang": "More confident decisions",
   "Semua yang penting": "Everything that matters",
   "Bukan lebih banyak angka.": "Not more numbers.",
