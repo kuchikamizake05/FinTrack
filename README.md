@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/brand/fintrack-mark.png" alt="FinTrack" width="160" />
+  <img src="public/brand/fintrack-logo.png" alt="FinTrack" width="280" />
 </p>
 
 <p align="center">
