@@ -330,8 +330,8 @@ const englishTranslations: Record<string, string> = {
   "Kunci sekarang": "Lock now",
   "Hapus Passkey?": "Delete Passkey?",
   "Perangkat ini tidak lagi dapat membuka FinTrack dengan Passkey tersebut.": "This device will no longer unlock FinTrack with this Passkey.",
-  "Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.":
-    "Each account can only access its own data through RLS policies.",
+  "Hanya kamu yang dapat mengakses catatan keuanganmu.":
+    "Only you can access your financial records.",
   "Periksa email untuk konfirmasi. Jika akun sudah ada, silakan masuk.":
     "Check your email for confirmation. If the account already exists, please sign in.",
   "Jika email terdaftar, tautan pemulihan akan dikirim.":

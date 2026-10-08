@@ -12,6 +12,7 @@ import BrandLockup from "@/components/BrandLockup";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
 import { QuickTransactionDialog } from "@/components/QuickTransactionDialog";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 const profileItems = [
   { name: "Dompet & akun", href: "/accounts", icon: WalletCards },
@@ -37,6 +38,7 @@ export default function Navbar() {
   const [quickTransactionOpen, setQuickTransactionOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const closeMobileMore = useCallback(() => setMobileMoreOpen(false), []);
 
   const closeProfile = useCallback((restoreFocus = false) => {
     const origin = profileOrigin;
@@ -68,6 +70,7 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!profileOrigin) return;
+    profileMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
@@ -79,13 +82,30 @@ export default function Navbar() {
         event.preventDefault();
         closeProfile(true);
       }
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        const menu = profileMenuRef.current;
+        if (!menu?.contains(document.activeElement)) return;
+        const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])'));
+        if (!items.length) return;
+        event.preventDefault();
+        const current = items.indexOf(document.activeElement as HTMLElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        items[next].focus();
+      }
+    };
+    const handleFocusIn = (event: FocusEvent) => {
+      const target = event.target as Node;
+      const trigger = profileOrigin === "desktop" ? desktopProfileTriggerRef.current : mobileProfileTriggerRef.current;
+      if (!profileMenuRef.current?.contains(target) && !trigger?.contains(target)) closeProfile();
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focusin", handleFocusIn);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
     };
   }, [closeProfile, profileOrigin]);
 
@@ -186,12 +206,12 @@ export default function Navbar() {
         <div className="mx-auto grid max-w-md grid-cols-5 items-center">
           <MobileNavItem href="/dashboard" icon={LayoutDashboard} label={t("Beranda")} active={isActive("/dashboard")} />
           <MobileNavItem href="/accounts" icon={WalletCards} label={t("Dompet")} active={isActive("/accounts")} />
-          <button type="button" onClick={() => setQuickTransactionOpen(true)} aria-label={t("Buka form catat")} className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none"><span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-transform group-active:scale-95"><Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" /></span><span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span></button>
+          <button type="button" onClick={() => setQuickTransactionOpen(true)} aria-label={t("Buka form catat")} className="group relative -mt-5 flex flex-col items-center justify-center gap-0.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"><span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--brand-primary)] text-white shadow-[0_8px_16px_rgba(21,128,61,0.35)] transition-transform group-active:scale-95"><Plus className="h-6 w-6 stroke-[2.5]" aria-hidden="true" /></span><span className="text-[10px] font-extrabold text-[var(--brand-ink)]">{t("Catat")}</span></button>
           <MobileNavItem href="/transactions" icon={Receipt} label={t("Transaksi")} active={isActive("/transactions")} />
-          <button type="button" onClick={() => setMobileMoreOpen((open) => !open)} aria-expanded={mobileMoreOpen} aria-controls="mobile-more-menu" className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors active:scale-95 ${mobileMoreOpen ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)]"}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${mobileMoreOpen ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : ""}`}><MoreHorizontal className="h-[20px] w-[20px]" aria-hidden="true" /></span><span>{t("Lainnya")}</span></button>
+          <button type="button" onClick={() => setMobileMoreOpen((open) => !open)} aria-expanded={mobileMoreOpen} aria-controls="mobile-more-menu" aria-haspopup="dialog" className={`relative flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-extrabold transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${mobileMoreOpen ? "text-[var(--brand-ink)]" : "text-[color:rgba(18,53,36,0.48)]"}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${mobileMoreOpen ? "bg-[var(--brand-ink)] text-[var(--brand-lime)]" : ""}`}><MoreHorizontal className="h-[20px] w-[20px]" aria-hidden="true" /></span><span>{t("Lainnya")}</span></button>
         </div>
       </nav>
-      {mobileMoreOpen && <MobileMoreMenu onClose={() => setMobileMoreOpen(false)} />}
+      {mobileMoreOpen && <MobileMoreMenu onClose={closeMobileMore} />}
       {quickTransactionOpen && <QuickTransactionDialog onClose={() => setQuickTransactionOpen(false)} />}
     </>
   );
@@ -216,7 +236,34 @@ function MobileMoreMenu({ onClose }: { onClose: () => void }) {
     { name: "Laporan bulanan", href: "/reports", icon: FileClock },
     { name: "Pengaturan", href: "/settings", icon: Settings },
   ];
-  return <div id="mobile-more-menu" role="dialog" aria-label={t("Menu lainnya")} className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 mx-auto w-full max-w-md px-4 md:hidden"><button type="button" aria-label={t("Tutup menu lainnya")} onClick={onClose} className="fixed inset-0 -z-10 bg-[rgba(18,53,36,0.12)]" /><div className="rounded-2xl border border-[color:rgba(18,53,36,0.14)] bg-white p-3 shadow-[var(--shadow-elevated)]"><div className="flex items-center justify-between px-2 py-1"><h2 className="text-sm font-extrabold text-[var(--brand-ink)]">{t("Lainnya")}</h2><button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50"><X className="h-4 w-4" /></button></div><div className="mt-2 grid grid-cols-2 gap-1">{items.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={onClose} className="flex min-h-12 items-center gap-2.5 rounded-xl px-3 text-xs font-bold text-[color:rgba(18,53,36,0.75)] hover:bg-[var(--brand-mint)]"><Icon className="h-4 w-4 text-[var(--brand-primary)]" />{t(item.name)}</Link>; })}</div></div></div>;
+  return (
+    <DialogFrame
+      titleId="mobile-more-menu-title"
+      onClose={onClose}
+      className="bg-[rgba(18,53,36,0.12)] px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-none sm:items-end md:hidden"
+      contentClassName="max-w-md rounded-2xl border-[color:rgba(18,53,36,0.14)] p-3 shadow-[var(--shadow-elevated)] sm:max-w-md"
+    >
+      <div id="mobile-more-menu">
+        <div className="flex items-center justify-between px-2 py-1">
+          <h2 id="mobile-more-menu-title" className="text-sm font-extrabold text-[var(--brand-ink)]">{t("Lainnya")}</h2>
+          <button type="button" onClick={onClose} aria-label={t("Tutup menu")} className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]">
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-1">
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} onClick={onClose} className="flex min-h-12 items-center gap-2.5 rounded-xl px-3 text-xs font-bold text-[color:rgba(18,53,36,0.75)] hover:bg-[var(--brand-mint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]">
+                <Icon className="h-4 w-4 text-[var(--brand-primary)]" aria-hidden="true" />
+                {t(item.name)}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </DialogFrame>
+  );
 }
 
 type ProfileMenuProps = {

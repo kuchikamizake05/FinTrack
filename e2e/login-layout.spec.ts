@@ -34,7 +34,7 @@ test("the complete login card stays within a short desktop viewport", async ({ p
   const brand = page.getByRole("link", { name: "FinTrack beranda", exact: true });
   const card = page.getByRole("region", { name: "Selamat datang kembali", exact: true });
   const submit = page.getByRole("button", { name: "Masuk ke FinTrack", exact: true });
-  const privacyNote = page.getByText("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.", { exact: true });
+  const privacyNote = page.getByText("Hanya kamu yang dapat mengakses catatan keuanganmu.", { exact: true });
 
   await expect(brand).toBeVisible();
   await expect(brand.getByText("FinTrack", { exact: true })).toBeVisible();
@@ -91,7 +91,7 @@ test("taller authentication modes remain vertically reachable", async ({ page })
   await page.goto("/login");
   await page.getByRole("button", { name: "Daftar", exact: true }).click();
 
-  const privacyNote = page.getByText("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.", { exact: true });
+  const privacyNote = page.getByText("Hanya kamu yang dapat mengakses catatan keuanganmu.", { exact: true });
   await privacyNote.scrollIntoViewIfNeeded();
 
   const layout = await page.evaluate(() => ({

@@ -258,7 +258,7 @@ export default function LoginPage() {
             {message && <div role={message.type === "error" ? "alert" : "status"} className={`mt-5 flex items-start gap-3 rounded-xl border p-3.5 text-sm leading-6 ${message.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{message.type === "success" ? <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0" /> : <Mail className="mt-0.5 h-4.5 w-4.5 shrink-0" />}<p>{t(message.text)}</p></div>}
           </div>
 
-          <div className={`${styles.privacyNote} mt-5 flex items-start gap-2.5 border-t border-slate-100 pt-4`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Setiap akun hanya dapat mengakses data miliknya melalui kebijakan RLS.")}</p></div>
+          <div className={`${styles.privacyNote} mt-5 flex items-start gap-2.5 border-t border-slate-100 pt-4`}><LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" /><p className="text-[11px] leading-[17px] text-slate-500">{t("Hanya kamu yang dapat mengakses catatan keuanganmu.")}</p></div>
         </section>
         </div>
       </main>

@@ -434,7 +434,7 @@ export default function DashboardPage() {
             </section>
 
             <MobileBudgetProgress items={budgetProgress} displayCurrency={displayCurrency} />
-            <MobileActivityCalendar month={selectedMonth} daysInMonth={daysInMonth} amounts={dailyAmounts} />
+            <MobileActivityCalendar month={selectedMonth} daysInMonth={daysInMonth} amounts={dailyAmounts} transactionDays={new Set(transactions.map((transaction) => parseISO(transaction.date).getDate()))} showBalances={showBalances} />
 
             <section aria-labelledby="mobile-activity-title" className="mt-5 overflow-hidden app-card">
               <CardHeader className="p-4" titleId="mobile-activity-title" title={t("Aktivitas terbaru")} subtitle={format(selectedMonth, "MMMM yyyy", { locale: language === "en" ? enUS : id })} action={{ href: "/transactions", label: t("Lihat semua") }} />
@@ -560,11 +560,11 @@ export default function DashboardPage() {
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart data={cashFlowData} margin={{ top: 8, right: 0, left: -18, bottom: 0 }}>
                                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} dy={10} />
-                                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value))} />
+                                <YAxis orientation="right" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(value) => maskAmount(new Intl.NumberFormat(language === "en" ? "en-US" : "id-ID", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value)), showBalances)} />
                                 <Tooltip
                                   cursor={{ stroke: "#d1fae5", strokeWidth: 1 }}
                                   contentStyle={{ borderRadius: 12, border: "1px solid #d1fae5", boxShadow: "0 8px 24px rgba(15,23,42,.08)", fontSize: 12 }}
-                                  formatter={(value) => formatCurrency(Number(value || 0), cashFlowCurrency)}
+                                  formatter={(value) => displayCurrency(Number(value || 0), cashFlowCurrency)}
                                 />
                                 <Line type="monotone" dataKey="income" name={t("Pemasukan")} stroke="#15803d" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#15803d", stroke: "#fff", strokeWidth: 2 }} />
                                 <Line type="monotone" dataKey="expense" name={t("Pengeluaran")} stroke="#fb7185" strokeWidth={2.5} strokeDasharray="7 4" dot={false} activeDot={{ r: 4, fill: "#fb7185", stroke: "#fff", strokeWidth: 2 }} />
@@ -649,7 +649,7 @@ export default function DashboardPage() {
                 <AttentionRow
                   icon={pendingTx.length > 0 ? ReceiptText : CheckCircle2}
                   title={pendingTx.length > 0 ? t("{count} transaksi perlu ditinjau", { count: pendingTx.length }) : t("Semua transaksi sudah ditinjau")}
-                  detail={pendingTx.length > 0 ? `${Object.entries(pendingByCurrency).map(([currency, amount]) => formatCurrency(amount, currency)).join(" · ")} · ${t("semua waktu, belum masuk total terkonfirmasi")}` : t("Tidak ada approval yang tertunda.")}
+                  detail={pendingTx.length > 0 ? `${Object.entries(pendingByCurrency).map(([currency, amount]) => displayCurrency(amount, currency)).join(" · ")} · ${t("semua waktu, belum masuk total terkonfirmasi")}` : t("Tidak ada approval yang tertunda.")}
                   href="/transactions?status=review"
                   tone={pendingTx.length > 0 ? "amber" : "emerald"}
                 />
@@ -663,7 +663,7 @@ export default function DashboardPage() {
                 <AttentionRow
                   icon={Goal}
                   title={primaryGoal ? primaryGoal.name : t("Buat target keuangan")}
-                  detail={primaryGoal ? t("{percentage}% dari target {amount}{additional}.", { percentage: calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount)).percentage, amount: formatCurrency(Number(primaryGoal.target_amount), primaryGoal.currency), additional: goals.length > 1 ? ` · +${goals.length - 1} ${t("target")}` : "" }) : t("Mulai dari dana darurat atau tabungan tujuan.")}
+                  detail={primaryGoal ? t("{percentage}% dari target {amount}{additional}.", { percentage: calculateGoalProgress(Number(primaryGoal.current_amount), Number(primaryGoal.target_amount)).percentage, amount: displayCurrency(Number(primaryGoal.target_amount), primaryGoal.currency), additional: goals.length > 1 ? ` · +${goals.length - 1} ${t("target")}` : "" }) : t("Mulai dari dana darurat atau tabungan tujuan.")}
                   href="/planning"
                   tone="emerald"
                 >
@@ -733,17 +733,21 @@ function MobileBudgetProgress({ items, displayCurrency }: { items: Array<Financi
   );
 }
 
-function MobileActivityCalendar({ month, daysInMonth, amounts }: { month: Date; daysInMonth: number; amounts: Map<number, number> }) {
+function MobileActivityCalendar({ month, daysInMonth, amounts, transactionDays, showBalances }: { month: Date; daysInMonth: number; amounts: Map<number, number>; transactionDays: Set<number>; showBalances: boolean }) {
   const { language, t } = useLanguage();
-  const leadingBlanks = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
-  const formatShort = (amount: number) => amount >= 1_000_000 ? `-${(amount / 1_000_000).toFixed(1)}JT` : `-${Math.round(amount / 1_000)}K`;
+  const firstWeekday = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const leadingBlanks = language === "en" ? firstWeekday : (firstWeekday + 6) % 7;
+  const formatShort = (amount: number) => amount >= 1_000_000 ? `-${(amount / 1_000_000).toFixed(1)}${language === "en" ? "M" : "JT"}` : `-${Math.round(amount / 1_000)}K`;
   return (
     <section className="mt-5 overflow-hidden app-card p-4" aria-labelledby="mobile-calendar-title">
       <CardHeader titleId="mobile-calendar-title" title={t("Aktivitas bulan ini")} subtitle={format(month, "MMMM yyyy", { locale: language === "en" ? enUS : id })} action={{ href: "/transactions", label: t("Lihat semua") }} />
-      <div className="mt-4 grid grid-cols-7 gap-y-2 text-center">{(language === "en" ? ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] : ["Sn", "Sl", "Rb", "Km", "Jm", "Sb", "Mg"]).map((day) => <span key={day} className="text-[9px] font-bold text-slate-400">{day}</span>)}{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: daysInMonth }).map((_, index) => {
+      <div className="mt-4 grid grid-cols-7 gap-y-2 text-center">{(language === "en" ? ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] : ["Sn", "Sl", "Rb", "Km", "Jm", "Sb", "Mg"]).map((day) => <span key={day} className="text-xs font-bold text-slate-500">{day}</span>)}{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: daysInMonth }).map((_, index) => {
         const day = index + 1;
         const amount = amounts.get(day);
-        return <Link href={amount ? "/transactions" : "/transactions?new=1"} key={day} aria-label={t("{day} {month}{amount}", { day, month: format(month, "MMMM", { locale: language === "en" ? enUS : id }), amount: amount ? `, ${t("pengeluaran")} ${formatShort(amount)}` : "" })} className={`relative mx-auto grid size-[34px] place-items-center rounded-lg text-[10px] font-semibold ${amount ? "bg-emerald-50 text-emerald-800" : "text-slate-500"}`}><span className="self-start pt-1">{day}</span>{amount && <span className="absolute bottom-0.5 text-[7px] font-bold text-rose-500">{formatShort(amount)}</span>}</Link>;
+        const date = format(new Date(month.getFullYear(), month.getMonth(), day), "yyyy-MM-dd");
+        const hasTransactions = transactionDays.has(day);
+        const displayedAmount = amount ? maskAmount(formatShort(amount), showBalances) : null;
+        return <Link href={hasTransactions ? `/transactions?date=${date}` : `/transactions?new=1&date=${date}`} key={day} aria-label={t("{day} {month}{amount}", { day, month: format(month, "MMMM yyyy", { locale: language === "en" ? enUS : id }), amount: amount ? `, ${t("pengeluaran")}${showBalances ? ` ${formatShort(amount)}` : ""}` : "" })} className={`relative grid min-h-12 min-w-0 place-items-center rounded-lg text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${hasTransactions ? "bg-emerald-50 text-emerald-800" : "text-slate-600"}`}><span className={displayedAmount ? "self-start pt-1" : ""}>{day}</span>{displayedAmount && <span aria-hidden="true" className="absolute bottom-1 max-w-full truncate text-[10px] font-bold text-rose-600">{displayedAmount}</span>}</Link>;
       })}</div>
     </section>
   );

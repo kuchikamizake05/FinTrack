@@ -195,23 +195,7 @@ a {
   box-shadow: var(--shadow-surface);
 }
 
-/* Keep previous dark-surface utilities readable during incremental route migration. */
-[class*="bg-[#050507]"], [class*="bg-[#030604]"] { background-color: transparent !important; }
-[class*="bg-[#07070f]"] { background-color: #ffffff !important; }
-[class*="bg-[#101012]"], [class*="bg-[#0a0a0d]"], [class*="bg-[#0b0b0f]"], [class*="bg-[#0f0f1b]"] { background-color: #ffffff !important; }
-[class*="text-[#f7f8f8]"] { color: #1b2740 !important; }
-.linear-panel .text-white, .linear-panel .text-\[\#f7f8f8\] { color: #1b2740 !important; }
-.linear-panel .border-neutral-800 { border-color: #e2e8f3 !important; }
-.linear-panel .border-neutral-900 { border-color: #edf1f7 !important; }
-main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-white,
-main :is(h1, h2, h3, h4, h5, p, td, th, label, li).text-\[\#f7f8f8\] { color: #17233b !important; }
-main :is(p, span, td, th, label, li).text-neutral-200,
-main :is(p, span, td, th, label, li).text-neutral-300 { color: #42526b !important; }
-main :is(input, textarea, select).text-white { color: #17233b !important; }
 main :is(input, textarea, select) { caret-color: var(--brand-primary); }
-main [class~="text-amber-100"], main [class~="text-amber-200"], main [class~="text-amber-300"] { color: #92400e !important; }
-main [class~="text-rose-100"], main [class~="text-rose-200"], main [class~="text-rose-300"] { color: #be123c !important; }
-main [class~="text-emerald-300"] { color: #047857 !important; }
 
 :where(a, button, input, textarea, select):focus-visible {
   outline: 2px solid var(--brand-primary);

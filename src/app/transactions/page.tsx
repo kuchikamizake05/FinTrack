@@ -70,6 +70,7 @@ import {
 } from "@/lib/transactions";
 import { canWriteOnline, offlineWriteMessage } from "@/lib/pwa";
 import { formatLocalDate } from "@/lib/planning";
+import { parseTransactionDate } from "@/lib/transaction-date";
 import {
   createQueuedTransactionOperation,
   listQueuedTransactionOperations,
@@ -158,7 +159,8 @@ export default function TransactionsPage() {
   const dateLocale = language === "en" ? enUS : idLocale;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const autoOpenedRef = useRef(false);
+  const chosenDate = parseTransactionDate(searchParams.get("date"));
+  const autoOpenedRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -182,13 +184,22 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
-  const [filters, setFilters] = useState<TransactionFilters>(defaultFilters);
-  const [dateFiltersOpen, setDateFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<TransactionFilters>(() => ({ ...defaultFilters, startDate: chosenDate ?? "", endDate: chosenDate ?? "" }));
+  const [dateFiltersOpen, setDateFiltersOpen] = useState(Boolean(chosenDate));
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [scanDerived, setScanDerived] = useState(false);
   const [form, setForm] = useState<TransactionFormState>(createDefaultForm);
   const merchantInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!chosenDate) return;
+    const timer = window.setTimeout(() => {
+      setFilters((current) => ({ ...current, startDate: chosenDate, endDate: chosenDate }));
+      setDateFiltersOpen(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [chosenDate]);
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -396,36 +407,42 @@ export default function TransactionsPage() {
   const openAdd = useCallback(() => {
     setSelectedTx(null);
     const nextForm = createDefaultForm();
+    if (chosenDate) nextForm.date = chosenDate;
     nextForm.category = buildTransactionCategoryOptions(categories, "expense")[0] ?? "";
     setForm(nextForm);
     setScanDerived(false);
     setFormError(null);
     setModalOpen(true);
-  }, [categories]);
+  }, [categories, chosenDate]);
 
   useEffect(() => {
-    if (loading || autoOpenedRef.current) return;
+    if (loading) return;
 
     const action = searchParams.get("new") === "1"
       ? "new"
       : searchParams.get("status") === "review"
         ? "review"
         : null;
-    if (!action) return;
+    if (!action) {
+      autoOpenedRef.current = null;
+      return;
+    }
+    const actionKey = `${action}:${chosenDate ?? ""}`;
+    if (autoOpenedRef.current === actionKey) return;
 
     const timer = window.setTimeout(() => {
-      if (autoOpenedRef.current) return;
-      autoOpenedRef.current = true;
+      if (autoOpenedRef.current === actionKey) return;
+      autoOpenedRef.current = actionKey;
       if (action === "new") {
         openAdd();
-        router.replace("/transactions", { scroll: false });
+        router.replace(chosenDate ? `/transactions?date=${chosenDate}` : "/transactions", { scroll: false });
         return;
       }
       setFilters((current) => ({ ...current, status: "review" }));
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [loading, openAdd, router, searchParams]);
+  }, [chosenDate, loading, openAdd, router, searchParams]);
 
   const openEdit = (transaction: Transaction) => {
     setSelectedTx(transaction);
@@ -662,6 +679,12 @@ export default function TransactionsPage() {
   const resetFilters = () => {
     setFilters(defaultFilters);
     setDateFiltersOpen(false);
+    if (searchParams.has("date")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("date");
+      const query = params.toString();
+      router.replace(query ? `/transactions?${query}` : "/transactions", { scroll: false });
+    }
   };
 
   const pendingQueuedOperations = queuedOperations.filter((operation) => operation.state === "pending");
